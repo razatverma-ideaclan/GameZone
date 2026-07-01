@@ -2,6 +2,17 @@
 
 Scripts are in `Assets/Scripts/`. Copy this whole `FlappyBird` folder's contents into your Unity project (or copy just the `Assets/Scripts` folder in).
 
+## 0. Fastest Path: One-Click Scene Build
+
+This project folder is already a valid Unity project (has `ProjectSettings/` and `Packages/manifest.json`) and includes an editor script that builds the entire scene for you.
+
+1. In Unity Hub → **Open** → select this `FlappyBird` folder directly.
+2. Once the Editor opens (first launch may take a minute while it resolves packages — needs internet), go to the top menu: **Tools > Flappy Bird > Build Scene**.
+3. This creates the circle/square sprites, Bird, Ground, Pipe prefab, PipeSpawner, UI Canvas (score text, start panel, game-over panel + restart button), and GameManager — fully wired — and saves it as `Assets/Scenes/SampleScene.unity`.
+4. Press **Play**. You're done. Re-run the menu item any time to rebuild the scene from scratch (e.g. after editing the builder script).
+
+If you'd rather build the hierarchy by hand instead (for learning purposes), follow sections 1–5 below.
+
 ## 1. Project Setup Steps
 
 1. Open Unity Hub → New Project → **2D (Core)** template. Name it `FlappyBird`.

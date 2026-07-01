@@ -48,7 +48,7 @@ public class BirdController : MonoBehaviour
 
         if (tiltWithVelocity)
         {
-            float targetAngle = Mathf.Clamp(rb.velocity.y * 6f, -maxTiltAngle, maxTiltAngle);
+            float targetAngle = Mathf.Clamp(rb.linearVelocity.y * 6f, -maxTiltAngle, maxTiltAngle);
             Quaternion targetRotation = Quaternion.Euler(0, 0, targetAngle);
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, tiltSpeed * Time.deltaTime);
         }
@@ -61,7 +61,7 @@ public class BirdController : MonoBehaviour
 
     private void Flap()
     {
-        rb.velocity = Vector2.zero;
+        rb.linearVelocity = Vector2.zero;
         rb.AddForce(Vector2.up * flapForce, ForceMode2D.Impulse);
     }
 
@@ -71,7 +71,7 @@ public class BirdController : MonoBehaviour
         isDead = false;
         controlEnabled = true;
         rb.bodyType = RigidbodyType2D.Dynamic;
-        rb.velocity = Vector2.zero;
+        rb.linearVelocity = Vector2.zero;
     }
 
     /// <summary>Called by GameManager to reset the bird to its starting pose.</summary>
@@ -79,7 +79,7 @@ public class BirdController : MonoBehaviour
     {
         isDead = false;
         controlEnabled = false;
-        rb.velocity = Vector2.zero;
+        rb.linearVelocity = Vector2.zero;
         rb.bodyType = RigidbodyType2D.Kinematic;
         transform.position = startPosition;
         transform.rotation = Quaternion.identity;
