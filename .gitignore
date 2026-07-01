@@ -1,0 +1,36 @@
+# macOS
+.DS_Store
+
+# Unity generated folders (in case any project is nested without its own .gitignore)
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+
+# Common WebGL/platform build output folders produced by "File > Build Profiles > Build"
+**/Flappy/
+**/WebGL-Build/
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# Editor/IDE files
+.vs/
+.vscode/
+*.csproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
