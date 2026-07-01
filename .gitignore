@@ -10,6 +10,7 @@
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
 /[Mm]emoryCaptures/
+**/.utmp/
 
 # Common WebGL/platform build output folders produced by "File > Build Profiles > Build"
 **/Flappy/
