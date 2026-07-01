@@ -24,18 +24,35 @@ public static class FlappyBirdSceneBuilder
     [MenuItem("Tools/Flappy Bird/Build Scene")]
     public static void BuildScene()
     {
+        if (EditorApplication.isPlaying)
+        {
+            EditorUtility.DisplayDialog("Flappy Bird", "Stopping Play Mode first. Click 'Tools > Flappy Bird > Build Scene' again once it stops.", "OK");
+            EditorApplication.isPlaying = false;
+            return;
+        }
+
         EnsureFolders();
         EnsureTags();
 
-        Sprite circleSprite = GetOrCreateSprite("Circle", true);
-        Sprite squareSprite = GetOrCreateSprite("Square", false);
+        // Force-regenerate sprites every run so a previous broken import can't linger.
+        if (AssetDatabase.IsValidFolder(SpriteFolder))
+        {
+            AssetDatabase.DeleteAsset(SpriteFolder);
+        }
+        EnsureFolders();
+
+        Sprite squareSprite = GetOrCreateSprite("Square", 128, 128, (w, h) => GenerateSquareTexture(w), 128);
+        Sprite birdSprite = GetOrCreateSprite("Bird", 128, 128, (w, h) => GenerateBirdTexture(w), 128);
+        const float bgWorldWidth = 20f;
+        Sprite backgroundSprite = GetOrCreateSprite("Background", 512, 288, (w, h) => GenerateBackgroundTexture(w, h), 512f / bgWorldWidth);
 
         // Start from a fresh empty scene so re-running this is safe.
         EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
         BuildCamera();
+        BuildBackground(backgroundSprite);
         GameObject ground = BuildGround(squareSprite);
-        GameObject bird = BuildBird(circleSprite);
+        GameObject bird = BuildBird(birdSprite);
         GameObject pipePairPrefab = BuildPipePairPrefab(squareSprite);
         GameObject pipeSpawnerGO = BuildPipeSpawner(pipePairPrefab);
         BuildEventSystem();
@@ -91,44 +108,170 @@ public static class FlappyBirdSceneBuilder
         tagManager.ApplyModifiedProperties();
     }
 
-    // ---------- Sprite generation (simple primitives, no external assets) ----------
+    // ---------- Sprite generation (original, procedurally drawn art — no external assets) ----------
 
-    private static Sprite GetOrCreateSprite(string name, bool circle)
+    private static Sprite GetOrCreateSprite(string name, int width, int height, System.Func<int, int, Texture2D> generator, float pixelsPerUnit)
     {
         string path = $"{SpriteFolder}/{name}.png";
-        Sprite existing = AssetDatabase.LoadAssetAtPath<Sprite>(path);
-        if (existing != null) return existing;
 
-        const int size = 128;
-        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-        Color clear = new Color(0, 0, 0, 0);
-        float radius = size / 2f;
-        Vector2 center = new Vector2(radius, radius);
-
-        for (int y = 0; y < size; y++)
-        {
-            for (int x = 0; x < size; x++)
-            {
-                bool inside = circle
-                    ? Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), center) <= radius
-                    : true;
-                tex.SetPixel(x, y, inside ? Color.white : clear);
-            }
-        }
-        tex.Apply();
-
+        Texture2D tex = generator(width, height);
         File.WriteAllBytes(path, tex.EncodeToPNG());
         Object.DestroyImmediate(tex);
         AssetDatabase.ImportAsset(path);
 
         TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
         importer.textureType = TextureImporterType.Sprite;
-        importer.spritePixelsPerUnit = size; // 1 texture = 1 world unit at scale 1
+        importer.spriteImportMode = SpriteImportMode.Single; // required or no Sprite sub-asset is generated
+        importer.spritePixelsPerUnit = pixelsPerUnit;
         importer.filterMode = FilterMode.Bilinear;
         importer.alphaIsTransparency = true;
+        importer.mipmapEnabled = false;
         importer.SaveAndReimport();
 
         return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
+
+    private static Texture2D GenerateSquareTexture(int size)
+    {
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+                tex.SetPixel(x, y, Color.white);
+        tex.Apply();
+        return tex;
+    }
+
+    private static Texture2D GenerateBirdTexture(int size)
+    {
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color clear = new Color(0, 0, 0, 0);
+        Color bodyColor = new Color(1f, 0.82f, 0.2f);
+        Color bellyColor = new Color(1f, 0.93f, 0.55f);
+        Color wingColor = new Color(0.95f, 0.6f, 0.1f);
+
+        Vector2 bodyCenter = new Vector2(size * 0.44f, size * 0.5f);
+        float bodyRadius = size * 0.36f;
+        Vector2 bellyCenter = new Vector2(size * 0.4f, size * 0.36f);
+        float bellyRadius = size * 0.22f;
+        Vector2 wingCenter = new Vector2(size * 0.32f, size * 0.5f);
+        float wingRx = size * 0.18f;
+        float wingRy = size * 0.13f;
+        Vector2 eyeCenter = new Vector2(size * 0.58f, size * 0.66f);
+        float eyeRadius = size * 0.13f;
+        Vector2 pupilCenter = eyeCenter + new Vector2(size * 0.035f, size * 0.02f);
+        float pupilRadius = size * 0.05f;
+        Vector2 beakTop = new Vector2(size * 0.72f, size * 0.56f);
+        Vector2 beakBottom = new Vector2(size * 0.72f, size * 0.40f);
+        Vector2 beakTip = new Vector2(size * 0.92f, size * 0.48f);
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                Vector2 p = new Vector2(x + 0.5f, y + 0.5f);
+                Color pixel = clear;
+
+                if (Vector2.Distance(p, bodyCenter) <= bodyRadius)
+                {
+                    pixel = bodyColor;
+                    if (IsInsideEllipse(p, wingCenter, wingRx, wingRy)) pixel = wingColor;
+                    if (IsInsideEllipse(p, bellyCenter, bellyRadius, bellyRadius)) pixel = bellyColor;
+                }
+
+                if (PointInTriangle(p, beakTop, beakBottom, beakTip)) pixel = new Color(0.9f, 0.25f, 0.1f);
+                if (Vector2.Distance(p, eyeCenter) <= eyeRadius) pixel = Color.white;
+                if (Vector2.Distance(p, pupilCenter) <= pupilRadius) pixel = Color.black;
+
+                tex.SetPixel(x, y, pixel);
+            }
+        }
+        tex.Apply();
+        return tex;
+    }
+
+    private static Texture2D GenerateBackgroundTexture(int width, int height)
+    {
+        Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        Color skyTop = new Color(0.30f, 0.60f, 0.85f);
+        Color skyBottom = new Color(0.75f, 0.88f, 0.97f);
+        Color hillColor = new Color(0.45f, 0.62f, 0.42f);
+        Color cloudColor = new Color(1f, 1f, 1f, 0.9f);
+
+        Vector2[] cloudCenters =
+        {
+            new Vector2(width * 0.18f, height * 0.78f),
+            new Vector2(width * 0.55f, height * 0.85f),
+            new Vector2(width * 0.82f, height * 0.72f)
+        };
+        float cloudScale = width * 0.05f;
+
+        for (int y = 0; y < height; y++)
+        {
+            float t = (float)y / height;
+            Color skyColor = Color.Lerp(skyBottom, skyTop, t);
+
+            for (int x = 0; x < width; x++)
+            {
+                Vector2 p = new Vector2(x, y);
+                Color pixel = skyColor;
+
+                foreach (Vector2 c in cloudCenters)
+                {
+                    bool inCloud =
+                        IsInsideEllipse(p, c, cloudScale * 1.3f, cloudScale * 0.7f) ||
+                        IsInsideEllipse(p, c + new Vector2(-cloudScale, -cloudScale * 0.1f), cloudScale * 0.8f, cloudScale * 0.55f) ||
+                        IsInsideEllipse(p, c + new Vector2(cloudScale, -cloudScale * 0.05f), cloudScale * 0.8f, cloudScale * 0.55f);
+                    if (inCloud) pixel = cloudColor;
+                }
+
+                tex.SetPixel(x, y, pixel);
+            }
+        }
+
+        float hillBaseHeight = height * 0.16f;
+        float hillAmplitude = height * 0.04f;
+        for (int x = 0; x < width; x++)
+        {
+            float hillTopY = hillBaseHeight + hillAmplitude * Mathf.Sin(x * 0.05f);
+            for (int y = 0; y < hillTopY; y++)
+            {
+                tex.SetPixel(x, y, hillColor);
+            }
+        }
+
+        tex.Apply();
+        return tex;
+    }
+
+    private static bool IsInsideEllipse(Vector2 p, Vector2 center, float rx, float ry)
+    {
+        float dx = (p.x - center.x) / rx;
+        float dy = (p.y - center.y) / ry;
+        return dx * dx + dy * dy <= 1f;
+    }
+
+    private static bool PointInTriangle(Vector2 p, Vector2 a, Vector2 b, Vector2 c)
+    {
+        float d1 = Sign(p, a, b);
+        float d2 = Sign(p, b, c);
+        float d3 = Sign(p, c, a);
+        bool hasNeg = d1 < 0 || d2 < 0 || d3 < 0;
+        bool hasPos = d1 > 0 || d2 > 0 || d3 > 0;
+        return !(hasNeg && hasPos);
+    }
+
+    private static float Sign(Vector2 p1, Vector2 p2, Vector2 p3)
+    {
+        return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+    }
+
+    private static void BuildBackground(Sprite backgroundSprite)
+    {
+        GameObject bg = new GameObject("Background");
+        SpriteRenderer sr = bg.AddComponent<SpriteRenderer>();
+        sr.sprite = backgroundSprite;
+        sr.sortingOrder = -100;
+        bg.transform.position = new Vector3(0, 0, 0);
     }
 
     // ---------- Scene objects ----------
@@ -140,6 +283,7 @@ public static class FlappyBirdSceneBuilder
         Camera cam = camGO.AddComponent<Camera>();
         cam.orthographic = true;
         cam.orthographicSize = 5f;
+        cam.clearFlags = CameraClearFlags.SolidColor; // avoid the default skybox masking missing sprites
         cam.backgroundColor = new Color(0.53f, 0.81f, 0.92f); // sky blue
         camGO.transform.position = new Vector3(0, 0, -10);
         camGO.AddComponent<AudioListener>();
@@ -152,23 +296,35 @@ public static class FlappyBirdSceneBuilder
         SpriteRenderer sr = ground.AddComponent<SpriteRenderer>();
         sr.sprite = squareSprite;
         sr.color = new Color(0.55f, 0.4f, 0.25f);
+        sr.sortingOrder = -1;
         ground.transform.position = new Vector3(0, -4.5f, 0);
         ground.transform.localScale = new Vector3(24, 1.5f, 1);
         ground.AddComponent<BoxCollider2D>();
+
+        // Purely cosmetic grass strip sitting right on the dirt's top edge.
+        GameObject grass = new GameObject("Grass");
+        grass.transform.SetParent(ground.transform);
+        SpriteRenderer grassSr = grass.AddComponent<SpriteRenderer>();
+        grassSr.sprite = squareSprite;
+        grassSr.color = new Color(0.3f, 0.75f, 0.3f);
+        grassSr.sortingOrder = 0;
+        grass.transform.localScale = new Vector3(1f, 0.2f, 1f); // 0.3 world units tall (parent scale.y = 1.5)
+        grass.transform.localPosition = new Vector3(0, 0.5f, 0); // sits at the dirt's top edge
+
         return ground;
     }
 
-    private static GameObject BuildBird(Sprite circleSprite)
+    private static GameObject BuildBird(Sprite birdSprite)
     {
         GameObject bird = new GameObject("Bird");
         bird.tag = "Bird";
         SpriteRenderer sr = bird.AddComponent<SpriteRenderer>();
-        sr.sprite = circleSprite;
-        sr.color = Color.yellow;
+        sr.sprite = birdSprite;
         bird.transform.position = new Vector3(-3, 0, 0);
-        bird.transform.localScale = new Vector3(0.6f, 0.6f, 1);
+        bird.transform.localScale = new Vector3(0.9f, 0.9f, 1);
         bird.AddComponent<Rigidbody2D>();
-        bird.AddComponent<CircleCollider2D>();
+        CircleCollider2D col = bird.AddComponent<CircleCollider2D>();
+        col.radius = 0.36f;
         bird.AddComponent<BirdController>();
         return bird;
     }
@@ -201,6 +357,24 @@ public static class FlappyBirdSceneBuilder
         pipeTop.transform.localScale = new Vector3(pipeWidth, pipeHeight, 1);
         pipeTop.transform.localPosition = new Vector3(0, half + pipeHeight / 2f, 0);
         pipeTop.AddComponent<BoxCollider2D>();
+
+        // Cosmetic caps sitting right at the pipe mouths (classic pipe-lip look).
+        Color capColor = new Color(0.12f, 0.5f, 0.12f);
+        GameObject capBottom = new GameObject("CapBottom");
+        capBottom.transform.SetParent(root.transform);
+        SpriteRenderer capBottomSr = capBottom.AddComponent<SpriteRenderer>();
+        capBottomSr.sprite = squareSprite;
+        capBottomSr.color = capColor;
+        capBottom.transform.localScale = new Vector3(pipeWidth * 1.25f, 0.3f, 1f);
+        capBottom.transform.localPosition = new Vector3(0, -half, 0);
+
+        GameObject capTop = new GameObject("CapTop");
+        capTop.transform.SetParent(root.transform);
+        SpriteRenderer capTopSr = capTop.AddComponent<SpriteRenderer>();
+        capTopSr.sprite = squareSprite;
+        capTopSr.color = capColor;
+        capTop.transform.localScale = new Vector3(pipeWidth * 1.25f, 0.3f, 1f);
+        capTop.transform.localPosition = new Vector3(0, half, 0);
 
         GameObject scoreZone = new GameObject("ScoreZone");
         scoreZone.transform.SetParent(root.transform);

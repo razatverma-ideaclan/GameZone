@@ -4,9 +4,7 @@
 TagManager:
   serializedVersion: 3
   tags:
-  - Bird
-  - Pipe
-  - Ground
+  - Obstacle
   layers:
   - Default
   - TransparentFX
