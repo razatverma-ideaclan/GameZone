@@ -33,6 +33,7 @@ public static class FlappyBirdSceneBuilder
 
         EnsureFolders();
         EnsureTags();
+        LockPortraitOrientation();
 
         // Force-regenerate sprites every run so a previous broken import can't linger.
         if (AssetDatabase.IsValidFolder(SpriteFolder))
@@ -90,6 +91,16 @@ public static class FlappyBirdSceneBuilder
         AddTag("Bird");
         AddTag("Pipe");
         AddTag("Ground");
+    }
+
+    private static void LockPortraitOrientation()
+    {
+        // Applies to Android/iOS builds. Forces strict portrait — no landscape rotation allowed.
+        PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
+        PlayerSettings.allowedAutorotateToPortrait = true;
+        PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
+        PlayerSettings.allowedAutorotateToLandscapeLeft = false;
+        PlayerSettings.allowedAutorotateToLandscapeRight = false;
     }
 
     private static void AddTag(string tag)
@@ -272,9 +283,12 @@ public static class FlappyBirdSceneBuilder
         sr.sprite = backgroundSprite;
         sr.sortingOrder = -100;
         bg.transform.position = new Vector3(0, 0, 0);
+        bg.AddComponent<BackgroundFitToCamera>(); // stretches to fill the screen on any phone aspect ratio
     }
 
     // ---------- Scene objects ----------
+
+    private const float CameraTargetHalfWidth = 9f; // fixed horizontal view width regardless of aspect ratio
 
     private static void BuildCamera()
     {
@@ -282,23 +296,31 @@ public static class FlappyBirdSceneBuilder
         camGO.tag = "MainCamera";
         Camera cam = camGO.AddComponent<Camera>();
         cam.orthographic = true;
-        cam.orthographicSize = 5f;
+        cam.orthographicSize = 5f; // editor preview only; CameraFitWidth recalculates this at runtime
         cam.clearFlags = CameraClearFlags.SolidColor; // avoid the default skybox masking missing sprites
         cam.backgroundColor = new Color(0.53f, 0.81f, 0.92f); // sky blue
         camGO.transform.position = new Vector3(0, 0, -10);
         camGO.AddComponent<AudioListener>();
+
+        CameraFitWidth fitWidth = camGO.AddComponent<CameraFitWidth>();
+        fitWidth.targetHalfWidth = CameraTargetHalfWidth;
     }
 
     private static GameObject BuildGround(Sprite squareSprite)
     {
+        // Tall enough that it still reaches the bottom of the screen on very
+        // tall portrait phones (its top edge always stays at y = -3.75).
+        const float dirtHeight = 40f;
+        const float dirtTopY = -3.75f;
+
         GameObject ground = new GameObject("Ground");
         ground.tag = "Ground";
         SpriteRenderer sr = ground.AddComponent<SpriteRenderer>();
         sr.sprite = squareSprite;
         sr.color = new Color(0.55f, 0.4f, 0.25f);
         sr.sortingOrder = -1;
-        ground.transform.position = new Vector3(0, -4.5f, 0);
-        ground.transform.localScale = new Vector3(24, 1.5f, 1);
+        ground.transform.position = new Vector3(0, dirtTopY - dirtHeight / 2f, 0);
+        ground.transform.localScale = new Vector3(24, dirtHeight, 1);
         ground.AddComponent<BoxCollider2D>();
 
         // Purely cosmetic grass strip sitting right on the dirt's top edge.
@@ -308,8 +330,8 @@ public static class FlappyBirdSceneBuilder
         grassSr.sprite = squareSprite;
         grassSr.color = new Color(0.3f, 0.75f, 0.3f);
         grassSr.sortingOrder = 0;
-        grass.transform.localScale = new Vector3(1f, 0.2f, 1f); // 0.3 world units tall (parent scale.y = 1.5)
-        grass.transform.localPosition = new Vector3(0, 0.5f, 0); // sits at the dirt's top edge
+        grass.transform.localScale = new Vector3(1f, 0.3f / dirtHeight, 1f); // 0.3 world units tall
+        grass.transform.localPosition = new Vector3(0, 0.5f, 0); // sits at the dirt's top edge (ratio-invariant)
 
         return ground;
     }
@@ -320,8 +342,9 @@ public static class FlappyBirdSceneBuilder
         bird.tag = "Bird";
         SpriteRenderer sr = bird.AddComponent<SpriteRenderer>();
         sr.sprite = birdSprite;
-        bird.transform.position = new Vector3(-3, 0, 0);
-        bird.transform.localScale = new Vector3(0.9f, 0.9f, 1);
+        sr.sortingOrder = 10; // guaranteed to draw above background/ground/pipes on every aspect ratio
+        bird.transform.position = new Vector3(-1f, 0, 0); // just left of center — still safely inside view on any aspect ratio
+        bird.transform.localScale = new Vector3(1.2f, 1.2f, 1); // larger — easier to see on tall/narrow mobile screens
         bird.AddComponent<Rigidbody2D>();
         CircleCollider2D col = bird.AddComponent<CircleCollider2D>();
         col.radius = 0.36f;
@@ -332,7 +355,7 @@ public static class FlappyBirdSceneBuilder
     private static GameObject BuildPipePairPrefab(Sprite squareSprite)
     {
         const float gapHeight = 2.5f;
-        const float pipeHeight = 10f;
+        const float pipeHeight = 40f; // generous enough to reach top/bottom on tall portrait phones too
         const float pipeWidth = 1f;
         float half = gapHeight / 2f;
 
@@ -344,6 +367,7 @@ public static class FlappyBirdSceneBuilder
         SpriteRenderer bottomSr = pipeBottom.AddComponent<SpriteRenderer>();
         bottomSr.sprite = squareSprite;
         bottomSr.color = new Color(0.2f, 0.7f, 0.2f);
+        bottomSr.sortingOrder = 5;
         pipeBottom.transform.localScale = new Vector3(pipeWidth, pipeHeight, 1);
         pipeBottom.transform.localPosition = new Vector3(0, -half - pipeHeight / 2f, 0);
         pipeBottom.AddComponent<BoxCollider2D>();
@@ -354,6 +378,7 @@ public static class FlappyBirdSceneBuilder
         SpriteRenderer topSr = pipeTop.AddComponent<SpriteRenderer>();
         topSr.sprite = squareSprite;
         topSr.color = new Color(0.2f, 0.7f, 0.2f);
+        topSr.sortingOrder = 5;
         pipeTop.transform.localScale = new Vector3(pipeWidth, pipeHeight, 1);
         pipeTop.transform.localPosition = new Vector3(0, half + pipeHeight / 2f, 0);
         pipeTop.AddComponent<BoxCollider2D>();
@@ -365,6 +390,7 @@ public static class FlappyBirdSceneBuilder
         SpriteRenderer capBottomSr = capBottom.AddComponent<SpriteRenderer>();
         capBottomSr.sprite = squareSprite;
         capBottomSr.color = capColor;
+        capBottomSr.sortingOrder = 6;
         capBottom.transform.localScale = new Vector3(pipeWidth * 1.25f, 0.3f, 1f);
         capBottom.transform.localPosition = new Vector3(0, -half, 0);
 
@@ -373,6 +399,7 @@ public static class FlappyBirdSceneBuilder
         SpriteRenderer capTopSr = capTop.AddComponent<SpriteRenderer>();
         capTopSr.sprite = squareSprite;
         capTopSr.color = capColor;
+        capTopSr.sortingOrder = 6;
         capTop.transform.localScale = new Vector3(pipeWidth * 1.25f, 0.3f, 1f);
         capTop.transform.localPosition = new Vector3(0, half, 0);
 
@@ -401,7 +428,7 @@ public static class FlappyBirdSceneBuilder
         GameObject spawnerGO = new GameObject("PipeSpawner");
         PipeSpawner spawner = spawnerGO.AddComponent<PipeSpawner>();
         spawner.pipePairPrefab = pipePairPrefab;
-        spawner.spawnInterval = 1.5f;
+        spawner.spawnInterval = 2.3f; // more horizontal breathing room between pipes on the fixed 18-unit-wide view
         spawner.spawnXPosition = 10f;
         spawner.minGapY = -2f;
         spawner.maxGapY = 2f;
@@ -423,7 +450,8 @@ public static class FlappyBirdSceneBuilder
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         CanvasScaler scaler = canvasGO.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1080, 1920);
+        scaler.referenceResolution = new Vector2(1080, 1920); // portrait reference — matches the strict-portrait lock
+        scaler.matchWidthOrHeight = 0f; // match width — width is the fixed/consistent dimension across phones
         canvasGO.AddComponent<GraphicRaycaster>();
         return canvas;
     }
@@ -438,6 +466,9 @@ public static class FlappyBirdSceneBuilder
         text.fontSize = 72;
         text.alignment = TextAnchor.MiddleCenter;
         text.color = Color.white;
+        Outline outline = go.AddComponent<Outline>(); // dark outline so it stays readable against a light sky/cloud
+        outline.effectColor = new Color(0, 0, 0, 0.8f);
+        outline.effectDistance = new Vector2(2f, -2f);
         RectTransform rt = go.GetComponent<RectTransform>();
         rt.anchorMin = new Vector2(0.5f, 1f);
         rt.anchorMax = new Vector2(0.5f, 1f);
@@ -500,6 +531,9 @@ public static class FlappyBirdSceneBuilder
         text.fontSize = fontSize;
         text.alignment = TextAnchor.MiddleCenter;
         text.color = Color.white;
+        Outline outline = go.AddComponent<Outline>();
+        outline.effectColor = new Color(0, 0, 0, 0.8f);
+        outline.effectDistance = new Vector2(2f, -2f);
         RectTransform rt = go.GetComponent<RectTransform>();
         rt.anchorMin = new Vector2(0.5f, 0.5f);
         rt.anchorMax = new Vector2(0.5f, 0.5f);
