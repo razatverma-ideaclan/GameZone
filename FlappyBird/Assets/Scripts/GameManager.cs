@@ -22,7 +22,16 @@ public class GameManager : MonoBehaviour
     public GameObject bird;
     public PipeSpawner pipeSpawner;
 
+    [Header("Audio (optional — leave empty to skip)")]
+    public AudioClip scoreSound;
+    public AudioClip buttonClickSound;
+    [Tooltip("Optional low-volume looping music. Leave empty to skip.")]
+    public AudioClip backgroundMusic;
+    [Range(0f, 1f)] public float musicVolume = 0.25f;
+
     private int score = 0;
+    private AudioSource sfxSource;
+    private AudioSource musicSource;
 
     void Awake()
     {
@@ -33,6 +42,15 @@ public class GameManager : MonoBehaviour
             return;
         }
         Instance = this;
+
+        // Two separate AudioSources: one for one-shot sound effects, one for looping music.
+        sfxSource = gameObject.AddComponent<AudioSource>();
+        sfxSource.playOnAwake = false;
+
+        musicSource = gameObject.AddComponent<AudioSource>();
+        musicSource.playOnAwake = false;
+        musicSource.loop = true;
+        musicSource.volume = musicVolume;
     }
 
     void Start()
@@ -81,8 +99,14 @@ public class GameManager : MonoBehaviour
         ClearExistingPipes();
     }
 
+    // Hook this up to the Start button's OnClick() in the Inspector (tapping
+    // anywhere on the Start screen also calls this, via Update() above).
     public void StartGame()
     {
+        if (CurrentState != GameState.Start) return;
+
+        PlayClickSound();
+
         CurrentState = GameState.Playing;
         if (startPanel != null) startPanel.SetActive(false);
         if (gameOverPanel != null) gameOverPanel.SetActive(false);
@@ -94,6 +118,13 @@ public class GameManager : MonoBehaviour
         }
 
         if (pipeSpawner != null) pipeSpawner.StartSpawning();
+
+        if (backgroundMusic != null && musicSource != null && !musicSource.isPlaying)
+        {
+            musicSource.clip = backgroundMusic;
+            musicSource.volume = musicVolume;
+            musicSource.Play();
+        }
     }
 
     public void AddScore(int amount = 1)
@@ -101,6 +132,7 @@ public class GameManager : MonoBehaviour
         if (CurrentState != GameState.Playing) return;
         score += amount;
         UpdateScoreUI();
+        if (scoreSound != null && sfxSource != null) sfxSource.PlayOneShot(scoreSound);
     }
 
     public void GameOver()
@@ -110,13 +142,21 @@ public class GameManager : MonoBehaviour
         CurrentState = GameState.GameOver;
         if (pipeSpawner != null) pipeSpawner.StopSpawning();
         if (gameOverPanel != null) gameOverPanel.SetActive(true);
+        if (musicSource != null) musicSource.Stop();
     }
 
     // Hooked up to the Restart button's OnClick() in the Inspector.
     public void RestartGame()
     {
+        PlayClickSound();
         Time.timeScale = 1f;
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+    }
+
+    /// <summary>Call from any UI Button's OnClick() for a consistent click sound.</summary>
+    public void PlayClickSound()
+    {
+        if (buttonClickSound != null && sfxSource != null) sfxSource.PlayOneShot(buttonClickSound);
     }
 
     private void UpdateScoreUI()

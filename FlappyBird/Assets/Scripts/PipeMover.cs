@@ -14,6 +14,14 @@ public class PipeMover : MonoBehaviour
 
     void Update()
     {
+        // Freeze in place once the run has ended, so pipes don't keep drifting
+        // past a dead bird. Still moves normally if GameManager doesn't exist
+        // (e.g. a test scene without one).
+        if (GameManager.Instance != null && GameManager.Instance.CurrentState != GameManager.GameState.Playing)
+        {
+            return;
+        }
+
         transform.position += Vector3.left * speed * Time.deltaTime;
 
         if (transform.position.x < destroyXPosition)

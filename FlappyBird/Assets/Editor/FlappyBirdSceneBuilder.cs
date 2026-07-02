@@ -35,36 +35,60 @@ public static class FlappyBirdSceneBuilder
         EnsureTags();
         LockPortraitOrientation();
 
-        // Force-regenerate sprites every run so a previous broken import can't linger.
-        if (AssetDatabase.IsValidFolder(SpriteFolder))
-        {
-            AssetDatabase.DeleteAsset(SpriteFolder);
-        }
+        // Force-regenerate only OUR OWN generated sprites every run (so a previous
+        // broken import can't linger) — without touching anything else you've
+        // added under Assets/Sprites, like a UI subfolder with real art in it.
+        AssetDatabase.DeleteAsset($"{SpriteFolder}/Square.png");
+        AssetDatabase.DeleteAsset($"{SpriteFolder}/Bird.png");
+        AssetDatabase.DeleteAsset($"{SpriteFolder}/Background.png");
+        AssetDatabase.DeleteAsset($"{SpriteFolder}/ButtonPill.png");
+        AssetDatabase.DeleteAsset($"{SpriteFolder}/TapBubble.png");
         EnsureFolders();
 
         Sprite squareSprite = GetOrCreateSprite("Square", 128, 128, (w, h) => GenerateSquareTexture(w), 128);
-        Sprite birdSprite = GetOrCreateSprite("Bird", 128, 128, (w, h) => GenerateBirdTexture(w), 128);
+        Sprite birdSprite = GetOrCreateSprite("Bird", 160, 160, (w, h) => GenerateBirdTexture(w), 160);
         const float bgWorldWidth = 20f;
         Sprite backgroundSprite = GetOrCreateSprite("Background", 512, 288, (w, h) => GenerateBackgroundTexture(w, h), 512f / bgWorldWidth);
+        Sprite pillButtonSprite = GetOrCreateSprite("ButtonPill", 320, 120, (w, h) => GenerateRoundedRectTexture(w, h, 30, new Color(0.35f, 0.78f, 0.95f), new Color(0.06f, 0.28f, 0.35f), 6), 320);
+        Sprite tapBubbleSprite = GetOrCreateSprite("TapBubble", 220, 90, (w, h) => GenerateRoundedRectTexture(w, h, 40, new Color(0.95f, 0.4f, 0.15f), new Color(0.35f, 0.1f, 0.02f), 6), 220);
+        // All four kept perfectly square (bounds 1x1 at scale 1) so the existing
+        // non-uniform transform.localScale stretching (unchanged from before)
+        // produces exactly the intended world-space size, same as the old
+        // flat-color "Square" sprite did — only the pixel content is new.
+        // Point filtering here — crisp pixel-art edges (zigzag grass, hatch marks,
+        // pipe rims) instead of a blurry bilinear smear when stretched.
+        Sprite pipeBodySprite = GetOrCreateSprite("PipeBody", 128, 128, (w, h) => GeneratePipeBodyTexture(w, h), 128, FilterMode.Point);
+        Sprite pipeCapSprite = GetOrCreateSprite("PipeCap", 128, 128, (w, h) => GeneratePipeCapTexture(w, h), 128, FilterMode.Point);
+        Sprite groundDirtSprite = GetOrCreateSprite("GroundDirt", 128, 128, (w, h) => GenerateGroundDirtTexture(w, h), 128, FilterMode.Point);
+        Sprite grassSprite = GetOrCreateSprite("Grass", 128, 128, (w, h) => GenerateGrassTexture(w, h), 128, FilterMode.Point);
+        AssetDatabase.Refresh(); // pick up the synthesized .wav clips generated outside the Editor
+        // All sound effects below are our own synthesized clips — the earlier
+        // downloaded Flap.ogg / ButtonClick.ogg are no longer used anywhere.
+        AudioClip flapClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Flap.wav");
+        AudioClip clickClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/ButtonClick.wav");
+        AudioClip scoreClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Score.wav");
+        AudioClip hitClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Hit.wav");
+        AudioClip landClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Land.wav");
 
         // Start from a fresh empty scene so re-running this is safe.
         EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
         BuildCamera();
         BuildBackground(backgroundSprite);
-        GameObject ground = BuildGround(squareSprite);
-        GameObject bird = BuildBird(birdSprite);
-        GameObject pipePairPrefab = BuildPipePairPrefab(squareSprite);
+        GameObject ground = BuildGround(groundDirtSprite, grassSprite);
+        GameObject bird = BuildBird(birdSprite, flapClip, hitClip, landClip);
+        GameObject pipePairPrefab = BuildPipePairPrefab(pipeBodySprite, pipeCapSprite);
         GameObject pipeSpawnerGO = BuildPipeSpawner(pipePairPrefab);
         BuildEventSystem();
         Canvas canvas = BuildCanvas();
         GameObject scoreTextGO = BuildScoreText(canvas.transform);
-        GameObject startPanel = BuildStartPanel(canvas.transform);
-        GameObject gameOverPanel = BuildGameOverPanel(canvas.transform, out Button restartButton);
-        GameObject gameManagerGO = BuildGameManager(bird, pipeSpawnerGO, scoreTextGO, startPanel, gameOverPanel);
+        GameObject startPanel = BuildStartPanel(canvas.transform, pillButtonSprite, tapBubbleSprite, out Button startButton);
+        GameObject gameOverPanel = BuildGameOverPanel(canvas.transform, pillButtonSprite, out Button restartButton);
+        GameObject gameManagerGO = BuildGameManager(bird, pipeSpawnerGO, scoreTextGO, startPanel, gameOverPanel, clickClip, scoreClip);
 
-        // Wire the restart button now that GameManager exists.
+        // Wire the buttons now that GameManager exists.
         GameManager gm = gameManagerGO.GetComponent<GameManager>();
+        UnityEventTools.AddPersistentListener(startButton.onClick, gm.StartGame);
         UnityEventTools.AddPersistentListener(restartButton.onClick, gm.RestartGame);
 
         if (!Directory.Exists(SceneFolder))
@@ -119,9 +143,36 @@ public static class FlappyBirdSceneBuilder
         tagManager.ApplyModifiedProperties();
     }
 
+    // ---------- Importing real downloaded assets (button art, sound clips) ----------
+
+    /// <summary>
+    /// Makes sure a PNG copied into the project (outside Unity's own import
+    /// pipeline) is actually recognized and configured as a UI-ready Sprite.
+    /// Returns null if the file isn't there yet — every call site handles that
+    /// gracefully by simply leaving the default look in place.
+    /// </summary>
+    private static Sprite EnsureImportedAsSprite(string path)
+    {
+        AssetDatabase.Refresh(); // pick up files copied in from outside the Editor
+
+        if (!File.Exists(path)) return null;
+
+        TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
+        if (importer == null) return null;
+
+        if (importer.textureType != TextureImporterType.Sprite || importer.spriteImportMode != SpriteImportMode.Single)
+        {
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.SaveAndReimport();
+        }
+
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
+
     // ---------- Sprite generation (original, procedurally drawn art — no external assets) ----------
 
-    private static Sprite GetOrCreateSprite(string name, int width, int height, System.Func<int, int, Texture2D> generator, float pixelsPerUnit)
+    private static Sprite GetOrCreateSprite(string name, int width, int height, System.Func<int, int, Texture2D> generator, float pixelsPerUnit, FilterMode filterMode = FilterMode.Bilinear)
     {
         string path = $"{SpriteFolder}/{name}.png";
 
@@ -134,7 +185,7 @@ public static class FlappyBirdSceneBuilder
         importer.textureType = TextureImporterType.Sprite;
         importer.spriteImportMode = SpriteImportMode.Single; // required or no Sprite sub-asset is generated
         importer.spritePixelsPerUnit = pixelsPerUnit;
-        importer.filterMode = FilterMode.Bilinear;
+        importer.filterMode = filterMode;
         importer.alphaIsTransparency = true;
         importer.mipmapEnabled = false;
         importer.SaveAndReimport();
@@ -156,24 +207,28 @@ public static class FlappyBirdSceneBuilder
     {
         Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
         Color clear = new Color(0, 0, 0, 0);
-        Color bodyColor = new Color(1f, 0.82f, 0.2f);
-        Color bellyColor = new Color(1f, 0.93f, 0.55f);
-        Color wingColor = new Color(0.95f, 0.6f, 0.1f);
+        Color outline = new Color(0.25f, 0.14f, 0.02f);
+        Color bodyColor = new Color(1f, 0.83f, 0.15f);
+        Color bellyColor = new Color(1f, 0.95f, 0.6f);
+        Color wingColor = new Color(0.95f, 0.6f, 0.08f);
+        Color beakColor = new Color(0.95f, 0.35f, 0.05f);
 
-        Vector2 bodyCenter = new Vector2(size * 0.44f, size * 0.5f);
-        float bodyRadius = size * 0.36f;
-        Vector2 bellyCenter = new Vector2(size * 0.4f, size * 0.36f);
-        float bellyRadius = size * 0.22f;
-        Vector2 wingCenter = new Vector2(size * 0.32f, size * 0.5f);
-        float wingRx = size * 0.18f;
+        Vector2 bodyCenter = new Vector2(size * 0.45f, size * 0.5f);
+        float bodyRadius = size * 0.34f;
+        float outlineRadius = bodyRadius + size * 0.03f;
+        Vector2 bellyCenter = new Vector2(size * 0.4f, size * 0.35f);
+        float bellyRadius = size * 0.21f;
+        Vector2 wingCenter = new Vector2(size * 0.32f, size * 0.48f);
+        float wingRx = size * 0.17f;
         float wingRy = size * 0.13f;
-        Vector2 eyeCenter = new Vector2(size * 0.58f, size * 0.66f);
-        float eyeRadius = size * 0.13f;
-        Vector2 pupilCenter = eyeCenter + new Vector2(size * 0.035f, size * 0.02f);
-        float pupilRadius = size * 0.05f;
-        Vector2 beakTop = new Vector2(size * 0.72f, size * 0.56f);
+        Vector2 eyeCenter = new Vector2(size * 0.6f, size * 0.68f);
+        float eyeRadius = size * 0.155f;
+        float eyeOutlineRadius = eyeRadius + size * 0.02f;
+        Vector2 pupilCenter = eyeCenter + new Vector2(size * 0.04f, size * 0.02f);
+        float pupilRadius = size * 0.06f;
+        Vector2 beakTop = new Vector2(size * 0.72f, size * 0.58f);
         Vector2 beakBottom = new Vector2(size * 0.72f, size * 0.40f);
-        Vector2 beakTip = new Vector2(size * 0.92f, size * 0.48f);
+        Vector2 beakTip = new Vector2(size * 0.95f, size * 0.49f);
 
         for (int y = 0; y < size; y++)
         {
@@ -181,19 +236,225 @@ public static class FlappyBirdSceneBuilder
             {
                 Vector2 p = new Vector2(x + 0.5f, y + 0.5f);
                 Color pixel = clear;
+                bool beakArea = PointInTriangle(p, beakTop, beakBottom, beakTip) ||
+                                 PointInTriangle(p, beakTop + Vector2.left * size * 0.02f, beakBottom + Vector2.left * size * 0.02f, beakTip);
 
-                if (Vector2.Distance(p, bodyCenter) <= bodyRadius)
+                if (Vector2.Distance(p, bodyCenter) <= outlineRadius || beakArea)
                 {
-                    pixel = bodyColor;
-                    if (IsInsideEllipse(p, wingCenter, wingRx, wingRy)) pixel = wingColor;
-                    if (IsInsideEllipse(p, bellyCenter, bellyRadius, bellyRadius)) pixel = bellyColor;
+                    pixel = outline;
+
+                    if (Vector2.Distance(p, bodyCenter) <= bodyRadius)
+                    {
+                        pixel = bodyColor;
+                        if (IsInsideEllipse(p, wingCenter, wingRx, wingRy)) pixel = wingColor;
+                        if (IsInsideEllipse(p, bellyCenter, bellyRadius, bellyRadius)) pixel = bellyColor;
+                    }
+
+                    if (PointInTriangle(p, beakTop, beakBottom, beakTip)) pixel = beakColor;
                 }
 
-                if (PointInTriangle(p, beakTop, beakBottom, beakTip)) pixel = new Color(0.9f, 0.25f, 0.1f);
+                if (Vector2.Distance(p, eyeCenter) <= eyeOutlineRadius) pixel = outline;
                 if (Vector2.Distance(p, eyeCenter) <= eyeRadius) pixel = Color.white;
-                if (Vector2.Distance(p, pupilCenter) <= pupilRadius) pixel = Color.black;
+                if (Vector2.Distance(p, pupilCenter) <= pupilRadius) pixel = new Color(0.05f, 0.05f, 0.05f);
 
                 tex.SetPixel(x, y, pixel);
+            }
+        }
+        tex.Apply();
+        return tex;
+    }
+
+    /// <summary>
+    /// Generates a rounded-rectangle sprite with a solid border, used for the
+    /// Start/Restart buttons and the "TAP" hint bubble — gives real rounded
+    /// corners instead of a flat rectangle, closer to a polished mobile UI look.
+    /// </summary>
+    private static Texture2D GenerateRoundedRectTexture(int width, int height, int radius, Color fill, Color border, int borderWidth)
+    {
+        Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        Color clear = new Color(0, 0, 0, 0);
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                bool inside = IsInsideRoundedRect(x, y, width, height, radius);
+                bool insideInner = IsInsideRoundedRect(x, y, width, height, Mathf.Max(1, radius - borderWidth), borderWidth);
+                Color pixel = clear;
+                if (inside) pixel = insideInner ? fill : border;
+                tex.SetPixel(x, y, pixel);
+            }
+        }
+        tex.Apply();
+        return tex;
+    }
+
+    private static bool IsInsideRoundedRect(int x, int y, int width, int height, int radius, int inset = 0)
+    {
+        float fx = x + 0.5f;
+        float fy = y + 0.5f;
+        float left = inset, right = width - inset, bottom = inset, top = height - inset;
+        if (fx < left || fx > right || fy < bottom || fy > top) return false;
+
+        float rx = Mathf.Min(radius, (right - left) / 2f);
+        float ry = Mathf.Min(radius, (top - bottom) / 2f);
+
+        if (fx < left + rx && fy < bottom + ry) return Vector2.Distance(new Vector2(fx, fy), new Vector2(left + rx, bottom + ry)) <= rx;
+        if (fx > right - rx && fy < bottom + ry) return Vector2.Distance(new Vector2(fx, fy), new Vector2(right - rx, bottom + ry)) <= rx;
+        if (fx < left + rx && fy > top - ry) return Vector2.Distance(new Vector2(fx, fy), new Vector2(left + rx, top - ry)) <= rx;
+        if (fx > right - rx && fy > top - ry) return Vector2.Distance(new Vector2(fx, fy), new Vector2(right - rx, top - ry)) <= rx;
+        return true;
+    }
+
+    /// <summary>
+    /// Shaded green pipe body. Shading varies only by column (left highlight
+    /// edge, mid base tone, right shadow edge) so the texture can be stretched
+    /// to any height via transform.localScale without ever looking distorted.
+    /// </summary>
+    private static Texture2D GeneratePipeBodyTexture(int width, int height)
+    {
+        Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        Color edgeDark = new Color(0.08f, 0.38f, 0.1f);
+        Color highlight = new Color(0.55f, 0.88f, 0.35f);
+        Color baseGreen = new Color(0.28f, 0.72f, 0.24f);
+        Color shadow = new Color(0.13f, 0.48f, 0.14f);
+
+        for (int x = 0; x < width; x++)
+        {
+            float u = (float)x / width;
+            Color column;
+            if (u < 0.06f) column = edgeDark;
+            else if (u < 0.22f) column = highlight;
+            else if (u < 0.78f) column = baseGreen;
+            else if (u < 0.94f) column = shadow;
+            else column = edgeDark;
+
+            for (int y = 0; y < height; y++)
+            {
+                tex.SetPixel(x, y, column);
+            }
+        }
+        tex.Apply();
+        return tex;
+    }
+
+    /// <summary>
+    /// The pipe "lip" cap — same column shading as the body, plus a horizontal
+    /// bevel (bright rim at the top, dark shadow rim at the bottom) so it
+    /// reads as a 3D lip sticking out from the pipe body.
+    /// </summary>
+    private static Texture2D GeneratePipeCapTexture(int width, int height)
+    {
+        Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        Color edgeDark = new Color(0.08f, 0.38f, 0.1f);
+        Color highlight = new Color(0.6f, 0.92f, 0.4f);
+        Color baseGreen = new Color(0.24f, 0.62f, 0.2f);
+        Color shadow = new Color(0.08f, 0.32f, 0.08f);
+
+        for (int x = 0; x < width; x++)
+        {
+            float u = (float)x / width;
+            Color columnBase;
+            if (u < 0.04f || u > 0.96f) columnBase = edgeDark;
+            else if (u < 0.16f) columnBase = highlight;
+            else if (u < 0.84f) columnBase = baseGreen;
+            else columnBase = shadow;
+
+            for (int y = 0; y < height; y++)
+            {
+                float v = (float)y / height;
+                Color pixel = columnBase;
+                if (v > 0.8f) pixel = Color.Lerp(columnBase, highlight, 0.5f); // bright top rim
+                if (v < 0.15f) pixel = Color.Lerp(columnBase, Color.black, 0.35f); // dark bottom shadow rim
+                tex.SetPixel(x, y, pixel);
+            }
+        }
+        tex.Apply();
+        return tex;
+    }
+
+    /// <summary>
+    /// Tan/khaki dirt with a lighter "topsoil" band baked near the top of the
+    /// texture (which lands right at the ground's visible top edge, no matter
+    /// how much the sprite is stretched vertically to reach off-screen) plus
+    /// subtle diagonal hatch marks for texture, like the classic game's dirt.
+    /// </summary>
+    private static Texture2D GenerateGroundDirtTexture(int width, int height)
+    {
+        Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        Color dirtBase = new Color(0.87f, 0.71f, 0.42f);
+        Color topsoil = new Color(0.93f, 0.8f, 0.52f);
+        Color hatch = new Color(0.72f, 0.55f, 0.28f);
+        Color dotColor = new Color(0.68f, 0.52f, 0.26f);
+
+        for (int y = 0; y < height; y++)
+        {
+            float v = (float)y / height; // 1 = top of texture = visible top edge of the ground
+            for (int x = 0; x < width; x++)
+            {
+                Color pixel = v > 0.85f ? topsoil : dirtBase;
+
+                // Diagonal hatch lines for a bit of texture, only below the topsoil band.
+                if (v <= 0.85f)
+                {
+                    int diag = (x + y) % 24;
+                    if (diag < 3) pixel = hatch;
+                }
+
+                tex.SetPixel(x, y, pixel);
+            }
+        }
+
+        // Scattered small round dots/pebbles over the sand, like real Flappy Bird's ground texture.
+        System.Random rng = new System.Random(101);
+        int dotCount = (width * height) / 350;
+        for (int i = 0; i < dotCount; i++)
+        {
+            int cx = rng.Next(0, width);
+            int cy = rng.Next(0, (int)(height * 0.8f)); // keep dots off the lighter topsoil band
+            int radius = rng.Next(1, 3);
+            for (int dy = -radius; dy <= radius; dy++)
+            {
+                for (int dx = -radius; dx <= radius; dx++)
+                {
+                    if (dx * dx + dy * dy > radius * radius) continue;
+                    int px = cx + dx;
+                    int py = cy + dy;
+                    if (px < 0 || px >= width || py < 0 || py >= height) continue;
+                    tex.SetPixel(px, py, dotColor);
+                }
+            }
+        }
+
+        tex.Apply();
+        return tex;
+    }
+
+    /// <summary>
+    /// Grass strip with a sharp, solid jagged sawtooth top edge (transparent
+    /// above it) — a single flat green, no soft shadow gradient along the
+    /// edge, so it stays crisp instead of reading as a blurry line even when
+    /// heavily stretched.
+    /// </summary>
+    private static Texture2D GenerateGrassTexture(int width, int height)
+    {
+        Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        Color clear = new Color(0, 0, 0, 0);
+        Color grass = new Color(0.38f, 0.8f, 0.28f);
+
+        int toothWidth = Mathf.Max(4, width / 16);
+        float toothHeight = height * 0.35f;
+        float baseTop = height * 0.55f; // top of the flat grass body before the teeth start
+
+        for (int x = 0; x < width; x++)
+        {
+            float toothPhase = (x % toothWidth) / (float)toothWidth; // 0..1 across one tooth
+            float triangleHeight = (1f - Mathf.Abs(toothPhase - 0.5f) * 2f) * toothHeight;
+            float edgeY = baseTop + triangleHeight;
+
+            for (int y = 0; y < height; y++)
+            {
+                tex.SetPixel(x, y, y > edgeY ? clear : grass);
             }
         }
         tex.Apply();
@@ -203,19 +464,22 @@ public static class FlappyBirdSceneBuilder
     private static Texture2D GenerateBackgroundTexture(int width, int height)
     {
         Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
-        Color skyTop = new Color(0.30f, 0.60f, 0.85f);
-        Color skyBottom = new Color(0.75f, 0.88f, 0.97f);
-        Color hillColor = new Color(0.45f, 0.62f, 0.42f);
-        Color cloudColor = new Color(1f, 1f, 1f, 0.9f);
+        Color skyTop = new Color(0.30f, 0.62f, 0.87f);
+        Color skyBottom = new Color(0.72f, 0.87f, 0.97f);
+        Color cloudColor = new Color(1f, 1f, 1f, 0.95f);
+        Color farBuildingColor = new Color(0.68f, 0.82f, 0.9f, 0.75f);
+        Color nearBuildingColor = new Color(0.78f, 0.88f, 0.93f, 0.9f);
+        Color windowColor = new Color(0.92f, 0.95f, 0.75f, 0.5f);
 
         Vector2[] cloudCenters =
         {
-            new Vector2(width * 0.18f, height * 0.78f),
-            new Vector2(width * 0.55f, height * 0.85f),
-            new Vector2(width * 0.82f, height * 0.72f)
+            new Vector2(width * 0.16f, height * 0.86f),
+            new Vector2(width * 0.55f, height * 0.90f),
+            new Vector2(width * 0.85f, height * 0.80f)
         };
-        float cloudScale = width * 0.05f;
+        float cloudScale = width * 0.045f;
 
+        // Sky gradient + clouds.
         for (int y = 0; y < height; y++)
         {
             float t = (float)y / height;
@@ -239,19 +503,59 @@ public static class FlappyBirdSceneBuilder
             }
         }
 
-        float hillBaseHeight = height * 0.16f;
-        float hillAmplitude = height * 0.04f;
-        for (int x = 0; x < width; x++)
-        {
-            float hillTopY = hillBaseHeight + hillAmplitude * Mathf.Sin(x * 0.05f);
-            for (int y = 0; y < hillTopY; y++)
-            {
-                tex.SetPixel(x, y, hillColor);
-            }
-        }
+        Color distantBuildingColor = new Color(0.72f, 0.85f, 0.92f, 0.55f);
+
+        // Distant hazy skyline (smallest, most transparent, densest — fills in the horizon).
+        DrawSkyline(tex, width, height, distantBuildingColor, windowColor, seed: 5, baseHeightFrac: 0.1f, buildingCount: 16, jitter: 0.03f);
+        // Far city skyline layer (shorter, more transparent, denser).
+        DrawSkyline(tex, width, height, farBuildingColor, windowColor, seed: 11, baseHeightFrac: 0.17f, buildingCount: 13, jitter: 0.06f);
+        // Near city skyline layer (taller, more opaque, matches the reference's foreground buildings).
+        DrawSkyline(tex, width, height, nearBuildingColor, windowColor, seed: 47, baseHeightFrac: 0.24f, buildingCount: 9, jitter: 0.1f);
 
         tex.Apply();
         return tex;
+    }
+
+    /// <summary>Draws one layer of a simple procedural city skyline with a scattering of lit windows.</summary>
+    private static void DrawSkyline(Texture2D tex, int width, int height, Color buildingColor, Color windowColor, int seed, float baseHeightFrac, int buildingCount, float jitter)
+    {
+        System.Random rng = new System.Random(seed);
+        float slotWidth = (float)width / buildingCount;
+
+        for (int i = 0; i < buildingCount; i++)
+        {
+            float bWidth = slotWidth * (0.6f + (float)rng.NextDouble() * 0.35f);
+            float bx = i * slotWidth + (slotWidth - bWidth) * 0.5f;
+            float bHeight = height * (baseHeightFrac + (float)rng.NextDouble() * jitter * 2f);
+            int x0 = Mathf.Clamp(Mathf.RoundToInt(bx), 0, width - 1);
+            int x1 = Mathf.Clamp(Mathf.RoundToInt(bx + bWidth), 0, width);
+            int yTop = Mathf.RoundToInt(bHeight);
+
+            for (int x = x0; x < x1; x++)
+            {
+                for (int y = 0; y < yTop; y++)
+                {
+                    // Blend into the existing pixel (sky/cloud/farther building) so the
+                    // building's alpha reads correctly baked into the final opaque texture.
+                    Color existing = tex.GetPixel(x, y);
+                    Color pixel = Color.Lerp(existing, buildingColor, buildingColor.a);
+                    pixel.a = 1f;
+
+                    // Sparse window grid — skip near edges so windows don't touch the building border.
+                    int wx = x - x0;
+                    int wy = y;
+                    bool onWindowGridX = wx > 3 && wx % 7 < 3 && wx < (x1 - x0) - 3;
+                    bool onWindowGridY = wy > 4 && wy % 9 < 4 && wy < yTop - 5;
+                    if (onWindowGridX && onWindowGridY)
+                    {
+                        pixel = Color.Lerp(pixel, windowColor, windowColor.a);
+                        pixel.a = 1f;
+                    }
+
+                    tex.SetPixel(x, y, pixel);
+                }
+            }
+        }
     }
 
     private static bool IsInsideEllipse(Vector2 p, Vector2 center, float rx, float ry)
@@ -278,12 +582,23 @@ public static class FlappyBirdSceneBuilder
 
     private static void BuildBackground(Sprite backgroundSprite)
     {
+        // Two copies of the same sky/skyline sprite, scrolled slowly left as a
+        // parallax layer (much slower than the ground/pipes) — always kept
+        // adjacent and "cover"-scaled to the camera, so there's never a seam.
         GameObject bg = new GameObject("Background");
         SpriteRenderer sr = bg.AddComponent<SpriteRenderer>();
         sr.sprite = backgroundSprite;
         sr.sortingOrder = -100;
         bg.transform.position = new Vector3(0, 0, 0);
-        bg.AddComponent<BackgroundFitToCamera>(); // stretches to fill the screen on any phone aspect ratio
+
+        GameObject bg2 = new GameObject("Background2");
+        SpriteRenderer sr2 = bg2.AddComponent<SpriteRenderer>();
+        sr2.sprite = backgroundSprite;
+        sr2.sortingOrder = -100;
+
+        ScrollingBackground scroller = bg.AddComponent<ScrollingBackground>();
+        scroller.tileB = bg2.transform;
+        scroller.scrollSpeed = 0.6f;
     }
 
     // ---------- Scene objects ----------
@@ -306,53 +621,78 @@ public static class FlappyBirdSceneBuilder
         fitWidth.targetHalfWidth = CameraTargetHalfWidth;
     }
 
-    private static GameObject BuildGround(Sprite squareSprite)
+    private static GameObject BuildGround(Sprite dirtSprite, Sprite grassSprite)
     {
         // Tall enough that it still reaches the bottom of the screen on very
         // tall portrait phones (its top edge always stays at y = -3.75).
         const float dirtHeight = 40f;
         const float dirtTopY = -3.75f;
+        // Wider than the camera's fixed 18-unit visible width (CameraTargetHalfWidth * 2)
+        // so two tiles side by side always fully cover the screen with room to spare.
+        const float tileWidth = 20f;
 
-        GameObject ground = new GameObject("Ground");
+        GameObject root = new GameObject("GroundRoot");
+
+        GameObject tileA = BuildGroundTile("GroundTileA", dirtSprite, grassSprite, tileWidth, dirtHeight, dirtTopY);
+        tileA.transform.SetParent(root.transform);
+        GameObject tileB = BuildGroundTile("GroundTileB", dirtSprite, grassSprite, tileWidth, dirtHeight, dirtTopY);
+        tileB.transform.SetParent(root.transform);
+
+        GroundScroller scroller = root.AddComponent<GroundScroller>();
+        scroller.tileA = tileA.transform;
+        scroller.tileB = tileB.transform;
+        scroller.tileWidth = tileWidth;
+        scroller.scrollSpeed = 3f; // matches PipeMover's default speed so the floor and pipes move together
+
+        return root;
+    }
+
+    /// <summary>One scrolling ground segment: dirt body (with collider + "Ground" tag) plus its grass cap.</summary>
+    private static GameObject BuildGroundTile(string name, Sprite dirtSprite, Sprite grassSprite, float tileWidth, float dirtHeight, float dirtTopY)
+    {
+        GameObject ground = new GameObject(name);
         ground.tag = "Ground";
         SpriteRenderer sr = ground.AddComponent<SpriteRenderer>();
-        sr.sprite = squareSprite;
-        sr.color = new Color(0.55f, 0.4f, 0.25f);
+        sr.sprite = dirtSprite; // tan/khaki dirt texture with a lighter topsoil band baked near the top edge
+        sr.color = Color.white; // texture already has its final color — no tint
         sr.sortingOrder = -1;
         ground.transform.position = new Vector3(0, dirtTopY - dirtHeight / 2f, 0);
-        ground.transform.localScale = new Vector3(24, dirtHeight, 1);
+        ground.transform.localScale = new Vector3(tileWidth, dirtHeight, 1);
         ground.AddComponent<BoxCollider2D>();
 
-        // Purely cosmetic grass strip sitting right on the dirt's top edge.
+        // Cosmetic grass strip with a jagged blade edge, sitting right on the dirt's top edge.
         GameObject grass = new GameObject("Grass");
         grass.transform.SetParent(ground.transform);
         SpriteRenderer grassSr = grass.AddComponent<SpriteRenderer>();
-        grassSr.sprite = squareSprite;
-        grassSr.color = new Color(0.3f, 0.75f, 0.3f);
+        grassSr.sprite = grassSprite;
+        grassSr.color = Color.white;
         grassSr.sortingOrder = 0;
-        grass.transform.localScale = new Vector3(1f, 0.3f / dirtHeight, 1f); // 0.3 world units tall
+        grass.transform.localScale = new Vector3(1f, 0.5f / dirtHeight, 1f); // 0.5 world units tall
         grass.transform.localPosition = new Vector3(0, 0.5f, 0); // sits at the dirt's top edge (ratio-invariant)
 
         return ground;
     }
 
-    private static GameObject BuildBird(Sprite birdSprite)
+    private static GameObject BuildBird(Sprite birdSprite, AudioClip flapClip, AudioClip hitClip, AudioClip landClip)
     {
         GameObject bird = new GameObject("Bird");
         bird.tag = "Bird";
         SpriteRenderer sr = bird.AddComponent<SpriteRenderer>();
         sr.sprite = birdSprite;
         sr.sortingOrder = 10; // guaranteed to draw above background/ground/pipes on every aspect ratio
-        bird.transform.position = new Vector3(-1f, 0, 0); // just left of center — still safely inside view on any aspect ratio
+        bird.transform.position = new Vector3(-1f, 0, 0); // dead-center vertically — keeps gameplay start position unchanged
         bird.transform.localScale = new Vector3(1.2f, 1.2f, 1); // larger — easier to see on tall/narrow mobile screens
         bird.AddComponent<Rigidbody2D>();
         CircleCollider2D col = bird.AddComponent<CircleCollider2D>();
         col.radius = 0.36f;
-        bird.AddComponent<BirdController>();
+        BirdController birdController = bird.AddComponent<BirdController>();
+        birdController.flapSound = flapClip;
+        birdController.hitSound = hitClip;
+        birdController.fallSound = landClip;
         return bird;
     }
 
-    private static GameObject BuildPipePairPrefab(Sprite squareSprite)
+    private static GameObject BuildPipePairPrefab(Sprite pipeBodySprite, Sprite pipeCapSprite)
     {
         const float gapHeight = 2.5f;
         const float pipeHeight = 40f; // generous enough to reach top/bottom on tall portrait phones too
@@ -365,8 +705,8 @@ public static class FlappyBirdSceneBuilder
         pipeBottom.transform.SetParent(root.transform);
         pipeBottom.tag = "Pipe";
         SpriteRenderer bottomSr = pipeBottom.AddComponent<SpriteRenderer>();
-        bottomSr.sprite = squareSprite;
-        bottomSr.color = new Color(0.2f, 0.7f, 0.2f);
+        bottomSr.sprite = pipeBodySprite; // shaded green body — safe to stretch vertically since shading is column-based only
+        bottomSr.color = Color.white;
         bottomSr.sortingOrder = 5;
         pipeBottom.transform.localScale = new Vector3(pipeWidth, pipeHeight, 1);
         pipeBottom.transform.localPosition = new Vector3(0, -half - pipeHeight / 2f, 0);
@@ -376,31 +716,30 @@ public static class FlappyBirdSceneBuilder
         pipeTop.transform.SetParent(root.transform);
         pipeTop.tag = "Pipe";
         SpriteRenderer topSr = pipeTop.AddComponent<SpriteRenderer>();
-        topSr.sprite = squareSprite;
-        topSr.color = new Color(0.2f, 0.7f, 0.2f);
+        topSr.sprite = pipeBodySprite;
+        topSr.color = Color.white;
         topSr.sortingOrder = 5;
         pipeTop.transform.localScale = new Vector3(pipeWidth, pipeHeight, 1);
         pipeTop.transform.localPosition = new Vector3(0, half + pipeHeight / 2f, 0);
         pipeTop.AddComponent<BoxCollider2D>();
 
         // Cosmetic caps sitting right at the pipe mouths (classic pipe-lip look).
-        Color capColor = new Color(0.12f, 0.5f, 0.12f);
         GameObject capBottom = new GameObject("CapBottom");
         capBottom.transform.SetParent(root.transform);
         SpriteRenderer capBottomSr = capBottom.AddComponent<SpriteRenderer>();
-        capBottomSr.sprite = squareSprite;
-        capBottomSr.color = capColor;
+        capBottomSr.sprite = pipeCapSprite;
+        capBottomSr.color = Color.white;
         capBottomSr.sortingOrder = 6;
-        capBottom.transform.localScale = new Vector3(pipeWidth * 1.25f, 0.3f, 1f);
+        capBottom.transform.localScale = new Vector3(pipeWidth * 1.3f, 0.35f, 1f);
         capBottom.transform.localPosition = new Vector3(0, -half, 0);
 
         GameObject capTop = new GameObject("CapTop");
         capTop.transform.SetParent(root.transform);
         SpriteRenderer capTopSr = capTop.AddComponent<SpriteRenderer>();
-        capTopSr.sprite = squareSprite;
-        capTopSr.color = capColor;
+        capTopSr.sprite = pipeCapSprite;
+        capTopSr.color = Color.white;
         capTopSr.sortingOrder = 6;
-        capTop.transform.localScale = new Vector3(pipeWidth * 1.25f, 0.3f, 1f);
+        capTop.transform.localScale = new Vector3(pipeWidth * 1.3f, -0.35f, 1f); // flipped vertically so its shading mirrors correctly on the underside
         capTop.transform.localPosition = new Vector3(0, half, 0);
 
         GameObject scoreZone = new GameObject("ScoreZone");
@@ -478,14 +817,58 @@ public static class FlappyBirdSceneBuilder
         return go;
     }
 
-    private static GameObject BuildStartPanel(Transform canvasTransform)
+    private static readonly Color[] TitlePalette =
     {
-        GameObject panel = CreatePanel("StartPanel", canvasTransform, new Color(0, 0, 0, 0.35f));
-        CreateLabel("StartText", panel.transform, "Tap to Play", 64);
+        new Color(1f, 0.82f, 0.2f),   // yellow
+        new Color(0.95f, 0.35f, 0.55f), // pink
+        new Color(0.55f, 0.4f, 0.95f),  // purple
+        new Color(0.55f, 0.85f, 0.3f),  // green
+        new Color(0.95f, 0.35f, 0.55f), // pink
+        new Color(0.55f, 0.4f, 0.95f),  // purple
+    };
+
+    private static GameObject BuildStartPanel(Transform canvasTransform, Sprite buttonSprite, Sprite tapBubbleSprite, out Button startButton)
+    {
+        GameObject panel = CreatePanel("StartPanel", canvasTransform, new Color(0, 0, 0, 0.0f));
+
+        // Colorful per-letter title near the top, a pulsing "TAP" hint just under
+        // the bird's idle spot, and the Start button lower down — leaves the
+        // vertical center clear, which is exactly where the bird idles.
+        CreateColoredTitle("TitleText", panel.transform, "FLAPPY BIRD", 78, new Vector2(0, 420));
+
+        GameObject tapBubble = new GameObject("TapBubble");
+        tapBubble.transform.SetParent(panel.transform, false);
+        Image tapImg = tapBubble.AddComponent<Image>();
+        tapImg.sprite = tapBubbleSprite;
+        tapImg.type = Image.Type.Simple;
+        RectTransform tapRt = tapBubble.GetComponent<RectTransform>();
+        tapRt.sizeDelta = new Vector2(190, 78);
+        tapRt.anchoredPosition = new Vector2(0, -190); // clear of the idling bird, well above the Start button
+        tapBubble.AddComponent<UIPulse>();
+
+        GameObject tapLabel = CreateLabel("Text", tapBubble.transform, "TAP", 40);
+        Text tapText = tapLabel.GetComponent<Text>();
+        tapText.color = Color.white;
+
+        GameObject buttonGO = new GameObject("StartButton");
+        buttonGO.transform.SetParent(panel.transform, false);
+        Image img = buttonGO.AddComponent<Image>();
+        ApplyButtonLook(img, buttonSprite, new Color(0.35f, 0.78f, 0.95f));
+        RectTransform btnRt = buttonGO.GetComponent<RectTransform>();
+        btnRt.sizeDelta = new Vector2(340, 110);
+        btnRt.anchoredPosition = new Vector2(0, -420); // near the bottom, well clear of the bird and the TAP hint
+        startButton = buttonGO.AddComponent<Button>();
+
+        GameObject label = CreateLabel("Text", buttonGO.transform, "START", 48);
+        Text labelText = label.GetComponent<Text>();
+        labelText.color = new Color(0.05f, 0.2f, 0.25f);
+        Outline labelOutline = label.GetComponent<Outline>();
+        if (labelOutline != null) Object.DestroyImmediate(labelOutline); // button already has contrast; skip the outline here
+
         return panel;
     }
 
-    private static GameObject BuildGameOverPanel(Transform canvasTransform, out Button restartButton)
+    private static GameObject BuildGameOverPanel(Transform canvasTransform, Sprite buttonSprite, out Button restartButton)
     {
         GameObject panel = CreatePanel("GameOverPanel", canvasTransform, new Color(0, 0, 0, 0.55f));
         CreateLabel("GameOverText", panel.transform, "Game Over", 72, new Vector2(0, 100));
@@ -493,18 +876,88 @@ public static class FlappyBirdSceneBuilder
         GameObject buttonGO = new GameObject("RestartButton");
         buttonGO.transform.SetParent(panel.transform, false);
         Image img = buttonGO.AddComponent<Image>();
-        img.color = Color.white;
+        ApplyButtonLook(img, buttonSprite, new Color(0.35f, 0.78f, 0.95f));
         RectTransform btnRt = buttonGO.GetComponent<RectTransform>();
         btnRt.sizeDelta = new Vector2(300, 100);
         btnRt.anchoredPosition = new Vector2(0, -60);
         restartButton = buttonGO.AddComponent<Button>();
 
-        GameObject label = CreateLabel("Text", buttonGO.transform, "Restart", 40);
+        GameObject label = CreateLabel("Text", buttonGO.transform, "RESTART", 40);
         Text labelText = label.GetComponent<Text>();
-        labelText.color = Color.black;
+        labelText.color = new Color(0.05f, 0.2f, 0.25f);
 
         panel.SetActive(false);
         return panel;
+    }
+
+    /// <summary>
+    /// Builds a title out of one colored Text object per letter (skipping the
+    /// space), approximating the classic multi-color blocky logo look without
+    /// using any copyrighted logo art.
+    /// </summary>
+    private static void CreateColoredTitle(string name, Transform parent, string content, int fontSize, Vector2 centerPos)
+    {
+        GameObject root = new GameObject(name);
+        root.transform.SetParent(parent, false);
+        RectTransform rootRt = root.AddComponent<RectTransform>();
+        rootRt.anchorMin = new Vector2(0.5f, 0.5f);
+        rootRt.anchorMax = new Vector2(0.5f, 0.5f);
+        rootRt.pivot = new Vector2(0.5f, 0.5f);
+        rootRt.anchoredPosition = centerPos;
+        rootRt.sizeDelta = new Vector2(900, 150);
+
+        float charWidth = fontSize * 0.72f;
+        float spaceWidth = fontSize * 0.4f;
+        float totalWidth = 0f;
+        foreach (char c in content) totalWidth += c == ' ' ? spaceWidth : charWidth;
+
+        float cursor = -totalWidth / 2f;
+        int colorIndex = 0;
+        for (int i = 0; i < content.Length; i++)
+        {
+            char c = content[i];
+            float w = c == ' ' ? spaceWidth : charWidth;
+
+            if (c != ' ')
+            {
+                GameObject letterGO = new GameObject("Letter_" + c + i);
+                letterGO.transform.SetParent(root.transform, false);
+                Text text = letterGO.AddComponent<Text>();
+                text.text = c.ToString();
+                text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                text.fontSize = fontSize;
+                text.fontStyle = FontStyle.Bold;
+                text.alignment = TextAnchor.MiddleCenter;
+                text.color = TitlePalette[colorIndex % TitlePalette.Length];
+                Outline outline = letterGO.AddComponent<Outline>();
+                outline.effectColor = new Color(0.15f, 0.08f, 0.02f, 0.9f);
+                outline.effectDistance = new Vector2(3f, -3f);
+                RectTransform rt = letterGO.GetComponent<RectTransform>();
+                rt.anchorMin = new Vector2(0.5f, 0.5f);
+                rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.sizeDelta = new Vector2(charWidth * 1.3f, fontSize * 1.3f);
+                rt.anchoredPosition = new Vector2(cursor + w / 2f, 0f);
+                colorIndex++;
+            }
+
+            cursor += w;
+        }
+    }
+
+    /// <summary>Uses the real downloaded button sprite if available, otherwise falls back to a plain color.</summary>
+    private static void ApplyButtonLook(Image img, Sprite buttonSprite, Color fallbackColor)
+    {
+        if (buttonSprite != null)
+        {
+            img.sprite = buttonSprite;
+            img.type = Image.Type.Simple; // no 9-slice border configured, so stretch as a whole image
+            img.color = Color.white;
+        }
+        else
+        {
+            img.color = fallbackColor;
+        }
     }
 
     private static GameObject CreatePanel(string name, Transform parent, Color color)
@@ -543,7 +996,7 @@ public static class FlappyBirdSceneBuilder
         return go;
     }
 
-    private static GameObject BuildGameManager(GameObject bird, GameObject pipeSpawnerGO, GameObject scoreTextGO, GameObject startPanel, GameObject gameOverPanel)
+    private static GameObject BuildGameManager(GameObject bird, GameObject pipeSpawnerGO, GameObject scoreTextGO, GameObject startPanel, GameObject gameOverPanel, AudioClip clickClip, AudioClip scoreClip)
     {
         GameObject go = new GameObject("GameManager");
         GameManager gm = go.AddComponent<GameManager>();
@@ -552,6 +1005,8 @@ public static class FlappyBirdSceneBuilder
         gm.scoreText = scoreTextGO;
         gm.startPanel = startPanel;
         gm.gameOverPanel = gameOverPanel;
+        gm.buttonClickSound = clickClip;
+        gm.scoreSound = scoreClip;
         return go;
     }
 }

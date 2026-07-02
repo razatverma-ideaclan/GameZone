@@ -37,7 +37,7 @@ public class BackgroundFitToCamera : MonoBehaviour
         // screen without ever stretching/distorting the art — like CSS
         // "background-size: cover." Any excess simply extends past the
         // camera's edges, which is invisible to the player.
-        float uniformScale = Mathf.Max(scaleX, scaleY);
+        float uniformScale = Mathf.Max(scaleX, scaleY) * 1.02f; // tiny safety margin so no hairline gap ever shows at the edges
 
         transform.localScale = new Vector3(uniformScale, uniformScale, 1f);
         transform.position = new Vector3(cam.transform.position.x, cam.transform.position.y, transform.position.z);
