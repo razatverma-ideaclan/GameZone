@@ -50,6 +50,7 @@ public class GameManager : MonoBehaviour
 
     private int score = 0;
     private float startStateTime = 0f;
+    private bool justEnteredStartState = false;
     private AudioSource sfxSource;
     private AudioSource musicSource;
 
@@ -84,28 +85,10 @@ public class GameManager : MonoBehaviour
 
     void Update()
     {
-        // Any tap/click/spacebar while on the Start screen begins the game.
+        // Spacebar key to start the game for keyboard players
         if (CurrentState == GameState.Start)
         {
-            // Prevent accidental tap leaks immediately after clicking Menu to return
-            if (Time.time - startStateTime < 0.25f) return;
-
-            // Ignore clicks/touches that are over UI elements (like bird selector arrows or the start button)
-            if (UnityEngine.EventSystems.EventSystem.current != null)
-            {
-                if (Input.touchCount > 0)
-                {
-                    if (UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject(Input.GetTouch(0).fingerId))
-                        return;
-                }
-                else
-                {
-                    if (UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
-                        return;
-                }
-            }
-
-            if (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Space) || TouchStarted())
+            if (Input.GetKeyDown(KeyCode.Space))
             {
                 StartGame();
             }
@@ -156,6 +139,7 @@ public class GameManager : MonoBehaviour
     public void StartGame()
     {
         if (CurrentState != GameState.Start) return;
+        if (justEnteredStartState) return;
 
         PlayClickSound();
 
@@ -213,6 +197,9 @@ public class GameManager : MonoBehaviour
 
         // Trigger camera shake to add feedback on impact
         StartCoroutine(ShakeCamera(0.22f, 0.14f));
+
+        // Hide top-right score counter when Game Over card displays
+        if (scoreText != null) scoreText.SetActive(false);
 
         // Update + persist the best score before showing the panel, so it's
         // always accurate the instant the run ends.
@@ -345,7 +332,23 @@ public class GameManager : MonoBehaviour
     public void RestartGame()
     {
         PlayClickSound();
+        justEnteredStartState = true;
         ShowStartState();
+        StartCoroutine(ClearTransitionFlag());
+    }
+
+    private System.Collections.IEnumerator ClearTransitionFlag()
+    {
+        // Wait until the user has fully released the click/touch
+        while (Input.GetMouseButton(0) || Input.touchCount > 0)
+        {
+            yield return null;
+        }
+        
+        // Wait one extra frame for all EventSystem pointer click queues to flush
+        yield return null;
+        
+        justEnteredStartState = false;
     }
 
     /// <summary>Hooked up to the Game Over panel's "RETRY" button — jumps straight back into play without a scene reload or an extra tap on Start.</summary>

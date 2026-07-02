@@ -1108,11 +1108,25 @@ public static class FlappyBirdSceneBuilder
         titleGO.AddComponent<UIFloat>().floatAmount = 12f;
         titleGO.GetComponent<UIFloat>().speed = 2f;
 
-        // Start Button - Text Only!
+        // Start Button - Fullscreen transparent catcher to trigger play on tap anywhere
         GameObject buttonGO = new GameObject("StartButton");
         buttonGO.transform.SetParent(panel.transform, false);
         
-        Text btnText = buttonGO.AddComponent<Text>();
+        Image startBtnImg = buttonGO.AddComponent<Image>();
+        startBtnImg.color = new Color(0f, 0f, 0f, 0f); // Transparent but catches clicks
+        
+        RectTransform btnRt = buttonGO.GetComponent<RectTransform>();
+        btnRt.anchorMin = Vector2.zero;
+        btnRt.anchorMax = Vector2.one;
+        btnRt.offsetMin = Vector2.zero;
+        btnRt.offsetMax = Vector2.zero;
+        startButton = buttonGO.AddComponent<Button>();
+
+        // Pulsating text child object
+        GameObject textGO = new GameObject("StartText");
+        textGO.transform.SetParent(buttonGO.transform, false);
+        
+        Text btnText = textGO.AddComponent<Text>();
         btnText.text = "TAP TO START";
         btnText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         btnText.fontSize = 64;
@@ -1120,23 +1134,22 @@ public static class FlappyBirdSceneBuilder
         btnText.alignment = TextAnchor.MiddleCenter;
         btnText.color = Color.white; // Crisp white text
 
-        Outline outline = buttonGO.AddComponent<Outline>();
+        Outline outline = textGO.AddComponent<Outline>();
         outline.effectColor = new Color(0.18f, 0.18f, 0.22f, 1f); // Charcoal outline
         outline.effectDistance = new Vector2(4f, -4f);
 
-        Shadow shadow = buttonGO.AddComponent<Shadow>();
+        Shadow shadow = textGO.AddComponent<Shadow>();
         shadow.effectColor = new Color(0f, 0f, 0f, 0.5f);
         shadow.effectDistance = new Vector2(3f, -5f);
 
         // Pulsating text animation
-        UIPulse pulse = buttonGO.AddComponent<UIPulse>();
+        UIPulse pulse = textGO.AddComponent<UIPulse>();
         pulse.scaleAmount = 0.08f;
         pulse.speed = 2.5f;
 
-        RectTransform btnRt = buttonGO.GetComponent<RectTransform>();
-        btnRt.sizeDelta = new Vector2(700, 140);
-        btnRt.anchoredPosition = new Vector2(0, -420); // near the bottom
-        startButton = buttonGO.AddComponent<Button>();
+        RectTransform textRt = textGO.GetComponent<RectTransform>();
+        textRt.sizeDelta = new Vector2(700, 140);
+        textRt.anchoredPosition = new Vector2(0, -420); // near the bottom
 
         // High Score Badge (UI Change)
         GameObject scoreBadge = new GameObject("HighScoreBadge");
