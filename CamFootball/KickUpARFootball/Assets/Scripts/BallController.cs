@@ -23,13 +23,22 @@ public class BallController : MonoBehaviour
     public float sideBounceStrength = 0.6f;
     [Tooltip("Y position (world space) below which the ball triggers Game Over")]
     public float gameOverBottomY = -6f;
+    [Tooltip("Maximum speed the ball can ever reach, so it can't rocket off screen")]
+    public float maxSpeed = 14f;
+    [Tooltip("How far past the top edge of the screen the ball can go before bouncing back down")]
+    public float topBoundsPadding = 0.3f;
 
     [Header("Start Position")]
     public Vector3 startPosition = new Vector3(0f, -2f, 0f);
+    [Tooltip("Automatic upward bounce given to the ball right when it (re)spawns, so the player has time to react")]
+    public float startBounceForce = 6f;
+    [Tooltip("Seconds after spawning during which the ball cannot trigger Game Over, giving the player time to react")]
+    public float startGracePeriod = 1.2f;
 
     private Rigidbody2D rb;
     private Camera mainCamera;
     private bool isGameOverTriggered = false;
+    private float graceTimer = 0f;
 
     private void Awake()
     {
@@ -45,7 +54,11 @@ public class BallController : MonoBehaviour
 
     private void Update()
     {
+        if (graceTimer > 0f) graceTimer -= Time.deltaTime;
+
+        ClampSpeed();
         CheckSideBounds();
+        CheckTopBounds();
         CheckBottomBoundary();
     }
 
@@ -65,6 +78,7 @@ public class BallController : MonoBehaviour
 
         Vector2 kick = new Vector2(direction.x * horizontalSwipeForce, kickForce * forceMultiplier);
         rb.AddForce(kick, ForceMode2D.Impulse);
+        ClampSpeed();
 
         AudioManager.Instance?.PlayKickSound();
 
@@ -84,6 +98,19 @@ public class BallController : MonoBehaviour
         transform.position = startPosition;
         rb.linearVelocity = Vector2.zero;
         rb.angularVelocity = 0f;
+        graceTimer = startGracePeriod;
+
+        // Give the ball an automatic little bounce upward so it doesn't just
+        // sit there or immediately fall - gives the player a moment to react.
+        rb.AddForce(new Vector2(0f, startBounceForce), ForceMode2D.Impulse);
+    }
+
+    private void ClampSpeed()
+    {
+        if (rb.linearVelocity.magnitude > maxSpeed)
+        {
+            rb.linearVelocity = rb.linearVelocity.normalized * maxSpeed;
+        }
     }
 
     private void CheckSideBounds()
@@ -92,13 +119,14 @@ public class BallController : MonoBehaviour
 
         Vector3 viewportPos = mainCamera.WorldToViewportPoint(transform.position);
 
-        if (viewportPos.x < -0.05f)
+        // Clamp immediately at the edge (0-1 viewport range) instead of letting it drift past first
+        if (viewportPos.x < 0f)
         {
             Vector3 edge = mainCamera.ViewportToWorldPoint(new Vector3(0f, viewportPos.y, transform.position.z - mainCamera.transform.position.z));
             transform.position = new Vector3(edge.x + sideBoundsPadding, transform.position.y, transform.position.z);
             rb.linearVelocity = new Vector2(Mathf.Abs(rb.linearVelocity.x) * sideBounceStrength, rb.linearVelocity.y);
         }
-        else if (viewportPos.x > 1.05f)
+        else if (viewportPos.x > 1f)
         {
             Vector3 edge = mainCamera.ViewportToWorldPoint(new Vector3(1f, viewportPos.y, transform.position.z - mainCamera.transform.position.z));
             transform.position = new Vector3(edge.x - sideBoundsPadding, transform.position.y, transform.position.z);
@@ -106,9 +134,25 @@ public class BallController : MonoBehaviour
         }
     }
 
+    private void CheckTopBounds()
+    {
+        if (mainCamera == null) return;
+
+        Vector3 viewportPos = mainCamera.WorldToViewportPoint(transform.position);
+
+        if (viewportPos.y > 1f)
+        {
+            Vector3 edge = mainCamera.ViewportToWorldPoint(new Vector3(viewportPos.x, 1f, transform.position.z - mainCamera.transform.position.z));
+            transform.position = new Vector3(transform.position.x, edge.y - topBoundsPadding, transform.position.z);
+            // Soften the upward velocity so it comes back down instead of sticking to the ceiling
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, Mathf.Min(rb.linearVelocity.y, 0f));
+        }
+    }
+
     private void CheckBottomBoundary()
     {
         if (isGameOverTriggered) return;
+        if (graceTimer > 0f) return;
 
         if (transform.position.y < gameOverBottomY)
         {
