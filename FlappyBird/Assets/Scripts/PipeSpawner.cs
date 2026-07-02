@@ -43,7 +43,12 @@ public class PipeSpawner : MonoBehaviour
         while (true)
         {
             SpawnPipe();
-            yield return new WaitForSeconds(spawnInterval);
+            float currentInterval = spawnInterval;
+            if (GameManager.Instance != null)
+            {
+                currentInterval /= GameManager.Instance.GetCurrentSpeedMultiplier();
+            }
+            yield return new WaitForSeconds(currentInterval);
         }
     }
 

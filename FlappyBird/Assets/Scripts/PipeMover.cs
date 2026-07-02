@@ -22,7 +22,13 @@ public class PipeMover : MonoBehaviour
             return;
         }
 
-        transform.position += Vector3.left * speed * Time.deltaTime;
+        float currentSpeed = speed;
+        if (GameManager.Instance != null)
+        {
+            currentSpeed *= GameManager.Instance.GetCurrentSpeedMultiplier();
+        }
+
+        transform.position += Vector3.left * currentSpeed * Time.deltaTime;
 
         if (transform.position.x < destroyXPosition)
         {

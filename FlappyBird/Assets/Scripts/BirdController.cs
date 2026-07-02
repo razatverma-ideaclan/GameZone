@@ -37,6 +37,25 @@ public class BirdController : MonoBehaviour
     [Tooltip("Plays once the bird actually lands on the ground after falling.")]
     public AudioClip fallSound;
 
+    [Header("Animation")]
+    public float animationSpeed = 10f;
+
+    [System.Serializable]
+    public struct BirdSkin
+    {
+        [Tooltip("Sprites for this skin's flap animation (Wing Up, Wing Mid, Wing Down).")]
+        public Sprite[] flapSprites;
+    }
+
+    [Header("Selectable Skins")]
+    public BirdSkin[] skins;
+    public int currentSkinIndex = 0;
+
+
+    [HideInInspector]
+    public Sprite[] flapSprites; // fallback for backwards compatibility
+
+    private SpriteRenderer spriteRenderer;
     private Rigidbody2D rb;
     private AudioSource audioSource;
     private Vector3 startPosition;
@@ -49,6 +68,7 @@ public class BirdController : MonoBehaviour
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
+        spriteRenderer = GetComponent<SpriteRenderer>();
         startPosition = transform.position;
 
         // Auto-add an AudioSource so sounds work without extra Inspector setup.
@@ -58,6 +78,11 @@ public class BirdController : MonoBehaviour
 
         // Randomizes the bob cycle slightly so a restarted bird doesn't look robotic.
         idleTimeOffset = Random.Range(0f, 10f);
+
+        // Load skin selection
+        currentSkinIndex = PlayerPrefs.GetInt("FlappyBird_SelectedSkin", 0);
+        if (skins != null && currentSkinIndex >= skins.Length) currentSkinIndex = 0;
+        UpdateSkin();
     }
 
     void Start()
@@ -80,6 +105,7 @@ public class BirdController : MonoBehaviour
         if (isIdle)
         {
             IdleFloat();
+            AnimateWings(animationSpeed * 0.5f);
             return;
         }
 
@@ -91,6 +117,26 @@ public class BirdController : MonoBehaviour
         }
 
         UpdateTilt();
+        AnimateWings(animationSpeed);
+    }
+
+    private void AnimateWings(float speed)
+    {
+        if (spriteRenderer == null) return;
+
+        Sprite[] activeSprites = null;
+        if (skins != null && skins.Length > 0 && currentSkinIndex < skins.Length)
+        {
+            activeSprites = skins[currentSkinIndex].flapSprites;
+        }
+        else
+        {
+            activeSprites = flapSprites;
+        }
+
+        if (activeSprites == null || activeSprites.Length == 0) return;
+        int index = (int)(Time.time * speed) % activeSprites.Length;
+        spriteRenderer.sprite = activeSprites[index];
     }
 
     private void IdleFloat()
@@ -139,10 +185,20 @@ public class BirdController : MonoBehaviour
         hasLanded = false;
         controlEnabled = false;
         isIdle = true;
-        rb.linearVelocity = Vector2.zero;
         rb.bodyType = RigidbodyType2D.Kinematic;
+        rb.linearVelocity = Vector2.zero;
         transform.position = startPosition;
         transform.rotation = Quaternion.identity;
+        UpdateSkin();
+    }
+
+    void OnMouseDown()
+    {
+        // Cycle bird skins when clicked directly on the start screen
+        if (isIdle && !controlEnabled)
+        {
+            NextSkin();
+        }
     }
 
     void OnCollisionEnter2D(Collision2D collision)
@@ -185,6 +241,7 @@ public class BirdController : MonoBehaviour
         rb.bodyType = RigidbodyType2D.Dynamic; // keep falling under gravity instead of freezing in place
 
         PlaySound(hitSound);
+        SpawnBlastEffect();
 
         if (GameManager.Instance != null)
         {
@@ -208,6 +265,10 @@ public class BirdController : MonoBehaviour
         rb.bodyType = RigidbodyType2D.Static; // fully stopped — no more falling or movement
 
         PlaySound(fallSound);
+        if (!alreadyDead)
+        {
+            SpawnBlastEffect();
+        }
 
         if (!alreadyDead && GameManager.Instance != null)
         {
@@ -218,5 +279,92 @@ public class BirdController : MonoBehaviour
     private void PlaySound(AudioClip clip)
     {
         if (clip != null && audioSource != null) audioSource.PlayOneShot(clip);
+    }
+
+    private void SpawnBlastEffect()
+    {
+        GameObject blast = new GameObject("PixelBlast");
+        blast.transform.position = transform.position;
+
+        ParticleSystem ps = blast.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear); // Stop default auto-play before editing parameters
+
+        var main = ps.main;
+        main.duration = 0.5f;
+        main.loop = false;
+        main.startLifetime = 0.4f;
+        main.startSpeed = new ParticleSystem.MinMaxCurve(1.5f, 3.5f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.12f, 0.25f);
+        main.gravityModifier = 0.35f;
+        main.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 0.5f, 0f), new Color(1f, 0.9f, 0.1f));
+        main.stopAction = ParticleSystemStopAction.Destroy;
+
+        var emission = ps.emission;
+        emission.rateOverTime = 0f;
+        emission.SetBursts(new ParticleSystem.Burst[] { new ParticleSystem.Burst(0f, 25) });
+
+        var shape = ps.shape;
+        shape.shapeType = ParticleSystemShapeType.Sphere;
+        shape.radius = 0.1f;
+
+        var colorOverLifetime = ps.colorOverLifetime;
+        colorOverLifetime.enabled = true;
+        Gradient grad = new Gradient();
+        grad.SetKeys(
+            new GradientColorKey[] { new GradientColorKey(new Color(1f, 0.85f, 0.1f), 0f), new GradientColorKey(new Color(0.95f, 0.15f, 0f), 1f) },
+            new GradientAlphaKey[] { new GradientAlphaKey(1.0f, 0f), new GradientAlphaKey(0f, 1f) }
+        );
+        colorOverLifetime.color = new ParticleSystem.MinMaxGradient(grad);
+
+        var sizeOverLifetime = ps.sizeOverLifetime;
+        sizeOverLifetime.enabled = true;
+        AnimationCurve curve = new AnimationCurve();
+        curve.AddKey(0f, 1f);
+        curve.AddKey(1f, 0f);
+        sizeOverLifetime.size = new ParticleSystem.MinMaxCurve(1f, curve);
+
+        var psRenderer = blast.GetComponent<ParticleSystemRenderer>();
+        psRenderer.sortingOrder = 40; // in front of bird (30)
+        psRenderer.material = new Material(Shader.Find("Sprites/Default"));
+
+        ps.Play();
+    }
+
+    public void NextSkin()
+    {
+        if (skins == null || skins.Length == 0) return;
+        currentSkinIndex = (currentSkinIndex + 1) % skins.Length;
+        PlayerPrefs.SetInt("FlappyBird_SelectedSkin", currentSkinIndex);
+        PlayerPrefs.Save();
+        UpdateSkin();
+        PlayFlapOrClickSound();
+    }
+
+    public void PrevSkin()
+    {
+        if (skins == null || skins.Length == 0) return;
+        currentSkinIndex = (currentSkinIndex - 1 + skins.Length) % skins.Length;
+        PlayerPrefs.SetInt("FlappyBird_SelectedSkin", currentSkinIndex);
+        PlayerPrefs.Save();
+        UpdateSkin();
+        PlayFlapOrClickSound();
+    }
+
+    public void UpdateSkin()
+    {
+        if (skins == null || skins.Length == 0 || currentSkinIndex >= skins.Length || spriteRenderer == null) return;
+        Sprite[] activeSprites = skins[currentSkinIndex].flapSprites;
+        if (activeSprites != null && activeSprites.Length > 1)
+        {
+            spriteRenderer.sprite = activeSprites[1]; // default to mid-flap
+        }
+    }
+
+    private void PlayFlapOrClickSound()
+    {
+        if (audioSource != null && flapSound != null)
+        {
+            audioSource.PlayOneShot(flapSound);
+        }
     }
 }

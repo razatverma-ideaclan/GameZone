@@ -7,6 +7,8 @@ TagManager:
   - Bird
   - Pipe
   - Ground
+  - Wall
+  - Ceiling
   layers:
   - Default
   - TransparentFX

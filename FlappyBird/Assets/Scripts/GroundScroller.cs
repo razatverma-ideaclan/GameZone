@@ -25,7 +25,12 @@ public class GroundScroller : MonoBehaviour
         bool frozen = GameManager.Instance != null && GameManager.Instance.CurrentState == GameManager.GameState.GameOver;
         if (!frozen)
         {
-            scrollOffset += scrollSpeed * Time.deltaTime;
+            float currentSpeed = scrollSpeed;
+            if (GameManager.Instance != null)
+            {
+                currentSpeed *= GameManager.Instance.GetCurrentSpeedMultiplier();
+            }
+            scrollOffset += currentSpeed * Time.deltaTime;
             scrollOffset %= tileWidth;
         }
 
