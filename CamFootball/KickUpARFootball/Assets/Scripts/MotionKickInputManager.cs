@@ -222,6 +222,12 @@ public class MotionKickInputManager : MonoBehaviour
             ballController.Kick(new Vector2(horizontalDirection, 0f), 1f);
             cooldownTimer = kickCooldown;
             consecutiveMotionFrames = 0;
+
+            // Clear the stored frame so that once the cooldown ends, the very next
+            // check just captures a fresh baseline instead of comparing against a
+            // frame from half a second ago (which is usually a huge, meaningless
+            // difference and made detection unreliable right after the first kick).
+            previousPixels = null;
         }
     }
 }
