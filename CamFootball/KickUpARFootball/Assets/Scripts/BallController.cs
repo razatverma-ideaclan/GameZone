@@ -51,11 +51,17 @@ public class BallController : MonoBehaviour
 
     private void Start()
     {
-        ResetBall();
+        // Sit still on the Start Menu instead of immediately falling under gravity -
+        // physics only turns on once GameManager.StartGame() calls ResetBall().
+        PlaceIdle();
     }
 
     private void Update()
     {
+        // Don't run gameplay physics/bounds checks until a game is actually in progress
+        if (GameManager.Instance != null && GameManager.Instance.CurrentState != GameManager.GameState.Playing)
+            return;
+
         if (graceTimer > 0f) graceTimer -= Time.deltaTime;
 
         ClampSpeed();
@@ -97,6 +103,7 @@ public class BallController : MonoBehaviour
     public void ResetBall()
     {
         isGameOverTriggered = false;
+        rb.simulated = true; // turn physics back on for actual gameplay
         transform.position = startPosition;
         rb.linearVelocity = Vector2.zero;
         rb.angularVelocity = 0f;
@@ -105,6 +112,19 @@ public class BallController : MonoBehaviour
         // Give the ball an automatic little bounce upward so it doesn't just
         // sit there or immediately fall - gives the player a moment to react.
         rb.AddForce(new Vector2(0f, startBounceForce), ForceMode2D.Impulse);
+    }
+
+    /// <summary>
+    /// Places the ball at rest with physics disabled - used on the Start Menu
+    /// (and Game Over screen) so it doesn't fall or drift on its own.
+    /// </summary>
+    public void PlaceIdle()
+    {
+        isGameOverTriggered = false;
+        transform.position = startPosition;
+        rb.linearVelocity = Vector2.zero;
+        rb.angularVelocity = 0f;
+        rb.simulated = false;
     }
 
     private void ClampSpeed()

@@ -17,10 +17,17 @@ public class GameManager : MonoBehaviour
     public GameObject startPanel;
     public GameObject gameOverPanel;
     public GameObject scoreText; // assign the in-game score label (TextMeshProUGUI or Text)
+    [Tooltip("Text on the Game Over panel showing this run's score.")]
+    public GameObject gameOverScoreText;
+    [Tooltip("Text on the Game Over panel showing the all-time best score.")]
+    public GameObject gameOverBestText;
 
     [Header("References")]
     public GameObject bird;
     public PipeSpawner pipeSpawner;
+
+    private const string HighScoreKey = "FlappyBird_HighScore";
+    private int bestScore = 0;
 
     [Header("Audio (optional — leave empty to skip)")]
     public AudioClip scoreSound;
@@ -51,6 +58,10 @@ public class GameManager : MonoBehaviour
         musicSource.playOnAwake = false;
         musicSource.loop = true;
         musicSource.volume = musicVolume;
+
+        // Local on-device persistence — survives app restarts (PlayerPrefs is
+        // Unity's standard local key/value storage, backed by the OS on each platform).
+        bestScore = PlayerPrefs.GetInt(HighScoreKey, 0);
     }
 
     void Start()
@@ -141,16 +152,45 @@ public class GameManager : MonoBehaviour
 
         CurrentState = GameState.GameOver;
         if (pipeSpawner != null) pipeSpawner.StopSpawning();
-        if (gameOverPanel != null) gameOverPanel.SetActive(true);
         if (musicSource != null) musicSource.Stop();
+
+        // Update + persist the best score before showing the panel, so it's
+        // always accurate the instant the run ends.
+        bool isNewBest = score > bestScore;
+        if (isNewBest)
+        {
+            bestScore = score;
+            PlayerPrefs.SetInt(HighScoreKey, bestScore);
+            PlayerPrefs.Save();
+        }
+
+        SetText(gameOverScoreText, score.ToString());
+        SetText(gameOverBestText, bestScore.ToString());
+
+        if (gameOverPanel != null) gameOverPanel.SetActive(true);
     }
 
-    // Hooked up to the Restart button's OnClick() in the Inspector.
+    private void SetText(GameObject go, string value)
+    {
+        if (go == null) return;
+        UnityEngine.UI.Text text = go.GetComponent<UnityEngine.UI.Text>();
+        if (text != null) text.text = value;
+    }
+
+    // Hooked up to the Game Over panel's "MENU" button — fully resets via a
+    // scene reload and lands back on the Start screen.
     public void RestartGame()
     {
         PlayClickSound();
         Time.timeScale = 1f;
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+    }
+
+    /// <summary>Hooked up to the Game Over panel's "RETRY" button — jumps straight back into play without a scene reload or an extra tap on Start.</summary>
+    public void RetryGame()
+    {
+        ShowStartState();
+        StartGame(); // StartGame() already plays the click sound — avoid double-triggering it here
     }
 
     /// <summary>Call from any UI Button's OnClick() for a consistent click sound.</summary>
@@ -174,10 +214,15 @@ public class GameManager : MonoBehaviour
 
     private void ClearExistingPipes()
     {
-        GameObject[] pipes = GameObject.FindGameObjectsWithTag("Pipe");
-        foreach (GameObject pipe in pipes)
+        // Destroying only the "Pipe"-tagged children (the top/bottom pipe
+        // bodies) left the parent PipePair object behind — including its caps
+        // and PipeMover — as an orphaned, still-moving leftover. Finding every
+        // PipeMover and destroying its root GameObject removes the whole
+        // pipe pair (body + caps + score trigger) in one go.
+        PipeMover[] pipes = FindObjectsOfType<PipeMover>();
+        foreach (PipeMover pipe in pipes)
         {
-            Destroy(pipe);
+            Destroy(pipe.gameObject);
         }
     }
 }

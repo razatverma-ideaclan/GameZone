@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Shows/hides the three UI panels (Start, Gameplay, Game Over) and updates
+/// Shows/hides the UI panels (Start, Gameplay, Game Over, Permission) and updates
 /// all on-screen text. Button OnClick() events in the Inspector should call
 /// the public methods below.
 ///
@@ -16,6 +16,7 @@ public class UIManager : MonoBehaviour
     public GameObject startPanel;
     public GameObject gameplayPanel;
     public GameObject gameOverPanel;
+    public GameObject permissionPanel;
 
     [Header("Start Panel")]
     public Text titleText;
@@ -27,6 +28,7 @@ public class UIManager : MonoBehaviour
     public Text scoreText;
     public Text bestScoreText;
     public Text timerText;
+    public Button exitToMenuButton;
 
     [Header("Game Over Panel")]
     public Text gameOverText;
@@ -34,6 +36,16 @@ public class UIManager : MonoBehaviour
     public Text bestScoreGameOverText;
     public Button restartButton;
     public Button mainMenuButton;
+
+    [Header("Permission Panel")]
+    public Text permissionText;
+    public Button openSettingsButton;
+    public Button retryCameraButton;
+
+    [Header("References")]
+    public CameraBackgroundManager cameraBackgroundManager;
+
+    private bool wasStartPanelShowingBeforePermissionPrompt = true;
 
     private void Start()
     {
@@ -43,10 +55,30 @@ public class UIManager : MonoBehaviour
         if (basketModeButton != null) basketModeButton.onClick.AddListener(OnClickStartBasket);
         if (restartButton != null) restartButton.onClick.AddListener(OnClickRestart);
         if (mainMenuButton != null) mainMenuButton.onClick.AddListener(OnClickMainMenu);
+        if (exitToMenuButton != null) exitToMenuButton.onClick.AddListener(OnClickMainMenu);
+        if (openSettingsButton != null) openSettingsButton.onClick.AddListener(OnClickOpenCameraSettings);
+        if (retryCameraButton != null) retryCameraButton.onClick.AddListener(OnClickRetryCamera);
 
         if (timerText != null)
         {
             timerText.gameObject.SetActive(false); // hidden until Basket Mode starts
+        }
+
+        if (cameraBackgroundManager != null)
+        {
+            cameraBackgroundManager.OnPermissionDenied += HandleCameraPermissionDenied;
+            cameraBackgroundManager.OnPermissionGranted += HandleCameraPermissionGranted;
+        }
+
+        SetPanel(permissionPanel, false);
+    }
+
+    private void OnDestroy()
+    {
+        if (cameraBackgroundManager != null)
+        {
+            cameraBackgroundManager.OnPermissionDenied -= HandleCameraPermissionDenied;
+            cameraBackgroundManager.OnPermissionGranted -= HandleCameraPermissionGranted;
         }
     }
 
@@ -57,6 +89,7 @@ public class UIManager : MonoBehaviour
         SetPanel(startPanel, true);
         SetPanel(gameplayPanel, false);
         SetPanel(gameOverPanel, false);
+        SetPanel(permissionPanel, false);
     }
 
     public void ShowGameplayUI()
@@ -64,6 +97,7 @@ public class UIManager : MonoBehaviour
         SetPanel(startPanel, false);
         SetPanel(gameplayPanel, true);
         SetPanel(gameOverPanel, false);
+        SetPanel(permissionPanel, false);
 
         bool isBasketMode = GameManager.Instance != null &&
                              GameManager.Instance.CurrentMode == GameManager.GameMode.Basket;
@@ -77,6 +111,7 @@ public class UIManager : MonoBehaviour
         SetPanel(startPanel, false);
         SetPanel(gameplayPanel, false);
         SetPanel(gameOverPanel, true);
+        SetPanel(permissionPanel, false);
 
         if (finalScoreText != null) finalScoreText.text = $"Score: {finalScore}";
         if (bestScoreGameOverText != null) bestScoreGameOverText.text = $"Best: {bestScore}";
@@ -85,6 +120,37 @@ public class UIManager : MonoBehaviour
     private void SetPanel(GameObject panel, bool active)
     {
         if (panel != null) panel.SetActive(active);
+    }
+
+    // ---------- Camera permission handling ----------
+
+    private void HandleCameraPermissionDenied()
+    {
+        // Remember what was on screen so we can restore it once the camera works.
+        wasStartPanelShowingBeforePermissionPrompt = startPanel == null || startPanel.activeSelf;
+
+        if (permissionText != null)
+        {
+            permissionText.text = "Camera access is needed to play.\nPlease allow camera permission to continue.";
+        }
+        SetPanel(permissionPanel, true);
+    }
+
+    private void HandleCameraPermissionGranted()
+    {
+        SetPanel(permissionPanel, false);
+    }
+
+    public void OnClickOpenCameraSettings()
+    {
+        AudioManager.Instance?.PlayButtonClick();
+        cameraBackgroundManager?.OpenAppSettings();
+    }
+
+    public void OnClickRetryCamera()
+    {
+        AudioManager.Instance?.PlayButtonClick();
+        cameraBackgroundManager?.StartCamera();
     }
 
     // ---------- Text updates ----------

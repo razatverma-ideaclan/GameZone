@@ -51,6 +51,7 @@ public class GameManager : MonoBehaviour
 
     public void StartGame(GameMode mode)
     {
+        Debug.Log("[GameManager] StartGame called with mode: " + mode);
         CurrentMode = mode;
         CurrentScore = 0;
         CurrentState = GameState.Playing;
@@ -89,6 +90,11 @@ public class GameManager : MonoBehaviour
     {
         CurrentState = GameState.MainMenu;
         CurrentScore = 0;
+
+        if (ballController != null)
+        {
+            ballController.PlaceIdle();
+        }
 
         if (uiManager != null)
         {
