@@ -32,9 +32,9 @@ public class MotionKickInputManager : MonoBehaviour
     [Tooltip("How much average pixel change (0 to 1) counts as motion. Lower = more sensitive (triggers more easily, but more false positives).")]
     public float motionThreshold = 0.10f;
     [Tooltip("How many consecutive checks in a row must show motion before triggering a kick. Higher = fewer false positives from camera noise.")]
-    public int consecutiveFramesRequired = 2;
+    public int consecutiveFramesRequired = 1;
     [Tooltip("Minimum seconds between triggered kicks, so held/continuous motion doesn't spam kicks.")]
-    public float kickCooldown = 0.5f;
+    public float kickCooldown = 0.35f;
     [Tooltip("Every N frames to check for motion (2-3 keeps performance smooth on mobile).")]
     public int checkEveryNFrames = 2;
     [Tooltip("Only detect motion while the ball is in the lower portion of the screen (closer to leg height). 1 = whole screen, 0.5 = bottom half only.")]

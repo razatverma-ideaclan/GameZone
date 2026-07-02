@@ -308,6 +308,18 @@ public static class KickUpSceneBuilder
         motionKickInput.ballController = ballController;
         motionKickInput.cameraBackgroundManager = camBgManager;
         motionKickInput.debugText = motionDebugText;
+
+        // Force these tuning values on every rebuild - they're the current best
+        // known settings for reliable repeated kicks. Public fields only keep their
+        // FIRST-EVER serialized value once a component exists in the scene, so
+        // without this, code changes to the defaults above would never actually
+        // reach an already-created MotionKickInputManager in your saved scene.
+        motionKickInput.sampleResolution = 40;
+        motionKickInput.motionThreshold = 0.10f;
+        motionKickInput.consecutiveFramesRequired = 1;
+        motionKickInput.kickCooldown = 0.35f;
+        motionKickInput.checkEveryNFrames = 2;
+        motionKickInput.detectionHeightLimit = 0.75f;
         camBgManager.backgroundRawImage = cameraBgImage;
 
         EditorUtility.SetDirty(gameManager);
