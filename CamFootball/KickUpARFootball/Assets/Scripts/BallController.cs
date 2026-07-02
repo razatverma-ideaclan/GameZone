@@ -27,6 +27,8 @@ public class BallController : MonoBehaviour
     public float maxSpeed = 14f;
     [Tooltip("How far past the top edge of the screen the ball can go before bouncing back down")]
     public float topBoundsPadding = 0.3f;
+    [Tooltip("Strength of the bounce when the ball hits the top of the screen")]
+    public float topBounceStrength = 0.6f;
 
     [Header("Start Position")]
     public Vector3 startPosition = new Vector3(0f, -2f, 0f);
@@ -144,8 +146,8 @@ public class BallController : MonoBehaviour
         {
             Vector3 edge = mainCamera.ViewportToWorldPoint(new Vector3(viewportPos.x, 1f, transform.position.z - mainCamera.transform.position.z));
             transform.position = new Vector3(transform.position.x, edge.y - topBoundsPadding, transform.position.z);
-            // Soften the upward velocity so it comes back down instead of sticking to the ceiling
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, Mathf.Min(rb.linearVelocity.y, 0f));
+            // Bounce back down, same as the side walls do
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, -Mathf.Abs(rb.linearVelocity.y) * topBounceStrength);
         }
     }
 
