@@ -37,10 +37,13 @@ public class ThemeApplier : MonoBehaviour
         Instance = this;
     }
 
+    private const string SelectedHeroKey = "FlappyBird_SelectedHeroGlobal";
+
     private void Start()
     {
         InitializeFallbacks();
         ApplySelectedTheme();
+        ApplySelectedHero();
     }
 
     /// <summary>
@@ -51,8 +54,9 @@ public class ThemeApplier : MonoBehaviour
     {
         if (initialized) return;
 
-        // Player / Bird Controller fallbacks
-        BirdController bird = FindObjectOfType<BirdController>();
+        // Player / Bird Controller fallbacks (include inactive — bird is hidden while
+        // browsing non-Lobby menu screens, but its data should still be readable)
+        BirdController bird = FindFirstObjectByType<BirdController>(FindObjectsInactive.Include);
         if (bird != null)
         {
             originalClassicSkins = bird.skins;
@@ -144,52 +148,22 @@ public class ThemeApplier : MonoBehaviour
         // 1. Update theme name on UI
         if (themeNameLabel != null)
         {
-            themeNameLabel.text = theme.themeName.ToUpper();
+            themeNameLabel.text = "WORLD: " + theme.themeName.ToUpper();
         }
 
-        // 2. Override Player Sprites
-        BirdController bird = FindObjectOfType<BirdController>();
+        // 2. Environment audio (per-world flap/hit/land sounds). The bird's visual sprite is
+        // fully independent of world selection now — see ApplyHeroSprite() / ApplySelectedHero().
+        // Include inactive: picking a World also happens while the bird is hidden (Worlds screen).
+        BirdController bird = FindFirstObjectByType<BirdController>(FindObjectsInactive.Include);
         if (bird != null)
         {
-            if (theme.themeName.ToLower() == "classic")
-            {
-                if (originalClassicSkins != null) bird.skins = originalClassicSkins;
-                bird.OverrideSprites(null);
-            }
-            else
-            {
-                BirdController.BirdSkin[] overrideSkins = new BirdController.BirdSkin[3];
-                for (int s = 0; s < 3; s++)
-                {
-                    overrideSkins[s] = new BirdController.BirdSkin();
-                    Sprite spr = null;
-                    if (theme.playerSprites != null && theme.playerSprites.Length > 0)
-                    {
-                        int sprIdx = Mathf.Clamp(s, 0, theme.playerSprites.Length - 1);
-                        spr = theme.playerSprites[sprIdx];
-                    }
-                    else
-                    {
-                        spr = originalPlayerSprites[1];
-                    }
-                    overrideSkins[s].flapSprites = new Sprite[] { spr, spr, spr };
-                }
-                bird.skins = overrideSkins;
-                bird.OverrideSprites(null);
-            }
-            
-            // Re-apply skin graphics and index logic
-            int savedSkin = PlayerPrefs.GetInt("FlappyBird_SelectedSkin", 0);
-            bird.currentSkinIndex = Mathf.Clamp(savedSkin, 0, bird.skins.Length - 1);
-            bird.UpdateSkin();
-            
-            // Audio Overrides
             bird.flapSound = theme.flapSound != null ? theme.flapSound : originalFlapSound;
             bird.hitSound = theme.hitSound != null ? theme.hitSound : originalHitSound;
             bird.fallSound = theme.hitSound != null ? theme.hitSound : originalFallSound; // land sound fallback
         }
 
-        // 3. Override Background SpScrolling background components
+        // 3. Override Background Scrolling background components — applied immediately,
+        // the menu reflects whichever world is currently selected.
         foreach (var sr in FindObjectsOfType<SpriteRenderer>())
         {
             if (sr.gameObject.name.StartsWith("Background"))
@@ -264,6 +238,61 @@ public class ThemeApplier : MonoBehaviour
         {
             applier.ApplyCurrentTheme();
         }
+    }
+
+    /// <summary>
+    /// Reads the persisted global hero choice (0-20, spanning all 7 worlds x 3 skins) and
+    /// applies it to the bird — fully independent of which world is currently selected.
+    /// </summary>
+    public void ApplySelectedHero()
+    {
+        InitializeFallbacks();
+        int globalIndex = PlayerPrefs.GetInt(SelectedHeroKey, 0);
+        ApplyHeroSprite(globalIndex);
+    }
+
+    /// <summary>
+    /// Forces the bird to display one specific hero (world*3 + skin) regardless of the
+    /// currently active world/environment theme. Writes directly into BirdController.skins
+    /// (as a single always-index-0 entry) — the same skins[]/currentSkinIndex mechanism the
+    /// old per-theme skin picker used, rather than the separate OverrideSprites path.
+    /// </summary>
+    public void ApplyHeroSprite(int globalIndex)
+    {
+        // Include inactive: the bird is deliberately deactivated while browsing the Heroes
+        // screen (so it doesn't show behind the cards), and FindObjectOfType() without this
+        // flag silently skips inactive GameObjects — which was why picks made while on the
+        // Heroes screen intermittently failed to reach the bird at all.
+        BirdController bird = FindFirstObjectByType<BirdController>(FindObjectsInactive.Include);
+        if (bird == null) return;
+
+        int worldIndex = globalIndex / 3;
+        int skinIndex = globalIndex % 3;
+
+        Sprite[] frames = null;
+        if (worldIndex == 0)
+        {
+            if (originalClassicSkins != null && skinIndex < originalClassicSkins.Length)
+            {
+                frames = originalClassicSkins[skinIndex].flapSprites;
+            }
+        }
+        else if (ThemeManager.Instance != null && ThemeManager.Instance.themes != null && worldIndex < ThemeManager.Instance.themes.Length)
+        {
+            ThemeData heroWorld = ThemeManager.Instance.themes[worldIndex];
+            if (heroWorld.playerSprites != null && skinIndex < heroWorld.playerSprites.Length)
+            {
+                Sprite s = heroWorld.playerSprites[skinIndex];
+                frames = new Sprite[] { s, s, s };
+            }
+        }
+
+        if (frames == null) return; // couldn't resolve this hero — leave whatever is currently showing
+
+        bird.skins = new BirdController.BirdSkin[] { new BirdController.BirdSkin { flapSprites = frames } };
+        bird.currentSkinIndex = 0;
+        bird.OverrideSprites(null); // clear any stale override so skins[0] always wins
+        bird.UpdateSkin();
     }
 
     /// <summary>

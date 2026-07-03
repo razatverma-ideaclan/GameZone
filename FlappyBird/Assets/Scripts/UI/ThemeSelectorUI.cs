@@ -60,8 +60,10 @@ public class ThemeSelectorUI : MonoBehaviour
 
             Outline outline = themeButtons[i].GetComponent<Outline>();
             RectTransform rt = themeButtons[i].GetComponent<RectTransform>();
+            Transform checkmark = themeButtons[i].transform.Find("Checkmark");
+            bool selected = i == selectedIndex;
 
-            if (i == selectedIndex)
+            if (selected)
             {
                 // Selected state: enable gold outline and scale up slightly
                 if (outline != null)
@@ -72,7 +74,7 @@ public class ThemeSelectorUI : MonoBehaviour
                 }
                 if (rt != null)
                 {
-                    rt.localScale = new Vector3(1.08f, 1.08f, 1f);
+                    rt.localScale = new Vector3(1.05f, 1.05f, 1f);
                 }
             }
             else
@@ -90,6 +92,8 @@ public class ThemeSelectorUI : MonoBehaviour
                     rt.localScale = Vector3.one;
                 }
             }
+
+            if (checkmark != null) checkmark.gameObject.SetActive(selected);
         }
     }
 }

@@ -146,7 +146,9 @@ public static class FlappyBirdSceneBuilder
         GameObject toastPanel, themeSelectorPanelRef;
         GameObject lobbyPanel, heroesPanel;
         UnityEngine.UI.Image playIconImageRef;
-        GameObject startPanel = BuildStartPanel(canvas.transform, pillButtonSprite, resultCardSprite, goldMedalSprite, out startButton, out startHighScoreText, birdMidSprites[0], themeAssets, shopIcon, heroesIcon, missionsIcon, themesIcon, playIcon, homeIcon, out shopButton, out heroesButton, out missionsButton, out themesButton, out toastPanel, out themeSelectorPanelRef, out lobbyPanel, out heroesPanel, out playIconImageRef, out navPlayBtn);
+        Text activeThemeLabelText;
+        GameObject shopPanel, questsPanel;
+        GameObject startPanel = BuildStartPanel(canvas.transform, pillButtonSprite, resultCardSprite, goldMedalSprite, out startButton, out startHighScoreText, birdMidSprites, themeAssets, shopIcon, heroesIcon, missionsIcon, themesIcon, playIcon, homeIcon, out shopButton, out heroesButton, out missionsButton, out themesButton, out toastPanel, out themeSelectorPanelRef, out lobbyPanel, out heroesPanel, out playIconImageRef, out navPlayBtn, out activeThemeLabelText, out shopPanel, out questsPanel);
         
         UnityEngine.UI.Image medalImage;
         GameObject newBestBadge;
@@ -162,6 +164,8 @@ public static class FlappyBirdSceneBuilder
         gm.themeSelectorPanel = themeSelectorPanelRef;
         gm.lobbyPanel = lobbyPanel;
         gm.heroesPanel = heroesPanel;
+        gm.shopPanel = shopPanel;
+        gm.questsPanel = questsPanel;
         gm.playIconImage = playIconImageRef;
         gm.playSprite = playIcon;
         gm.homeSprite = homeIcon;
@@ -169,6 +173,10 @@ public static class FlappyBirdSceneBuilder
         gm.heroesButton = heroesButton;
         gm.missionsButton = missionsButton;
         gm.themesButton = themesButton;
+        gm.centerButton = navPlayBtn;
+
+        ThemeApplier themeApplierRef = gameManagerGO.GetComponent<ThemeApplier>();
+        if (themeApplierRef != null) themeApplierRef.themeNameLabel = activeThemeLabelText;
 
         UnityEventTools.AddPersistentListener(startButton.onClick, gm.StartGame);
         UnityEventTools.AddPersistentListener(navPlayBtn.onClick, gm.StartGame);
@@ -180,16 +188,20 @@ public static class FlappyBirdSceneBuilder
         UnityEventTools.AddPersistentListener(menuButton.onClick, gm.RestartGame);
         UnityEventTools.AddPersistentListener(retryButton.onClick, gm.RetryGame);
 
-        // Wire the 3 cards inside heroesPanel
-        for (int i = 0; i < 3; i++)
+        // Wire all 21 hero cards (7 worlds x 3 skins) inside heroesPanel to the global selector
+        string[] wireThemeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja" };
+        for (int t = 0; t < 7; t++)
         {
-            Transform cardTrans = heroesPanel.transform.Find("Grid/Card" + i);
-            if (cardTrans != null)
+            for (int s = 0; s < 3; s++)
             {
-                Button cardBtn = cardTrans.GetComponent<Button>();
-                if (cardBtn != null)
+                Transform cardTrans = heroesPanel.transform.Find("ScrollView/Viewport/Content/" + wireThemeNames[t] + "Card" + s);
+                if (cardTrans != null)
                 {
-                    UnityEventTools.AddIntPersistentListener(cardBtn.onClick, gm.SelectHero, i);
+                    Button cardBtn = cardTrans.GetComponent<Button>();
+                    if (cardBtn != null)
+                    {
+                        UnityEventTools.AddIntPersistentListener(cardBtn.onClick, gm.SelectHeroGlobal, t * 3 + s);
+                    }
                 }
             }
         }
@@ -1150,7 +1162,7 @@ public static class FlappyBirdSceneBuilder
         new Color(0.15f, 0.15f, 0.18f) // Premium dark charcoal color
     };
 
-    private static GameObject BuildStartPanel(Transform canvasTransform, Sprite buttonSprite, Sprite resultCardSprite, Sprite goldMedalSprite, out Button startButton, out GameObject startHighScoreText, Sprite birdMidSprite, ThemeData[] themeAssets, Sprite shopIcon, Sprite heroesIcon, Sprite missionsIcon, Sprite themesIcon, Sprite playIcon, Sprite homeIcon, out Button shopButton, out Button heroesButton, out Button missionsButton, out Button themesButton, out GameObject toastPanel, out GameObject themeSelectorPanelRef, out GameObject lobbyPanel, out GameObject heroesPanel, out UnityEngine.UI.Image playIconImageRef, out Button navPlayBtn)
+    private static GameObject BuildStartPanel(Transform canvasTransform, Sprite buttonSprite, Sprite resultCardSprite, Sprite goldMedalSprite, out Button startButton, out GameObject startHighScoreText, Sprite[] birdMidSprites, ThemeData[] themeAssets, Sprite shopIcon, Sprite heroesIcon, Sprite missionsIcon, Sprite themesIcon, Sprite playIcon, Sprite homeIcon, out Button shopButton, out Button heroesButton, out Button missionsButton, out Button themesButton, out GameObject toastPanel, out GameObject themeSelectorPanelRef, out GameObject lobbyPanel, out GameObject heroesPanel, out UnityEngine.UI.Image playIconImageRef, out Button navPlayBtn, out Text activeThemeLabelText, out GameObject shopPanel, out GameObject questsPanel)
     {
         GameObject panel = CreatePanel("StartPanel", canvasTransform, new Color(0, 0, 0, 0.0f));
 
@@ -1183,42 +1195,20 @@ public static class FlappyBirdSceneBuilder
         titleGO.AddComponent<UIFloat>().floatAmount = 12f;
         titleGO.GetComponent<UIFloat>().speed = 2f;
 
-        // Optimized Floating World/Theme Banner
-        GameObject worldBanner = new GameObject("WorldBanner");
-        worldBanner.transform.SetParent(lobbyPanel.transform, false);
-        Image wbImg = worldBanner.AddComponent<Image>();
-        wbImg.sprite = resultCardSprite;
-        wbImg.color = new Color(0.08f, 0.45f, 0.85f, 0.9f); // premium blue banner background
-        
-        Outline wbOutline = worldBanner.AddComponent<Outline>();
-        wbOutline.effectColor = Color.white;
-        wbOutline.effectDistance = new Vector2(2f, -2f);
+        // World name is no longer shown on the main Lobby screen (it has its own dedicated
+        // Worlds screen now), so ThemeApplier has no label to update here.
+        activeThemeLabelText = null;
 
-        RectTransform wbRt = worldBanner.GetComponent<RectTransform>();
-        wbRt.sizeDelta = new Vector2(360, 80);
-        wbRt.anchoredPosition = new Vector2(0, 220); // floating above bird character preview
-
-        GameObject activeThemeLabel = CreateLabel("ActiveThemeLabel", worldBanner.transform, "WORLD: CLASSIC", 26, Vector2.zero);
-        Text activeThemeTxt = activeThemeLabel.GetComponent<Text>();
-        activeThemeTxt.color = Color.white;
-        activeThemeTxt.fontStyle = FontStyle.Bold;
-        
-        RectTransform atlRt = activeThemeLabel.GetComponent<RectTransform>();
-        atlRt.anchorMin = Vector2.zero;
-        atlRt.anchorMax = Vector2.one;
-        atlRt.offsetMin = Vector2.zero;
-        atlRt.offsetMax = Vector2.zero;
-
-        // High Score Badge (positioned below the central character)
+        // High Score Badge (positioned below the central character, clear of the bird preview)
         GameObject scoreBadge = new GameObject("HighScoreBadge");
         scoreBadge.transform.SetParent(lobbyPanel.transform, false);
         Image badgeImg = scoreBadge.AddComponent<Image>();
         badgeImg.sprite = resultCardSprite; // rounded card texture
         badgeImg.color = new Color(0.15f, 0.15f, 0.18f, 0.75f); // dark translucent charcoal
-        
+
         RectTransform badgeRt = scoreBadge.GetComponent<RectTransform>();
         badgeRt.sizeDelta = new Vector2(280, 68);
-        badgeRt.anchoredPosition = new Vector2(0, -100);
+        badgeRt.anchoredPosition = new Vector2(0, -210); // just above "TAP TO START", clear of the bird preview
 
         // Small Gold Medal icon inside badge
         GameObject medalIcon = new GameObject("MedalIcon");
@@ -1285,7 +1275,7 @@ public static class FlappyBirdSceneBuilder
         hbRt.sizeDelta = new Vector2(900, 80);
         hbRt.anchoredPosition = new Vector2(0, 620); // top header position
 
-        GameObject hbTxtGO = CreateLabel("Text", hbGO.transform, "CLASSIC HEROES (1/3)", 28, Vector2.zero);
+        GameObject hbTxtGO = CreateLabel("Text", hbGO.transform, "HEROES (1/21)", 28, Vector2.zero);
         hbTxtGO.GetComponent<Text>().color = Color.white;
         hbTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
         RectTransform hbtRt = hbTxtGO.GetComponent<RectTransform>();
@@ -1294,25 +1284,185 @@ public static class FlappyBirdSceneBuilder
         hbtRt.offsetMin = Vector2.zero;
         hbtRt.offsetMax = Vector2.zero;
 
-        // Grid Container inside HeroesPanel
-        GameObject gridGO = new GameObject("Grid");
-        gridGO.transform.SetParent(heroesPanel.transform, false);
-        RectTransform gridRt = gridGO.AddComponent<RectTransform>();
-        gridRt.sizeDelta = new Vector2(900, 1000);
-        gridRt.anchoredPosition = new Vector2(0, 0); // centered
+        // Scrollable roster: every hero from every world, not just the currently active one.
+        GameObject scrollGO = new GameObject("ScrollView");
+        scrollGO.transform.SetParent(heroesPanel.transform, false);
+        RectTransform scrollRt = scrollGO.AddComponent<RectTransform>();
+        scrollRt.sizeDelta = new Vector2(900, 1100);
+        scrollRt.anchoredPosition = new Vector2(0, -60);
 
-        GridLayoutGroup hGrid = gridGO.AddComponent<GridLayoutGroup>();
-        hGrid.cellSize = new Vector2(270, 360);
-        hGrid.spacing = new Vector2(30, 30);
+        ScrollRect scrollRect = scrollGO.AddComponent<ScrollRect>();
+        scrollRect.horizontal = false;
+        scrollRect.vertical = true;
+        scrollRect.movementType = ScrollRect.MovementType.Clamped;
+
+        GameObject viewportGO = new GameObject("Viewport");
+        viewportGO.transform.SetParent(scrollGO.transform, false);
+        RectTransform viewportRt = viewportGO.AddComponent<RectTransform>();
+        viewportRt.anchorMin = Vector2.zero;
+        viewportRt.anchorMax = Vector2.one;
+        viewportRt.offsetMin = Vector2.zero;
+        viewportRt.offsetMax = Vector2.zero;
+        viewportGO.AddComponent<RectMask2D>();
+
+        GameObject contentGO = new GameObject("Content");
+        contentGO.transform.SetParent(viewportGO.transform, false);
+        RectTransform contentRt = contentGO.AddComponent<RectTransform>();
+        contentRt.anchorMin = new Vector2(0f, 1f);
+        contentRt.anchorMax = new Vector2(1f, 1f);
+        contentRt.pivot = new Vector2(0.5f, 1f);
+        contentRt.anchoredPosition = Vector2.zero;
+
+        GridLayoutGroup hGrid = contentGO.AddComponent<GridLayoutGroup>();
+        hGrid.cellSize = new Vector2(260, 300);
+        hGrid.spacing = new Vector2(20, 20);
         hGrid.startCorner = GridLayoutGroup.Corner.UpperLeft;
         hGrid.startAxis = GridLayoutGroup.Axis.Horizontal;
-        hGrid.childAlignment = TextAnchor.MiddleCenter;
+        hGrid.childAlignment = TextAnchor.UpperCenter;
+        hGrid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        hGrid.constraintCount = 3;
 
-        // Instantiate 3 character cards in grid
-        for (int i = 0; i < 3; i++)
+        ContentSizeFitter contentFitter = contentGO.AddComponent<ContentSizeFitter>();
+        contentFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        scrollRect.content = contentRt;
+        scrollRect.viewport = viewportRt;
+
+        string[] heroThemeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja" };
+        string[][] heroNames = new string[][]
         {
-            GameObject cardGO = new GameObject("Card" + i);
-            cardGO.transform.SetParent(gridGO.transform, false);
+            new [] { "YELLOW HERO", "BLUE HERO", "RED HERO" },
+            new [] { "ROCKET SPEEDER", "COSMIC UFO", "COMM SATELLITE" },
+            new [] { "SOCCER BALL", "BASKETBALL", "TENNIS BALL" },
+            new [] { "RED DRAKE", "EMERALD DRAGON", "GOLD WYVERN" },
+            new [] { "GOLDFISH", "BULL SHARK", "PINK JELLYFISH" },
+            new [] { "HONEY BEE", "LADYBUG", "BUTTERFLY" },
+            new [] { "SHADOW NINJA", "CRIMSON NINJA", "SILVER SHINOBI" }
+        };
+
+        // Instantiate all 7 worlds x 3 skins = 21 hero cards (wired to GameManager.SelectHeroGlobal in BuildScene(), once GameManager exists)
+        for (int t = 0; t < 7; t++)
+        {
+            for (int s = 0; s < 3; s++)
+            {
+                GameObject cardGO = new GameObject(heroThemeNames[t] + "Card" + s);
+                cardGO.transform.SetParent(contentGO.transform, false);
+                Image cardImg = cardGO.AddComponent<Image>();
+                cardImg.sprite = resultCardSprite;
+                // Tint each card toward its world's color (darkened for text contrast) so worlds
+                // stay visually distinguishable now that we don't show a separate world label.
+                Color worldTint = themeAssets != null && t < themeAssets.Length ? themeAssets[t].themeColor : new Color(0.3f, 0.3f, 0.35f);
+                Color darkenedTint = Color.Lerp(worldTint, Color.black, 0.72f);
+                cardImg.color = new Color(darkenedTint.r, darkenedTint.g, darkenedTint.b, 0.95f);
+
+                Outline cardOutline = cardGO.AddComponent<Outline>();
+                cardOutline.effectColor = new Color(0.35f, 0.35f, 0.4f);
+                cardOutline.effectDistance = new Vector2(2f, -2f);
+
+                cardGO.AddComponent<Button>();
+
+                // Icon preview image (Classic = the 3 inspector-configured bird colors, other worlds = ThemeData.playerSprites)
+                GameObject iconGO = new GameObject("PreviewImage");
+                iconGO.transform.SetParent(cardGO.transform, false);
+                Image previewImg = iconGO.AddComponent<Image>();
+                previewImg.preserveAspect = true;
+                if (t == 0)
+                {
+                    if (birdMidSprites != null && s < birdMidSprites.Length) previewImg.sprite = birdMidSprites[s];
+                }
+                else if (themeAssets != null && t < themeAssets.Length && themeAssets[t].playerSprites != null && s < themeAssets[t].playerSprites.Length)
+                {
+                    previewImg.sprite = themeAssets[t].playerSprites[s];
+                }
+                RectTransform iconRt = iconGO.GetComponent<RectTransform>();
+                iconRt.sizeDelta = new Vector2(160, 160);
+                iconRt.anchoredPosition = new Vector2(0, 50);
+
+                // Hero name (only — no separate world sub-label; the card's tint conveys the world)
+                GameObject nameTxtGO = CreateLabel("NameText", cardGO.transform, heroNames[t][s], 18, new Vector2(0, -75));
+                nameTxtGO.GetComponent<Text>().color = Color.white;
+                nameTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+                RectTransform ntRt = nameTxtGO.GetComponent<RectTransform>();
+                ntRt.sizeDelta = new Vector2(240, 36);
+
+                // Selection Checkmark overlay badge
+                GameObject checkGO = new GameObject("Checkmark");
+                checkGO.transform.SetParent(cardGO.transform, false);
+                Image checkImg = checkGO.AddComponent<Image>();
+                checkImg.sprite = goldMedalSprite;
+                RectTransform checkRt = checkGO.GetComponent<RectTransform>();
+                checkRt.sizeDelta = new Vector2(40, 40);
+                checkRt.anchoredPosition = new Vector2(95, 115); // top right of card
+
+                checkGO.SetActive(false); // active if this hero is equipped
+            }
+        }
+
+        heroesPanel.SetActive(false);
+
+        // --- Interactive Worlds Selection Screen (Grid) ---
+        // Full-screen sibling of HeroesPanel (same construction pattern) instead of a small
+        // floating button grid — previously this overlaid the still-visible lobby/tap-to-start.
+        GameObject worldsPanel = new GameObject("WorldsPanel");
+        worldsPanel.transform.SetParent(panel.transform, false);
+        themeSelectorPanelRef = worldsPanel;
+
+        RectTransform wpRt = worldsPanel.AddComponent<RectTransform>();
+        wpRt.anchorMin = new Vector2(0.5f, 0.5f);
+        wpRt.anchorMax = new Vector2(0.5f, 0.5f);
+        wpRt.pivot = new Vector2(0.5f, 0.5f);
+        wpRt.sizeDelta = new Vector2(1000, 1400);
+        wpRt.anchoredPosition = new Vector2(0, 80); // centered vertically above bottom bar
+
+        // Header bar inside WorldsPanel
+        GameObject wHbGO = new GameObject("HeaderBar");
+        wHbGO.transform.SetParent(worldsPanel.transform, false);
+        Image wHbImg = wHbGO.AddComponent<Image>();
+        wHbImg.sprite = resultCardSprite;
+        wHbImg.color = new Color(0.08f, 0.45f, 0.85f, 1f); // bright royal blue
+
+        Outline wHbOutline = wHbGO.AddComponent<Outline>();
+        wHbOutline.effectColor = Color.white;
+        wHbOutline.effectDistance = new Vector2(2f, -2f);
+
+        RectTransform wHbRt = wHbGO.GetComponent<RectTransform>();
+        wHbRt.sizeDelta = new Vector2(900, 80);
+        wHbRt.anchoredPosition = new Vector2(0, 620); // top header position
+
+        GameObject wHbTxtGO = CreateLabel("Text", wHbGO.transform, "SELECT WORLD", 28, Vector2.zero);
+        wHbTxtGO.GetComponent<Text>().color = Color.white;
+        wHbTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+        RectTransform wHbtRt = wHbTxtGO.GetComponent<RectTransform>();
+        wHbtRt.anchorMin = Vector2.zero;
+        wHbtRt.anchorMax = Vector2.one;
+        wHbtRt.offsetMin = Vector2.zero;
+        wHbtRt.offsetMax = Vector2.zero;
+
+        // Grid Container inside WorldsPanel
+        GameObject wGridGO = new GameObject("Grid");
+        wGridGO.transform.SetParent(worldsPanel.transform, false);
+        RectTransform wGridRt = wGridGO.AddComponent<RectTransform>();
+        wGridRt.sizeDelta = new Vector2(900, 1000);
+        wGridRt.anchoredPosition = new Vector2(0, 0);
+
+        GridLayoutGroup wGrid = wGridGO.AddComponent<GridLayoutGroup>();
+        wGrid.cellSize = new Vector2(260, 300);
+        wGrid.spacing = new Vector2(20, 20);
+        wGrid.startCorner = GridLayoutGroup.Corner.UpperLeft;
+        wGrid.startAxis = GridLayoutGroup.Axis.Horizontal;
+        wGrid.childAlignment = TextAnchor.UpperCenter;
+        wGrid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        wGrid.constraintCount = 3;
+
+        ThemeSelectorUI selectorUI = worldsPanel.AddComponent<ThemeSelectorUI>();
+        selectorUI.themeButtons = new Button[7];
+
+        string[] themeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja" };
+        for (int i = 0; i < 7; i++)
+        {
+            GameObject cardGO = new GameObject(themeNames[i] + "Card");
+            cardGO.transform.SetParent(wGridGO.transform, false);
+
             Image cardImg = cardGO.AddComponent<Image>();
             cardImg.sprite = resultCardSprite;
             cardImg.color = new Color(0.15f, 0.15f, 0.18f, 0.95f); // dark card body
@@ -1321,98 +1471,43 @@ public static class FlappyBirdSceneBuilder
             cardOutline.effectColor = new Color(0.35f, 0.35f, 0.4f);
             cardOutline.effectDistance = new Vector2(2f, -2f);
 
-            cardGO.AddComponent<Button>();
-
-            // Icon preview image
-            GameObject iconGO = new GameObject("PreviewImage");
-            iconGO.transform.SetParent(cardGO.transform, false);
-            Image previewImg = iconGO.AddComponent<Image>();
-            previewImg.preserveAspect = true;
-            RectTransform iconRt = iconGO.GetComponent<RectTransform>();
-            iconRt.sizeDelta = new Vector2(160, 160);
-            iconRt.anchoredPosition = new Vector2(0, 40);
-
-            // Name label text
-            GameObject nameTxtGO = CreateLabel("NameText", cardGO.transform, "HERO", 20, new Vector2(0, -90));
-            nameTxtGO.GetComponent<Text>().color = Color.white;
-            nameTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
-            RectTransform ntRt = nameTxtGO.GetComponent<RectTransform>();
-            ntRt.sizeDelta = new Vector2(240, 50);
-
-            // Selection Checkmark overlay badge
-            GameObject checkGO = new GameObject("Checkmark");
-            checkGO.transform.SetParent(cardGO.transform, false);
-            Image checkImg = checkGO.AddComponent<Image>();
-            checkImg.sprite = goldMedalSprite;
-            RectTransform checkRt = checkGO.GetComponent<RectTransform>();
-            checkRt.sizeDelta = new Vector2(50, 50);
-            checkRt.anchoredPosition = new Vector2(90, 130); // top right of card
-
-            checkGO.SetActive(false); // active if skin is selected
-        }
-
-        heroesPanel.SetActive(false);
-
-        // --- Theme Selection Interface ---
-
-        // Grid Panel Container for the buttons
-        GameObject themePanelGO = new GameObject("ThemeSelectorPanel");
-        themePanelGO.transform.SetParent(panel.transform, false);
-        themeSelectorPanelRef = themePanelGO;
-        
-        RectTransform tpRt = themePanelGO.AddComponent<RectTransform>();
-        tpRt.sizeDelta = new Vector2(850, 200);
-        tpRt.anchoredPosition = new Vector2(0, -250); // positioned just above the bottom menu bar
-
-        // Add a Grid Layout Group
-        GridLayoutGroup grid = themePanelGO.AddComponent<GridLayoutGroup>();
-        grid.cellSize = new Vector2(180, 70);
-        grid.spacing = new Vector2(12, 12);
-        grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
-        grid.startAxis = GridLayoutGroup.Axis.Horizontal;
-        grid.childAlignment = TextAnchor.MiddleCenter;
-
-        ThemeSelectorUI selectorUI = themePanelGO.AddComponent<ThemeSelectorUI>();
-        selectorUI.themeButtons = new Button[7];
-
-        string[] themeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja" };
-        for (int i = 0; i < 7; i++)
-        {
-            GameObject btnGO = new GameObject(themeNames[i] + "Button");
-            btnGO.transform.SetParent(themePanelGO.transform, false);
-            
-            Image btnImg = btnGO.AddComponent<Image>();
-            btnImg.sprite = buttonSprite; // pill button shape
-            btnImg.type = Image.Type.Simple;
-            btnImg.color = Color.white;
-
-            Outline btnOutline = btnGO.AddComponent<Outline>();
-            btnOutline.effectColor = new Color(0.38f, 0.15f, 0.02f); // normal dark brown border
-            btnOutline.effectDistance = new Vector2(2f, -2f);
-
-            GameObject txtGO = new GameObject("Text");
-            txtGO.transform.SetParent(btnGO.transform, false);
-            Text txt = txtGO.AddComponent<Text>();
-            txt.text = themeNames[i].ToUpper();
-            txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            txt.fontSize = 22;
-            txt.fontStyle = FontStyle.Bold;
-            txt.alignment = TextAnchor.MiddleCenter;
-            txt.color = Color.white;
-
-            Outline txtOutline = txtGO.AddComponent<Outline>();
-            txtOutline.effectColor = new Color(0.15f, 0.15f, 0.18f); // dark charcoal outline
-            txtOutline.effectDistance = new Vector2(2f, -2f);
-
-            RectTransform txtRt = txtGO.GetComponent<RectTransform>();
-            txtRt.anchorMin = Vector2.zero;
-            txtRt.anchorMax = Vector2.one;
-            txtRt.offsetMin = Vector2.zero;
-            txtRt.offsetMax = Vector2.zero;
-
-            Button btn = btnGO.AddComponent<Button>();
+            Button btn = cardGO.AddComponent<Button>();
             selectorUI.themeButtons[i] = btn;
+
+            // Preview thumbnail (this world's background art)
+            GameObject previewGO = new GameObject("PreviewImage");
+            previewGO.transform.SetParent(cardGO.transform, false);
+            Image previewImg = previewGO.AddComponent<Image>();
+            previewImg.preserveAspect = true;
+            if (themeAssets != null && i < themeAssets.Length) previewImg.sprite = themeAssets[i].backgroundSprite;
+            RectTransform previewRt = previewGO.GetComponent<RectTransform>();
+            previewRt.sizeDelta = new Vector2(220, 130);
+            previewRt.anchoredPosition = new Vector2(0, 55);
+
+            // Name label
+            GameObject wNameTxtGO = CreateLabel("NameText", cardGO.transform, themeNames[i].ToUpper(), 22, new Vector2(0, -70));
+            wNameTxtGO.GetComponent<Text>().color = Color.white;
+            wNameTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+            RectTransform wNtRt = wNameTxtGO.GetComponent<RectTransform>();
+            wNtRt.sizeDelta = new Vector2(240, 50);
+
+            // Selection checkmark overlay badge (same treatment as Heroes cards)
+            GameObject wCheckGO = new GameObject("Checkmark");
+            wCheckGO.transform.SetParent(cardGO.transform, false);
+            Image wCheckImg = wCheckGO.AddComponent<Image>();
+            wCheckImg.sprite = goldMedalSprite;
+            RectTransform wCheckRt = wCheckGO.GetComponent<RectTransform>();
+            wCheckRt.sizeDelta = new Vector2(46, 46);
+            wCheckRt.anchoredPosition = new Vector2(95, 115); // top right of card
+
+            wCheckGO.SetActive(false); // active if world is selected
         }
+
+        worldsPanel.SetActive(false);
+
+        // --- Shop / Quests placeholder screens ---
+        shopPanel = BuildComingSoonPanel(panel.transform, "SHOP", "Gear, boosts and skins\nare on the way.", resultCardSprite);
+        questsPanel = BuildComingSoonPanel(panel.transform, "QUESTS", "Daily challenges and rewards\nare on the way.", resultCardSprite);
 
         // --- Bottom Navigation Bar ---
         GameObject bottomBar = new GameObject("BottomNavBar");
@@ -1438,6 +1533,7 @@ public static class FlappyBirdSceneBuilder
         Image shopImg = shopGO.AddComponent<Image>();
         shopImg.sprite = shopIcon;
         shopButton = shopGO.AddComponent<Button>();
+        shopButton.transition = Selectable.Transition.None; // don't let Unity's built-in color tint fight our own active-state styling
         RectTransform shopRt = shopGO.GetComponent<RectTransform>();
         shopRt.sizeDelta = new Vector2(100, 100);
         shopRt.anchoredPosition = new Vector2(-340, 0);
@@ -1451,6 +1547,7 @@ public static class FlappyBirdSceneBuilder
         Image heroesImg = heroesGO.AddComponent<Image>();
         heroesImg.sprite = heroesIcon;
         heroesButton = heroesGO.AddComponent<Button>();
+        heroesButton.transition = Selectable.Transition.None;
         RectTransform heroesRt = heroesGO.GetComponent<RectTransform>();
         heroesRt.sizeDelta = new Vector2(100, 100);
         heroesRt.anchoredPosition = new Vector2(-170, 0);
@@ -1465,6 +1562,7 @@ public static class FlappyBirdSceneBuilder
         playImg.sprite = resultCardSprite;
         playImg.color = new Color(0.98f, 0.82f, 0.12f); // yellow
         navPlayBtn = playGO.AddComponent<Button>();
+        navPlayBtn.transition = Selectable.Transition.None;
         RectTransform playRt = playGO.GetComponent<RectTransform>();
         playRt.sizeDelta = new Vector2(170, 170);
         playRt.anchoredPosition = new Vector2(0, 20); // overlaps top
@@ -1488,6 +1586,7 @@ public static class FlappyBirdSceneBuilder
         Image missionsImg = missionsGO.AddComponent<Image>();
         missionsImg.sprite = missionsIcon;
         missionsButton = missionsGO.AddComponent<Button>();
+        missionsButton.transition = Selectable.Transition.None;
         RectTransform missionsRt = missionsGO.GetComponent<RectTransform>();
         missionsRt.sizeDelta = new Vector2(100, 100);
         missionsRt.anchoredPosition = new Vector2(170, 0);
@@ -1501,6 +1600,7 @@ public static class FlappyBirdSceneBuilder
         Image themesImg = themesGO.AddComponent<Image>();
         themesImg.sprite = themesIcon;
         themesButton = themesGO.AddComponent<Button>();
+        themesButton.transition = Selectable.Transition.None;
         RectTransform themesRt = themesGO.GetComponent<RectTransform>();
         themesRt.sizeDelta = new Vector2(100, 100);
         themesRt.anchoredPosition = new Vector2(340, 0);
@@ -1540,6 +1640,77 @@ public static class FlappyBirdSceneBuilder
         toastPanel.SetActive(false);
 
         return panel;
+    }
+
+    /// <summary>Full-screen placeholder used by Shop/Quests until those systems are built — same construction pattern as WorldsPanel/HeroesPanel.</summary>
+    private static GameObject BuildComingSoonPanel(Transform parent, string title, string message, Sprite resultCardSprite)
+    {
+        GameObject comingSoonPanel = new GameObject(title + "Panel");
+        comingSoonPanel.transform.SetParent(parent, false);
+        RectTransform rt = comingSoonPanel.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0.5f);
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(1000, 1400);
+        rt.anchoredPosition = new Vector2(0, 80);
+
+        GameObject hbGO = new GameObject("HeaderBar");
+        hbGO.transform.SetParent(comingSoonPanel.transform, false);
+        Image hbImg = hbGO.AddComponent<Image>();
+        hbImg.sprite = resultCardSprite;
+        hbImg.color = new Color(0.08f, 0.45f, 0.85f, 1f);
+
+        Outline hbOutline = hbGO.AddComponent<Outline>();
+        hbOutline.effectColor = Color.white;
+        hbOutline.effectDistance = new Vector2(2f, -2f);
+
+        RectTransform hbRt = hbGO.GetComponent<RectTransform>();
+        hbRt.sizeDelta = new Vector2(900, 80);
+        hbRt.anchoredPosition = new Vector2(0, 620);
+
+        GameObject hbTxtGO = CreateLabel("Text", hbGO.transform, title, 28, Vector2.zero);
+        hbTxtGO.GetComponent<Text>().color = Color.white;
+        hbTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+        RectTransform hbtRt = hbTxtGO.GetComponent<RectTransform>();
+        hbtRt.anchorMin = Vector2.zero;
+        hbtRt.anchorMax = Vector2.one;
+        hbtRt.offsetMin = Vector2.zero;
+        hbtRt.offsetMax = Vector2.zero;
+
+        // Centered "coming soon" card
+        GameObject cardGO = new GameObject("Card");
+        cardGO.transform.SetParent(comingSoonPanel.transform, false);
+        Image cardImg = cardGO.AddComponent<Image>();
+        cardImg.sprite = resultCardSprite;
+        cardImg.color = new Color(0.15f, 0.15f, 0.18f, 0.95f);
+        Outline cardOutline = cardGO.AddComponent<Outline>();
+        cardOutline.effectColor = new Color(0.35f, 0.35f, 0.4f);
+        cardOutline.effectDistance = new Vector2(2f, -2f);
+        RectTransform cardRt = cardGO.GetComponent<RectTransform>();
+        cardRt.sizeDelta = new Vector2(700, 420);
+        cardRt.anchoredPosition = new Vector2(0, 80);
+
+        GameObject bigTitleGO = CreateLabel("BigTitle", cardGO.transform, "COMING SOON", 42, new Vector2(0, 70));
+        Text bigTitleTxt = bigTitleGO.GetComponent<Text>();
+        bigTitleTxt.color = new Color(0.95f, 0.72f, 0.15f);
+        bigTitleTxt.fontStyle = FontStyle.Bold;
+        Outline bigTitleOutline = bigTitleGO.GetComponent<Outline>();
+        if (bigTitleOutline == null) bigTitleOutline = bigTitleGO.AddComponent<Outline>();
+        bigTitleOutline.effectColor = new Color(0.1f, 0.08f, 0.05f, 1f);
+        bigTitleOutline.effectDistance = new Vector2(3f, -3f);
+
+        UIFloat titleFloat = bigTitleGO.AddComponent<UIFloat>();
+        titleFloat.floatAmount = 8f;
+        titleFloat.speed = 2f;
+
+        GameObject msgGO = CreateLabel("Message", cardGO.transform, message, 24, new Vector2(0, -70));
+        Text msgTxt = msgGO.GetComponent<Text>();
+        msgTxt.color = new Color(0.85f, 0.85f, 0.85f);
+        RectTransform msgRt = msgGO.GetComponent<RectTransform>();
+        msgRt.sizeDelta = new Vector2(600, 200);
+
+        comingSoonPanel.SetActive(false);
+        return comingSoonPanel;
     }
 
     private static GameObject BuildGameOverPanel(Transform canvasTransform, Sprite buttonSprite, Sprite resultCardSprite, out Button menuButton, out Button retryButton, out GameObject scoreValueText, out GameObject bestValueText, out UnityEngine.UI.Image medalImage, out GameObject newBestBadge, out RectTransform resultCardTransform)
@@ -1763,6 +1934,10 @@ public static class FlappyBirdSceneBuilder
         text.fontSize = fontSize;
         text.alignment = TextAnchor.MiddleCenter;
         text.color = Color.white;
+        // Caption text should never intercept clicks meant for a parent/neighboring button —
+        // without this, this label's default 600x150 hitbox can extend past its small parent
+        // button and steal clicks from an adjacent button (e.g. GameOver's MENU/RETRY pair).
+        text.raycastTarget = false;
         Outline outline = go.AddComponent<Outline>();
         outline.effectColor = new Color(0, 0, 0, 0.8f);
         outline.effectDistance = new Vector2(2f, -2f);

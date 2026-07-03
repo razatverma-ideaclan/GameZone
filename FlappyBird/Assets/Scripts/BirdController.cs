@@ -202,16 +202,6 @@ public class BirdController : MonoBehaviour
         UpdateSkin();
     }
 
-    void OnMouseDown()
-    {
-        // Cycle bird skins when clicked directly on the start screen
-        // Only allow skin cycling if we don't have a theme override active (or if the theme has its own multiple skins)
-        if (isIdle && !controlEnabled && themeOverrideSprites == null)
-        {
-            NextSkin();
-        }
-    }
-
     void OnCollisionEnter2D(Collision2D collision)
     {
         HandleImpact(collision.gameObject);

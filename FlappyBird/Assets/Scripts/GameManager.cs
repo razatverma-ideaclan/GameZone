@@ -13,6 +13,9 @@ public class GameManager : MonoBehaviour
     public enum GameState { Start, Playing, GameOver }
     public GameState CurrentState { get; private set; } = GameState.Start;
 
+    public enum MenuScreen { Lobby, Worlds, Heroes, Shop, Quests }
+    public MenuScreen CurrentScreen { get; private set; } = MenuScreen.Lobby;
+
     [Header("UI Panels")]
     public GameObject startPanel;
     public GameObject gameOverPanel;
@@ -39,6 +42,8 @@ public class GameManager : MonoBehaviour
     public GameObject themeSelectorPanel;
     public GameObject lobbyPanel;
     public GameObject heroesPanel;
+    public GameObject shopPanel;
+    public GameObject questsPanel;
     public UnityEngine.UI.Image playIconImage;
     public Sprite playSprite;
     public Sprite homeSprite;
@@ -48,8 +53,7 @@ public class GameManager : MonoBehaviour
     public UnityEngine.UI.Button heroesButton;
     public UnityEngine.UI.Button missionsButton;
     public UnityEngine.UI.Button themesButton;
-
-    private bool isViewingHeroes = false;
+    public UnityEngine.UI.Button centerButton;
 
     [Header("References")]
     public GameObject bird;
@@ -125,23 +129,8 @@ public class GameManager : MonoBehaviour
                     }
                 }
 
-                bool onThemePanel = false;
-                if (themeSelectorPanel != null && themeSelectorPanel.activeSelf)
+                if (!onBottomBar && CurrentScreen == MenuScreen.Lobby && !justEnteredStartState)
                 {
-                    RectTransform themeRt = themeSelectorPanel.GetComponent<RectTransform>();
-                    if (themeRt != null)
-                    {
-                        onThemePanel = RectTransformUtility.RectangleContainsScreenPoint(themeRt, clickPos, null);
-                    }
-                }
-
-                if (!onBottomBar && !onThemePanel && !isViewingHeroes && !justEnteredStartState)
-                {
-                    if (themeSelectorPanel != null && themeSelectorPanel.activeSelf)
-                    {
-                        themeSelectorPanel.SetActive(false);
-                        SetFocusedButton(null);
-                    }
                     StartGame();
                 }
             }
@@ -156,20 +145,13 @@ public class GameManager : MonoBehaviour
     public void ShowStartState()
     {
         CurrentState = GameState.Start;
-        isViewingHeroes = false;
         justEnteredStartState = true;
         startStateTime = Time.time; // Record start screen entry time
         UpdateScoreUI();
 
         if (startPanel != null) startPanel.SetActive(true);
-        if (lobbyPanel != null) lobbyPanel.SetActive(true);
-        if (heroesPanel != null) heroesPanel.SetActive(false);
-        if (themeSelectorPanel != null) themeSelectorPanel.SetActive(false);
         if (gameOverPanel != null) gameOverPanel.SetActive(false);
         if (scoreText != null) scoreText.SetActive(false);
-
-        // Reset play button icon to Play arrow
-        if (playIconImage != null && playSprite != null) playIconImage.sprite = playSprite;
 
         // Update high score on start screen
         bestScore = PlayerPrefs.GetInt(HighScoreKey, 0);
@@ -179,23 +161,103 @@ public class GameManager : MonoBehaviour
         WeatherController weather = FindObjectOfType<WeatherController>();
         if (weather != null) weather.ResetWeather();
 
-        // Freeze bird and pipes until the player starts.
-        if (bird != null)
-        {
-            bird.SetActive(true);
-            bird.transform.localScale = new Vector3(2.0f, 2.0f, 1f); // Large preview scale
-            BirdController birdController = bird.GetComponent<BirdController>();
-            if (birdController != null) birdController.ResetBird();
-        }
-
         if (pipeSpawner != null) pipeSpawner.StopSpawning();
 
         // Remove any pipes left over from a previous run.
         ClearExistingPipes();
 
+        // Always land back on the Lobby screen (resets bird preview, panels, nav visuals).
+        SetMenuScreen(MenuScreen.Lobby);
+
         // Start flushing click queue to allow play trigger
         StartCoroutine(ClearTransitionFlag());
-        SetFocusedButton(null);
+    }
+
+    /// <summary>
+    /// Single source of truth for which full-screen menu panel is showing
+    /// (Lobby / Worlds / Heroes). Replaces the old scattered SetActive() calls
+    /// and boolean flags so Home/back navigation works uniformly from any screen.
+    /// </summary>
+    public void SetMenuScreen(MenuScreen screen)
+    {
+        CurrentScreen = screen;
+        bool onLobby = screen == MenuScreen.Lobby;
+
+        if (lobbyPanel != null) lobbyPanel.SetActive(onLobby);
+        if (themeSelectorPanel != null) themeSelectorPanel.SetActive(screen == MenuScreen.Worlds);
+        if (heroesPanel != null) heroesPanel.SetActive(screen == MenuScreen.Heroes);
+        if (shopPanel != null) shopPanel.SetActive(screen == MenuScreen.Shop);
+        if (questsPanel != null) questsPanel.SetActive(screen == MenuScreen.Quests);
+
+        // Bird preview only shows on the Lobby screen.
+        if (bird != null)
+        {
+            bird.SetActive(onLobby);
+            if (onLobby)
+            {
+                bird.transform.localScale = new Vector3(2.0f, 2.0f, 1f); // Large preview scale
+                BirdController birdController = bird.GetComponent<BirdController>();
+                if (birdController != null) birdController.ResetBird();
+            }
+        }
+
+        // Center nav button doubles as Play (Lobby) / Home (any other screen).
+        if (playIconImage != null)
+        {
+            Sprite iconSprite = onLobby ? playSprite : homeSprite;
+            if (iconSprite != null) playIconImage.sprite = iconSprite;
+        }
+
+        if (screen == MenuScreen.Heroes) RefreshHeroesPanel();
+        if (screen == MenuScreen.Worlds)
+        {
+            ThemeSelectorUI selector = themeSelectorPanel != null ? themeSelectorPanel.GetComponent<ThemeSelectorUI>() : null;
+            if (selector != null) selector.UpdateSelectionUI();
+        }
+
+        UpdateNavVisuals(screen);
+
+        GameObject activePanel;
+        switch (screen)
+        {
+            case MenuScreen.Worlds: activePanel = themeSelectorPanel; break;
+            case MenuScreen.Heroes: activePanel = heroesPanel; break;
+            case MenuScreen.Shop: activePanel = shopPanel; break;
+            case MenuScreen.Quests: activePanel = questsPanel; break;
+            default: activePanel = lobbyPanel; break;
+        }
+        if (screenTransitionCoroutine != null) StopCoroutine(screenTransitionCoroutine);
+        if (activePanel != null) screenTransitionCoroutine = StartCoroutine(AnimateScreenIn(activePanel));
+    }
+
+    private Coroutine screenTransitionCoroutine;
+
+    /// <summary>Fades/slides a menu screen in on entry. Same ease-out-sine pattern as AnimateGameOverBoard().</summary>
+    private System.Collections.IEnumerator AnimateScreenIn(GameObject screenPanel)
+    {
+        RectTransform rt = screenPanel.GetComponent<RectTransform>();
+        CanvasGroup cg = screenPanel.GetComponent<CanvasGroup>();
+        if (cg == null) cg = screenPanel.AddComponent<CanvasGroup>();
+
+        Vector2 originalPos = rt != null ? rt.anchoredPosition : Vector2.zero;
+        Vector2 startPos = originalPos + new Vector2(0, -40f);
+
+        cg.alpha = 0f;
+        if (rt != null) rt.anchoredPosition = startPos;
+
+        float duration = 0.22f;
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Sin(Mathf.Clamp01(elapsed / duration) * Mathf.PI * 0.5f); // ease out sine
+            cg.alpha = t;
+            if (rt != null) rt.anchoredPosition = Vector2.Lerp(startPos, originalPos, t);
+            yield return null;
+        }
+
+        cg.alpha = 1f;
+        if (rt != null) rt.anchoredPosition = originalPos;
     }
 
     // Hook this up to the Start button's OnClick() in the Inspector (tapping
@@ -206,28 +268,16 @@ public class GameManager : MonoBehaviour
 
         PlayClickSound();
 
-        if (isViewingHeroes)
+        if (CurrentScreen != MenuScreen.Lobby)
         {
-            // Center button acts as HOME button! Return to lobby state
-            isViewingHeroes = false;
-            if (lobbyPanel != null) lobbyPanel.SetActive(true);
-            if (heroesPanel != null) heroesPanel.SetActive(false);
-            if (bird != null)
-            {
-                bird.SetActive(true);
-                bird.transform.localScale = new Vector3(2.0f, 2.0f, 1f);
-                BirdController bc = bird.GetComponent<BirdController>();
-                if (bc != null) bc.UpdateSkin(); // Refresh visual preview
-            }
-            if (playIconImage != null && playSprite != null) playIconImage.sprite = playSprite;
-            SetFocusedButton(null);
-            ShowToast("RETURNED TO LOBBY");
+            // Center button acts as HOME button on any non-Lobby screen (Worlds, Heroes, ...).
+            SetMenuScreen(MenuScreen.Lobby);
             return;
         }
 
         // Lobby state: start the gameplay!
         CurrentState = GameState.Playing;
-        SetFocusedButton(null);
+
         if (startPanel != null) startPanel.SetActive(false);
         if (gameOverPanel != null) gameOverPanel.SetActive(false);
         if (scoreText != null) scoreText.SetActive(true);
@@ -501,8 +551,9 @@ public class GameManager : MonoBehaviour
     public void OnShopClicked()
     {
         PlayClickSound();
-        SetFocusedButton(shopButton);
-        ShowToast("SHOP COMING SOON!");
+        if (CurrentState != GameState.Start) return;
+
+        SetMenuScreen(CurrentScreen == MenuScreen.Shop ? MenuScreen.Lobby : MenuScreen.Shop);
     }
 
     public void OnHeroesClicked()
@@ -510,32 +561,27 @@ public class GameManager : MonoBehaviour
         PlayClickSound();
         if (CurrentState != GameState.Start) return;
 
-        isViewingHeroes = true;
-        if (lobbyPanel != null) lobbyPanel.SetActive(false);
-        if (heroesPanel != null) heroesPanel.SetActive(true);
-        if (themeSelectorPanel != null) themeSelectorPanel.SetActive(false); // Hide world select panel
-        if (bird != null) bird.SetActive(false); // Hide bird under character grid screen
-        
-        // Swap play button icon to Home
-        if (playIconImage != null && homeSprite != null) playIconImage.sprite = homeSprite;
-
-        SetFocusedButton(heroesButton);
-        RefreshHeroesPanel();
-        ShowToast("OPENED HERO SELECTION");
+        SetMenuScreen(CurrentScreen == MenuScreen.Heroes ? MenuScreen.Lobby : MenuScreen.Heroes);
     }
 
-    public void SelectHero(int skinIndex)
+    private static readonly string[] HeroWorldNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja" };
+
+    /// <summary>
+    /// Hooked up to every card in the all-worlds Heroes roster. globalIndex is (worldIndex*3 + skinIndex),
+    /// covering all 7 worlds x 3 skins = 21 heroes. Fully independent of the selected World —
+    /// picking a hero here never changes which world/environment is active, and vice versa.
+    /// </summary>
+    private const string SelectedHeroKey = "FlappyBird_SelectedHeroGlobal";
+
+    public void SelectHeroGlobal(int globalIndex)
     {
         PlayClickSound();
-        if (bird != null)
-        {
-            BirdController bc = bird.GetComponent<BirdController>();
-            if (bc != null)
-            {
-                bc.SetSkin(skinIndex);
-                ShowToast("HERO SELECTED!");
-            }
-        }
+
+        PlayerPrefs.SetInt(SelectedHeroKey, globalIndex);
+        PlayerPrefs.Save();
+
+        if (ThemeApplier.Instance != null) ThemeApplier.Instance.ApplyHeroSprite(globalIndex);
+
         RefreshHeroesPanel();
     }
 
@@ -543,91 +589,39 @@ public class GameManager : MonoBehaviour
     {
         if (heroesPanel == null) return;
 
-        ThemeData currentTheme = ThemeManager.Instance != null ? ThemeManager.Instance.GetCurrentTheme() : null;
-        string themeNameLower = currentTheme != null ? currentTheme.themeName.ToLower() : "classic";
-
-        string[] skinNames = new string[3];
-        Sprite[] skinSprites = new Sprite[3];
-
-        if (themeNameLower == "classic")
-        {
-            skinNames = new string[] { "YELLOW HERO", "BLUE HERO", "RED HERO" };
-            if (bird != null)
-            {
-                BirdController bc = bird.GetComponent<BirdController>();
-                if (bc != null && bc.skins != null && bc.skins.Length >= 3)
-                {
-                    skinSprites[0] = bc.skins[0].flapSprites[1];
-                    skinSprites[1] = bc.skins[1].flapSprites[1];
-                    skinSprites[2] = bc.skins[2].flapSprites[1];
-                }
-            }
-        }
-        else
-        {
-            if (themeNameLower == "space") skinNames = new string[] { "ROCKET SPEEDER", "COSMIC UFO", "COMM SATELLITE" };
-            else if (themeNameLower == "football") skinNames = new string[] { "SOCCER BALL", "BASKETBALL", "TENNIS BALL" };
-            else if (themeNameLower == "dragon") skinNames = new string[] { "RED DRAKE", "EMERALD DRAGON", "GOLD WYVERN" };
-            else if (themeNameLower == "fish") skinNames = new string[] { "GOLDFISH", "BULL SHARK", "PINK JELLYFISH" };
-            else if (themeNameLower == "bee") skinNames = new string[] { "HONEY BEE", "LADYBUG", "BUTTERFLY" };
-            else if (themeNameLower == "ninja") skinNames = new string[] { "SHADOW NINJA", "CRIMSON NINJA", "SILVER SHINOBI" };
-            else skinNames = new string[] { "HERO A", "HERO B", "HERO C" };
-
-            if (currentTheme != null && currentTheme.playerSprites != null)
-            {
-                for (int i = 0; i < 3; i++)
-                {
-                    int sprIdx = Mathf.Clamp(i, 0, currentTheme.playerSprites.Length - 1);
-                    skinSprites[i] = currentTheme.playerSprites[sprIdx];
-                }
-            }
-        }
+        int currentGlobal = PlayerPrefs.GetInt(SelectedHeroKey, 0);
+        int currentWorld = currentGlobal / 3;
+        int currentSkin = currentGlobal % 3;
 
         // Header Text update
         Transform headerTextTrans = heroesPanel.transform.Find("HeaderBar/Text");
         if (headerTextTrans != null)
         {
             UnityEngine.UI.Text headerText = headerTextTrans.GetComponent<UnityEngine.UI.Text>();
-            if (headerText != null)
-            {
-                string nameDisplay = currentTheme != null ? currentTheme.themeName.ToUpper() : "CLASSIC";
-                int currentSel = bird != null ? bird.GetComponent<BirdController>().currentSkinIndex : 0;
-                headerText.text = nameDisplay + " HEROES (" + (currentSel + 1) + "/3)";
-            }
+            if (headerText != null) headerText.text = "HEROES (" + (currentGlobal + 1) + "/21)";
         }
 
-        // Apply skin name, preview image, and checkmark indicator to each card
-        for (int i = 0; i < 3; i++)
+        // Update the selected-state outline/scale/checkmark on all 21 cards (names/sprites are
+        // baked in at build time since the roster never changes).
+        for (int t = 0; t < HeroWorldNames.Length; t++)
         {
-            Transform cardTrans = heroesPanel.transform.Find("Grid/Card" + i);
-            if (cardTrans == null) continue;
-
-            // Name
-            Transform nameTrans = cardTrans.Find("NameText");
-            if (nameTrans != null)
+            for (int s = 0; s < 3; s++)
             {
-                UnityEngine.UI.Text txt = nameTrans.GetComponent<UnityEngine.UI.Text>();
-                if (txt != null) txt.text = skinNames[i];
-            }
+                Transform cardTrans = heroesPanel.transform.Find("ScrollView/Viewport/Content/" + HeroWorldNames[t] + "Card" + s);
+                if (cardTrans == null) continue;
 
-            // Preview Image
-            Transform imgTrans = cardTrans.Find("PreviewImage");
-            if (imgTrans != null)
-            {
-                UnityEngine.UI.Image img = imgTrans.GetComponent<UnityEngine.UI.Image>();
-                if (img != null && skinSprites[i] != null)
+                bool selected = t == currentWorld && s == currentSkin;
+
+                Transform checkTrans = cardTrans.Find("Checkmark");
+                if (checkTrans != null) checkTrans.gameObject.SetActive(selected);
+
+                UnityEngine.UI.Outline cardOutline = cardTrans.GetComponent<UnityEngine.UI.Outline>();
+                if (cardOutline != null)
                 {
-                    img.sprite = skinSprites[i];
-                    img.color = Color.white;
+                    cardOutline.effectColor = selected ? new Color(0.95f, 0.72f, 0.15f) : new Color(0.35f, 0.35f, 0.4f);
+                    cardOutline.effectDistance = selected ? new Vector2(4f, -4f) : new Vector2(2f, -2f);
                 }
-            }
-
-            // Checkmark
-            Transform checkTrans = cardTrans.Find("Checkmark");
-            if (checkTrans != null)
-            {
-                int currentSel = bird != null ? bird.GetComponent<BirdController>().currentSkinIndex : 0;
-                checkTrans.gameObject.SetActive(i == currentSel);
+                cardTrans.localScale = selected ? new Vector3(1.05f, 1.05f, 1f) : Vector3.one;
             }
         }
     }
@@ -635,59 +629,49 @@ public class GameManager : MonoBehaviour
     public void OnMissionsClicked()
     {
         PlayClickSound();
-        SetFocusedButton(missionsButton);
-        string[] missions = {
-            "MISSION: MAKE 90 LOOPS (0/90)",
-            "MISSION: FLY 300 METERS (12/300)",
-            "MISSION: PASS 20 GATES (0/20)",
-            "MISSION: SCORE 50 POINTS (0/50)"
-        };
-        ShowToast(missions[Random.Range(0, missions.Length)]);
+        if (CurrentState != GameState.Start) return;
+
+        SetMenuScreen(CurrentScreen == MenuScreen.Quests ? MenuScreen.Lobby : MenuScreen.Quests);
     }
 
     public void OnThemesClicked()
     {
         PlayClickSound();
-        if (themeSelectorPanel != null)
-        {
-            if (isViewingHeroes)
-            {
-                isViewingHeroes = false;
-                if (heroesPanel != null) heroesPanel.SetActive(false);
-                if (lobbyPanel != null) lobbyPanel.SetActive(true);
-                if (bird != null)
-                {
-                    bird.SetActive(true);
-                    bird.transform.localScale = new Vector3(2.0f, 2.0f, 1f);
-                    BirdController bc = bird.GetComponent<BirdController>();
-                    if (bc != null) bc.UpdateSkin();
-                }
-                if (playIconImage != null && playSprite != null) playIconImage.sprite = playSprite;
-            }
+        if (CurrentState != GameState.Start) return;
 
-            bool nextState = !themeSelectorPanel.activeSelf;
-            themeSelectorPanel.SetActive(nextState);
-            SetFocusedButton(nextState ? themesButton : null);
-            ShowToast(nextState ? "OPENED WORLD SELECT" : "CLOSED WORLD SELECT");
-        }
+        SetMenuScreen(CurrentScreen == MenuScreen.Worlds ? MenuScreen.Lobby : MenuScreen.Worlds);
     }
 
-    private void SetFocusedButton(UnityEngine.UI.Button focusedBtn)
+    /// <summary>
+    /// Styles all 5 bottom-bar slots so exactly one reads as active, matching CurrentScreen.
+    /// Replaces the old SetFocusedButton, which excluded the center button and left it
+    /// permanently looking "active" regardless of the real screen state.
+    /// </summary>
+    private void UpdateNavVisuals(MenuScreen screen)
     {
-        UnityEngine.UI.Button[] navButtons = { shopButton, heroesButton, missionsButton, themesButton };
-        foreach (var btn in navButtons)
+        SetNavButtonActive(shopButton, screen == MenuScreen.Shop, false);
+        SetNavButtonActive(heroesButton, screen == MenuScreen.Heroes, false);
+        SetNavButtonActive(missionsButton, screen == MenuScreen.Quests, false);
+        SetNavButtonActive(themesButton, screen == MenuScreen.Worlds, false);
+        SetNavButtonActive(centerButton, screen == MenuScreen.Lobby, true);
+    }
+
+    private void SetNavButtonActive(UnityEngine.UI.Button btn, bool active, bool isCenter)
+    {
+        if (btn == null) return;
+        float targetScale = active ? 1.15f : (isCenter ? 0.9f : 1f);
+        btn.transform.localScale = new Vector3(targetScale, targetScale, 1f);
+
+        if (isCenter)
         {
-            if (btn == null) continue;
-            if (btn == focusedBtn)
-            {
-                btn.transform.localScale = new Vector3(1.15f, 1.15f, 1f);
-                btn.image.color = Color.white;
-            }
-            else
-            {
-                btn.transform.localScale = Vector3.one;
-                btn.image.color = new Color(0.7f, 0.7f, 0.7f, 0.9f);
-            }
+            // Keeps its yellow branding, but visibly fades when it's not the active tab
+            // (Play, on Lobby) instead of always reading as highlighted.
+            Color c = btn.image.color;
+            btn.image.color = new Color(c.r, c.g, c.b, active ? 1f : 0.55f);
+        }
+        else
+        {
+            btn.image.color = active ? Color.white : new Color(0.7f, 0.7f, 0.7f, 0.9f);
         }
     }
 
