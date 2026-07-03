@@ -1241,18 +1241,23 @@ public static class FlappyBirdSceneBuilder
         bestOutline.effectDistance = new Vector2(2f, -2f);
 
         // Pulsing "TAP TO START" hint text on start screen
-        GameObject tapStartGO = CreateLabel("TapToStartText", lobbyPanel.transform, "TAP TO START", 36, new Vector2(0, -300));
+        GameObject tapStartGO = CreateLabel("TapToStartText", lobbyPanel.transform, "TAP TO START", 52, new Vector2(0, -300));
         Text tapText = tapStartGO.GetComponent<Text>();
-        tapText.color = new Color(0.95f, 0.95f, 0.95f, 0.85f);
+        tapText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); // bulky, retro game font
+        tapText.color = Color.white;
         tapText.fontStyle = FontStyle.Bold;
         
         Outline tapOutline = tapStartGO.GetComponent<Outline>();
         if (tapOutline == null) tapOutline = tapStartGO.AddComponent<Outline>();
-        tapOutline.effectColor = new Color(0.1f, 0.1f, 0.1f, 0.9f);
-        tapOutline.effectDistance = new Vector2(2f, -2f);
+        tapOutline.effectColor = new Color(0.12f, 0.12f, 0.12f, 0.9f);
+        tapOutline.effectDistance = new Vector2(1.5f, -1.5f);
+
+        Shadow tapShadow = tapStartGO.AddComponent<Shadow>();
+        tapShadow.effectColor = new Color(0.12f, 0.12f, 0.12f, 0.9f);
+        tapShadow.effectDistance = new Vector2(2f, -2f);
 
         UIPulse pulse = tapStartGO.AddComponent<UIPulse>();
-        pulse.scaleAmount = 0.06f;
+        pulse.scaleAmount = 0.05f;
         pulse.speed = 3f;
 
         // --- Interactive Heroes Selection Screen (Grid) ---
