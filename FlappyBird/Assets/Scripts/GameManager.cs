@@ -147,6 +147,7 @@ public class GameManager : MonoBehaviour
         CurrentState = GameState.Start;
         justEnteredStartState = true;
         startStateTime = Time.time; // Record start screen entry time
+        score = 0; // each run starts fresh — this was never reset, so score kept accumulating across retries
         UpdateScoreUI();
 
         if (startPanel != null) startPanel.SetActive(true);
