@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 
 /// <summary>
@@ -13,7 +14,7 @@ public class GameManager : MonoBehaviour
     public enum GameState { Start, Playing, GameOver }
     public GameState CurrentState { get; private set; } = GameState.Start;
 
-    public enum MenuScreen { Lobby, Worlds, Heroes, Shop, Quests }
+    public enum MenuScreen { Lobby, Worlds, Heroes, Shop, Quests, Leaderboard }
     public MenuScreen CurrentScreen { get; private set; } = MenuScreen.Lobby;
 
     [Header("UI Panels")]
@@ -44,6 +45,7 @@ public class GameManager : MonoBehaviour
     public GameObject heroesPanel;
     public GameObject shopPanel;
     public GameObject questsPanel;
+    public GameObject leaderboardPanel;
     public UnityEngine.UI.Image playIconImage;
     public Sprite playSprite;
     public Sprite homeSprite;
@@ -116,20 +118,13 @@ public class GameManager : MonoBehaviour
 
             if (Input.GetMouseButtonDown(0) || TouchStarted())
             {
-                Vector2 clickPos = Input.mousePosition;
-                if (Input.touchCount > 0) clickPos = Input.GetTouch(0).position;
+                // Any tap on a UI element (nav bar, badges, the Leaderboard button, etc.) is
+                // handled by that element's own Button.onClick — don't also treat it as tap-to-start.
+                bool overUI = EventSystem.current != null && (Input.touchCount > 0
+                    ? EventSystem.current.IsPointerOverGameObject(Input.GetTouch(0).fingerId)
+                    : EventSystem.current.IsPointerOverGameObject());
 
-                bool onBottomBar = false;
-                if (shopButton != null && shopButton.transform.parent != null)
-                {
-                    RectTransform barRt = shopButton.transform.parent.GetComponent<RectTransform>();
-                    if (barRt != null)
-                    {
-                        onBottomBar = RectTransformUtility.RectangleContainsScreenPoint(barRt, clickPos, null);
-                    }
-                }
-
-                if (!onBottomBar && CurrentScreen == MenuScreen.Lobby && !justEnteredStartState)
+                if (!overUI && CurrentScreen == MenuScreen.Lobby && !justEnteredStartState)
                 {
                     StartGame();
                 }
@@ -189,6 +184,7 @@ public class GameManager : MonoBehaviour
         if (heroesPanel != null) heroesPanel.SetActive(screen == MenuScreen.Heroes);
         if (shopPanel != null) shopPanel.SetActive(screen == MenuScreen.Shop);
         if (questsPanel != null) questsPanel.SetActive(screen == MenuScreen.Quests);
+        if (leaderboardPanel != null) leaderboardPanel.SetActive(screen == MenuScreen.Leaderboard);
 
         // Bird preview only shows on the Lobby screen.
         if (bird != null)
@@ -215,6 +211,11 @@ public class GameManager : MonoBehaviour
             ThemeSelectorUI selector = themeSelectorPanel != null ? themeSelectorPanel.GetComponent<ThemeSelectorUI>() : null;
             if (selector != null) selector.UpdateSelectionUI();
         }
+        if (screen == MenuScreen.Leaderboard)
+        {
+            LeaderboardUI board = leaderboardPanel != null ? leaderboardPanel.GetComponent<LeaderboardUI>() : null;
+            if (board != null) board.Refresh();
+        }
 
         UpdateNavVisuals(screen);
 
@@ -225,6 +226,7 @@ public class GameManager : MonoBehaviour
             case MenuScreen.Heroes: activePanel = heroesPanel; break;
             case MenuScreen.Shop: activePanel = shopPanel; break;
             case MenuScreen.Quests: activePanel = questsPanel; break;
+            case MenuScreen.Leaderboard: activePanel = leaderboardPanel; break;
             default: activePanel = lobbyPanel; break;
         }
         if (screenTransitionCoroutine != null) StopCoroutine(screenTransitionCoroutine);
@@ -345,6 +347,8 @@ public class GameManager : MonoBehaviour
             bestScore = score;
             PlayerPrefs.SetInt(HighScoreKey, bestScore);
             PlayerPrefs.Save();
+
+            if (LeaderboardManager.Instance != null) LeaderboardManager.Instance.SubmitScore(bestScore);
         }
 
         if (gameOverPanel != null)
@@ -643,6 +647,22 @@ public class GameManager : MonoBehaviour
         SetMenuScreen(CurrentScreen == MenuScreen.Worlds ? MenuScreen.Lobby : MenuScreen.Worlds);
     }
 
+    public void OnLeaderboardClicked()
+    {
+        PlayClickSound();
+        if (CurrentState != GameState.Start) return;
+
+        SetMenuScreen(CurrentScreen == MenuScreen.Leaderboard ? MenuScreen.Lobby : MenuScreen.Leaderboard);
+    }
+
+    /// <summary>
+    /// Styles all 5 bottom-bar slots so exactly one reads as active, matching CurrentScreen.
+    /// Replaces the old SetFocusedButton, which excluded the center button and left it
+    /// permanently looking "active" regardless of the real screen state.
+    /// </summary>
+    private RectTransform navIndicator;
+    private Coroutine navIndicatorCoroutine;
+
     /// <summary>
     /// Styles all 5 bottom-bar slots so exactly one reads as active, matching CurrentScreen.
     /// Replaces the old SetFocusedButton, which excluded the center button and left it
@@ -655,6 +675,67 @@ public class GameManager : MonoBehaviour
         SetNavButtonActive(missionsButton, screen == MenuScreen.Quests, false);
         SetNavButtonActive(themesButton, screen == MenuScreen.Worlds, false);
         SetNavButtonActive(centerButton, screen == MenuScreen.Lobby, true);
+
+        // Slide the active indicator behind the active button
+        UnityEngine.UI.Button targetBtn = null;
+        bool isCenter = false;
+        switch (screen)
+        {
+            case MenuScreen.Shop: targetBtn = shopButton; break;
+            case MenuScreen.Heroes: targetBtn = heroesButton; break;
+            case MenuScreen.Quests: targetBtn = missionsButton; break;
+            case MenuScreen.Worlds: targetBtn = themesButton; break;
+            case MenuScreen.Lobby: targetBtn = centerButton; isCenter = true; break;
+        }
+
+        if (targetBtn != null)
+        {
+            if (navIndicatorCoroutine != null) StopCoroutine(navIndicatorCoroutine);
+
+            if (navIndicator == null && shopButton != null && shopButton.transform.parent != null)
+            {
+                Transform t = shopButton.transform.parent.Find("ActiveIndicator");
+                if (t != null) navIndicator = t.GetComponent<RectTransform>();
+            }
+
+            if (navIndicator != null)
+            {
+                RectTransform targetRt = targetBtn.GetComponent<RectTransform>();
+                Vector2 targetPos = targetRt.anchoredPosition;
+                if (isCenter) targetPos.y += 10f;
+                Vector2 targetSize = isCenter ? new Vector2(180, 130) : new Vector2(120, 110);
+
+                if (navIndicator.anchoredPosition == Vector2.zero) // Snap on first layout
+                {
+                    navIndicator.anchoredPosition = targetPos;
+                    navIndicator.sizeDelta = targetSize;
+                }
+                else
+                {
+                    navIndicatorCoroutine = StartCoroutine(AnimateNavIndicator(targetPos, targetSize));
+                }
+            }
+        }
+    }
+
+    private System.Collections.IEnumerator AnimateNavIndicator(Vector2 targetPos, Vector2 targetSize)
+    {
+        float t = 0f;
+        float duration = 0.22f;
+        Vector2 startPos = navIndicator.anchoredPosition;
+        Vector2 startSize = navIndicator.sizeDelta;
+
+        while (t < duration)
+        {
+            t += Time.unscaledDeltaTime;
+            float progress = Mathf.Sin((t / duration) * Mathf.PI * 0.5f); // ease-out-sine
+            navIndicator.anchoredPosition = Vector2.Lerp(startPos, targetPos, progress);
+            navIndicator.sizeDelta = Vector2.Lerp(startSize, targetSize, progress);
+            yield return null;
+        }
+
+        navIndicator.anchoredPosition = targetPos;
+        navIndicator.sizeDelta = targetSize;
     }
 
     private void SetNavButtonActive(UnityEngine.UI.Button btn, bool active, bool isCenter)
@@ -662,6 +743,21 @@ public class GameManager : MonoBehaviour
         if (btn == null) return;
         float targetScale = active ? 1.15f : (isCenter ? 0.9f : 1f);
         btn.transform.localScale = new Vector3(targetScale, targetScale, 1f);
+
+        Color activeColor = Color.white;
+        if (ThemeManager.Instance != null)
+        {
+            ThemeData currentTheme = ThemeManager.Instance.GetCurrentTheme();
+            if (currentTheme != null)
+            {
+                activeColor = currentTheme.themeColor;
+                float h, s, v;
+                Color.RGBToHSV(activeColor, out h, out s, out v);
+                s = Mathf.Max(s, 0.75f);
+                v = Mathf.Max(v, 0.95f);
+                activeColor = Color.HSVToRGB(h, s, v);
+            }
+        }
 
         if (isCenter)
         {
@@ -672,7 +768,18 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            btn.image.color = active ? Color.white : new Color(0.7f, 0.7f, 0.7f, 0.9f);
+            btn.image.color = active ? Color.white : new Color(0.6f, 0.6f, 0.6f, 0.8f);
+
+            Transform labelTrans = btn.transform.Find("Label");
+            if (labelTrans != null)
+            {
+                UnityEngine.UI.Text txt = labelTrans.GetComponent<UnityEngine.UI.Text>();
+                if (txt != null)
+                {
+                    txt.color = active ? activeColor : new Color(0.7f, 0.7f, 0.7f, 0.8f);
+                    txt.fontStyle = active ? FontStyle.Bold : FontStyle.Normal;
+                }
+            }
         }
     }
 

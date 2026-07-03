@@ -238,6 +238,61 @@ public class ThemeApplier : MonoBehaviour
         {
             applier.ApplyCurrentTheme();
         }
+
+        // 8. Dynamic Bottom Bar Custom Styling matching the selected theme
+        GameObject bottomBar = GameObject.Find("BottomNavBar");
+        if (bottomBar != null)
+        {
+            Color themeColor = theme.themeColor;
+            
+            // Background tint (blend with theme color but very dark for contrast)
+            UnityEngine.UI.Image barImg = bottomBar.GetComponent<UnityEngine.UI.Image>();
+            if (barImg != null)
+            {
+                Color barColor = Color.Lerp(themeColor, Color.black, 0.90f);
+                barColor.a = 0.95f;
+                barImg.color = barColor;
+            }
+
+            // Outline glow (bright themed outline border)
+            UnityEngine.UI.Outline barOutline = bottomBar.GetComponent<UnityEngine.UI.Outline>();
+            if (barOutline != null)
+            {
+                Color outlineColor = Color.Lerp(themeColor, Color.white, 0.40f);
+                outlineColor.a = 0.35f;
+                barOutline.effectColor = outlineColor;
+            }
+
+            // Active indicator pill tint
+            Transform indTrans = bottomBar.transform.Find("ActiveIndicator");
+            if (indTrans != null)
+            {
+                UnityEngine.UI.Image indImg = indTrans.GetComponent<UnityEngine.UI.Image>();
+                if (indImg != null)
+                {
+                    Color indColor = themeColor;
+                    indColor.a = 0.22f; // semi-transparent glow
+                    indImg.color = indColor;
+                }
+            }
+
+            // Center play/home button tint
+            Transform playTrans = bottomBar.transform.Find("PlayButton");
+            if (playTrans != null)
+            {
+                UnityEngine.UI.Image playImg = playTrans.GetComponent<UnityEngine.UI.Image>();
+                if (playImg != null)
+                {
+                    Color playBtnColor = themeColor;
+                    // Saturate and brighten it so it pops!
+                    float h, s, v;
+                    Color.RGBToHSV(playBtnColor, out h, out s, out v);
+                    s = Mathf.Max(s, 0.78f);
+                    v = Mathf.Max(v, 0.90f);
+                    playImg.color = Color.HSVToRGB(h, s, v);
+                }
+            }
+        }
     }
 
     /// <summary>

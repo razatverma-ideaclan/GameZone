@@ -147,8 +147,9 @@ public static class FlappyBirdSceneBuilder
         GameObject lobbyPanel, heroesPanel;
         UnityEngine.UI.Image playIconImageRef;
         Text activeThemeLabelText;
-        GameObject shopPanel, questsPanel;
-        GameObject startPanel = BuildStartPanel(canvas.transform, pillButtonSprite, resultCardSprite, goldMedalSprite, out startButton, out startHighScoreText, birdMidSprites, themeAssets, shopIcon, heroesIcon, missionsIcon, themesIcon, playIcon, homeIcon, out shopButton, out heroesButton, out missionsButton, out themesButton, out toastPanel, out themeSelectorPanelRef, out lobbyPanel, out heroesPanel, out playIconImageRef, out navPlayBtn, out activeThemeLabelText, out shopPanel, out questsPanel);
+        GameObject shopPanel, questsPanel, leaderboardPanel;
+        Button bestScoreButton;
+        GameObject startPanel = BuildStartPanel(canvas.transform, pillButtonSprite, resultCardSprite, goldMedalSprite, out startButton, out startHighScoreText, birdMidSprites, themeAssets, shopIcon, heroesIcon, missionsIcon, themesIcon, playIcon, homeIcon, out shopButton, out heroesButton, out missionsButton, out themesButton, out toastPanel, out themeSelectorPanelRef, out lobbyPanel, out heroesPanel, out playIconImageRef, out navPlayBtn, out activeThemeLabelText, out shopPanel, out questsPanel, out leaderboardPanel, out bestScoreButton);
         
         UnityEngine.UI.Image medalImage;
         GameObject newBestBadge;
@@ -166,6 +167,7 @@ public static class FlappyBirdSceneBuilder
         gm.heroesPanel = heroesPanel;
         gm.shopPanel = shopPanel;
         gm.questsPanel = questsPanel;
+        gm.leaderboardPanel = leaderboardPanel;
         gm.playIconImage = playIconImageRef;
         gm.playSprite = playIcon;
         gm.homeSprite = homeIcon;
@@ -184,7 +186,8 @@ public static class FlappyBirdSceneBuilder
         UnityEventTools.AddPersistentListener(heroesButton.onClick, gm.OnHeroesClicked);
         UnityEventTools.AddPersistentListener(missionsButton.onClick, gm.OnMissionsClicked);
         UnityEventTools.AddPersistentListener(themesButton.onClick, gm.OnThemesClicked);
-        
+        UnityEventTools.AddPersistentListener(bestScoreButton.onClick, gm.OnLeaderboardClicked);
+
         UnityEventTools.AddPersistentListener(menuButton.onClick, gm.RestartGame);
         UnityEventTools.AddPersistentListener(retryButton.onClick, gm.RetryGame);
 
@@ -1162,7 +1165,7 @@ public static class FlappyBirdSceneBuilder
         new Color(0.15f, 0.15f, 0.18f) // Premium dark charcoal color
     };
 
-    private static GameObject BuildStartPanel(Transform canvasTransform, Sprite buttonSprite, Sprite resultCardSprite, Sprite goldMedalSprite, out Button startButton, out GameObject startHighScoreText, Sprite[] birdMidSprites, ThemeData[] themeAssets, Sprite shopIcon, Sprite heroesIcon, Sprite missionsIcon, Sprite themesIcon, Sprite playIcon, Sprite homeIcon, out Button shopButton, out Button heroesButton, out Button missionsButton, out Button themesButton, out GameObject toastPanel, out GameObject themeSelectorPanelRef, out GameObject lobbyPanel, out GameObject heroesPanel, out UnityEngine.UI.Image playIconImageRef, out Button navPlayBtn, out Text activeThemeLabelText, out GameObject shopPanel, out GameObject questsPanel)
+    private static GameObject BuildStartPanel(Transform canvasTransform, Sprite buttonSprite, Sprite resultCardSprite, Sprite goldMedalSprite, out Button startButton, out GameObject startHighScoreText, Sprite[] birdMidSprites, ThemeData[] themeAssets, Sprite shopIcon, Sprite heroesIcon, Sprite missionsIcon, Sprite themesIcon, Sprite playIcon, Sprite homeIcon, out Button shopButton, out Button heroesButton, out Button missionsButton, out Button themesButton, out GameObject toastPanel, out GameObject themeSelectorPanelRef, out GameObject lobbyPanel, out GameObject heroesPanel, out UnityEngine.UI.Image playIconImageRef, out Button navPlayBtn, out Text activeThemeLabelText, out GameObject shopPanel, out GameObject questsPanel, out GameObject leaderboardPanel, out Button bestScoreButton)
     {
         GameObject panel = CreatePanel("StartPanel", canvasTransform, new Color(0, 0, 0, 0.0f));
 
@@ -1194,6 +1197,21 @@ public static class FlappyBirdSceneBuilder
         GameObject titleGO = CreateColoredTitle("TitleText", lobbyPanel.transform, "FLAPPY BIRD", 110, new Vector2(0, 420));
         titleGO.AddComponent<UIFloat>().floatAmount = 12f;
         titleGO.GetComponent<UIFloat>().speed = 2f;
+
+        // Dedicated Leaderboard corner button — a clear, labeled tap target
+        // (separate from the small BEST badge, which isn't an obvious button).
+        GameObject leaderboardBtnGO = new GameObject("LeaderboardButton");
+        leaderboardBtnGO.transform.SetParent(lobbyPanel.transform, false);
+        Image leaderboardBtnImg = leaderboardBtnGO.AddComponent<Image>();
+        leaderboardBtnImg.sprite = goldMedalSprite;
+        bestScoreButton = leaderboardBtnGO.AddComponent<Button>();
+        bestScoreButton.transition = Selectable.Transition.None;
+        RectTransform leaderboardBtnRt = leaderboardBtnGO.GetComponent<RectTransform>();
+        leaderboardBtnRt.sizeDelta = new Vector2(100, 100);
+        leaderboardBtnRt.anchoredPosition = new Vector2(400, 650); // clear above the wide "FLAPPY BIRD" title
+
+        GameObject leaderboardBtnLabel = CreateLabel("Label", leaderboardBtnGO.transform, "RANKS", 20, new Vector2(0, -62));
+        leaderboardBtnLabel.GetComponent<Text>().color = new Color(0.9f, 0.9f, 0.9f);
 
         // World name is no longer shown on the main Lobby screen (it has its own dedicated
         // Worlds screen now), so ThemeApplier has no label to update here.
@@ -1509,6 +1527,9 @@ public static class FlappyBirdSceneBuilder
         shopPanel = BuildComingSoonPanel(panel.transform, "SHOP", "Gear, boosts and skins\nare on the way.", resultCardSprite);
         questsPanel = BuildComingSoonPanel(panel.transform, "QUESTS", "Daily challenges and rewards\nare on the way.", resultCardSprite);
 
+        // --- Leaderboard screen ---
+        leaderboardPanel = BuildLeaderboardPanel(panel.transform, resultCardSprite, buttonSprite);
+
         // --- Bottom Navigation Bar ---
         GameObject bottomBar = new GameObject("BottomNavBar");
         bottomBar.transform.SetParent(panel.transform, false);
@@ -1526,6 +1547,23 @@ public static class FlappyBirdSceneBuilder
         Shadow barShadow = bottomBar.AddComponent<Shadow>();
         barShadow.effectColor = new Color(0f, 0f, 0f, 0.4f);
         barShadow.effectDistance = new Vector2(0f, -8f);
+
+        Outline barOutline = bottomBar.AddComponent<Outline>();
+        barOutline.effectColor = new Color(1f, 1f, 1f, 0.15f);
+        barOutline.effectDistance = new Vector2(1f, -1f);
+
+        GameObject indicatorGO = new GameObject("ActiveIndicator");
+        indicatorGO.transform.SetParent(bottomBar.transform, false);
+        Image indImg = indicatorGO.AddComponent<Image>();
+        indImg.sprite = resultCardSprite;
+        indImg.color = new Color(1f, 1f, 1f, 0.15f);
+        
+        RectTransform indRt = indicatorGO.GetComponent<RectTransform>();
+        indRt.anchorMin = new Vector2(0.5f, 0.5f);
+        indRt.anchorMax = new Vector2(0.5f, 0.5f);
+        indRt.pivot = new Vector2(0.5f, 0.5f);
+        indRt.sizeDelta = new Vector2(180, 130);
+        indRt.anchoredPosition = new Vector2(0, 15);
 
         // 1. Shop Button
         GameObject shopGO = new GameObject("ShopButton");
@@ -1713,6 +1751,224 @@ public static class FlappyBirdSceneBuilder
         return comingSoonPanel;
     }
 
+    private static GameObject BuildLeaderboardPanel(Transform parent, Sprite resultCardSprite, Sprite buttonSprite)
+    {
+        GameObject leaderboardPanel = new GameObject("LeaderboardPanel");
+        leaderboardPanel.transform.SetParent(parent, false);
+        RectTransform rt = leaderboardPanel.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0.5f);
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(1000, 1400);
+        rt.anchoredPosition = new Vector2(0, 80);
+
+        LeaderboardUI board = leaderboardPanel.AddComponent<LeaderboardUI>();
+
+        // Header bar
+        GameObject hbGO = new GameObject("HeaderBar");
+        hbGO.transform.SetParent(leaderboardPanel.transform, false);
+        Image hbImg = hbGO.AddComponent<Image>();
+        hbImg.sprite = resultCardSprite;
+        hbImg.color = new Color(0.08f, 0.45f, 0.85f, 1f);
+        Outline hbOutline = hbGO.AddComponent<Outline>();
+        hbOutline.effectColor = Color.white;
+        hbOutline.effectDistance = new Vector2(2f, -2f);
+        RectTransform hbRt = hbGO.GetComponent<RectTransform>();
+        hbRt.sizeDelta = new Vector2(900, 80);
+        hbRt.anchoredPosition = new Vector2(0, 620);
+
+        GameObject hbTxtGO = CreateLabel("Text", hbGO.transform, "LEADERBOARD", 28, Vector2.zero);
+        hbTxtGO.GetComponent<Text>().color = Color.white;
+        hbTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+        RectTransform hbtRt = hbTxtGO.GetComponent<RectTransform>();
+        hbtRt.anchorMin = Vector2.zero;
+        hbtRt.anchorMax = Vector2.one;
+        hbtRt.offsetMin = Vector2.zero;
+        hbtRt.offsetMax = Vector2.zero;
+
+        // --- Signed-out group ---
+        GameObject signedOutGroup = new GameObject("SignedOutGroup");
+        signedOutGroup.transform.SetParent(leaderboardPanel.transform, false);
+        RectTransform sogRt = signedOutGroup.AddComponent<RectTransform>();
+        sogRt.anchorMin = new Vector2(0.5f, 0.5f);
+        sogRt.anchorMax = new Vector2(0.5f, 0.5f);
+        sogRt.sizeDelta = Vector2.zero;
+        sogRt.anchoredPosition = Vector2.zero;
+
+        GameObject infoGO = CreateLabel("InfoText", signedOutGroup.transform, "Sign in with Google to save your\nbest score to the global leaderboard!", 24, new Vector2(0, 500));
+        infoGO.GetComponent<Text>().color = new Color(0.85f, 0.85f, 0.85f);
+        infoGO.GetComponent<RectTransform>().sizeDelta = new Vector2(760, 90);
+
+        GameObject signInGO = new GameObject("SignInButton");
+        signInGO.transform.SetParent(signedOutGroup.transform, false);
+        Image signInImg = signInGO.AddComponent<Image>();
+        ApplyButtonLook(signInImg, buttonSprite, new Color(0.85f, 0.25f, 0.2f));
+        RectTransform signInRt = signInGO.GetComponent<RectTransform>();
+        signInRt.sizeDelta = new Vector2(480, 90);
+        signInRt.anchoredPosition = new Vector2(0, 390);
+        Button signInBtn = signInGO.AddComponent<Button>();
+        signInBtn.transition = Selectable.Transition.None;
+        GameObject signInLabelGO = CreateLabel("Text", signInGO.transform, "SIGN IN WITH GOOGLE", 26);
+        Text signInLabelText = signInLabelGO.GetComponent<Text>();
+        signInLabelText.color = Color.white;
+        signInLabelText.fontStyle = FontStyle.Bold;
+
+        // --- Signed-in group ---
+        GameObject signedInGroup = new GameObject("SignedInGroup");
+        signedInGroup.transform.SetParent(leaderboardPanel.transform, false);
+        RectTransform sigRt = signedInGroup.AddComponent<RectTransform>();
+        sigRt.anchorMin = new Vector2(0.5f, 0.5f);
+        sigRt.anchorMax = new Vector2(0.5f, 0.5f);
+        sigRt.sizeDelta = Vector2.zero;
+        sigRt.anchoredPosition = Vector2.zero;
+
+        GameObject nameDisplayGO = CreateLabel("NameText", signedInGroup.transform, "Player", 28, new Vector2(0, 520));
+        Text nameDisplayText = nameDisplayGO.GetComponent<Text>();
+        nameDisplayText.color = new Color(0.95f, 0.72f, 0.15f);
+        nameDisplayText.fontStyle = FontStyle.Bold;
+
+        GameObject nameFieldGO = new GameObject("NameInputField");
+        nameFieldGO.transform.SetParent(signedInGroup.transform, false);
+        Image nameFieldImg = nameFieldGO.AddComponent<Image>();
+        nameFieldImg.color = new Color(1f, 1f, 1f, 0.9f);
+        RectTransform nameFieldRt = nameFieldGO.GetComponent<RectTransform>();
+        nameFieldRt.sizeDelta = new Vector2(540, 70);
+        nameFieldRt.anchoredPosition = new Vector2(-80, 430);
+        InputField nameInput = nameFieldGO.AddComponent<InputField>();
+
+        GameObject nameFieldTextGO = new GameObject("Text");
+        nameFieldTextGO.transform.SetParent(nameFieldGO.transform, false);
+        Text nameFieldText = nameFieldTextGO.AddComponent<Text>();
+        nameFieldText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        nameFieldText.fontSize = 26;
+        nameFieldText.color = Color.black;
+        nameFieldText.alignment = TextAnchor.MiddleLeft;
+        nameFieldText.supportRichText = false;
+        RectTransform nameFieldTextRt = nameFieldTextGO.GetComponent<RectTransform>();
+        nameFieldTextRt.anchorMin = Vector2.zero;
+        nameFieldTextRt.anchorMax = Vector2.one;
+        nameFieldTextRt.offsetMin = new Vector2(16, 4);
+        nameFieldTextRt.offsetMax = new Vector2(-16, -4);
+        nameInput.textComponent = nameFieldText;
+        nameInput.characterLimit = 20;
+
+        GameObject saveNameGO = new GameObject("SaveNameButton");
+        saveNameGO.transform.SetParent(signedInGroup.transform, false);
+        Image saveNameImg = saveNameGO.AddComponent<Image>();
+        ApplyButtonLook(saveNameImg, buttonSprite, new Color(0.4f, 0.82f, 0.4f));
+        RectTransform saveNameRt = saveNameGO.GetComponent<RectTransform>();
+        saveNameRt.sizeDelta = new Vector2(160, 70);
+        saveNameRt.anchoredPosition = new Vector2(300, 430);
+        Button saveNameBtn = saveNameGO.AddComponent<Button>();
+        saveNameBtn.transition = Selectable.Transition.None;
+        GameObject saveNameLabelGO = CreateLabel("Text", saveNameGO.transform, "SAVE", 24);
+        saveNameLabelGO.GetComponent<Text>().color = Color.white;
+
+        GameObject signOutGO = new GameObject("SignOutButton");
+        signOutGO.transform.SetParent(signedInGroup.transform, false);
+        Image signOutImg = signOutGO.AddComponent<Image>();
+        ApplyButtonLook(signOutImg, buttonSprite, new Color(0.55f, 0.6f, 0.65f));
+        RectTransform signOutRt = signOutGO.GetComponent<RectTransform>();
+        signOutRt.sizeDelta = new Vector2(220, 60);
+        signOutRt.anchoredPosition = new Vector2(0, 340);
+        Button signOutBtn = signOutGO.AddComponent<Button>();
+        signOutBtn.transition = Selectable.Transition.None;
+        GameObject signOutLabelGO = CreateLabel("Text", signOutGO.transform, "SIGN OUT", 22);
+        signOutLabelGO.GetComponent<Text>().color = Color.white;
+
+        // --- Global / Country scope tabs ---
+        GameObject globalTabGO = new GameObject("GlobalTabButton");
+        globalTabGO.transform.SetParent(leaderboardPanel.transform, false);
+        Image globalTabImg = globalTabGO.AddComponent<Image>();
+        globalTabImg.sprite = resultCardSprite;
+        globalTabImg.color = new Color(0.95f, 0.72f, 0.15f);
+        RectTransform globalTabRt = globalTabGO.GetComponent<RectTransform>();
+        globalTabRt.sizeDelta = new Vector2(230, 64);
+        globalTabRt.anchoredPosition = new Vector2(-125, 250);
+        Button globalTabBtn = globalTabGO.AddComponent<Button>();
+        globalTabBtn.transition = Selectable.Transition.None;
+        GameObject globalTabLabelGO = CreateLabel("Text", globalTabGO.transform, "GLOBAL", 24);
+        globalTabLabelGO.GetComponent<Text>().color = Color.white;
+        globalTabLabelGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        GameObject countryTabGO = new GameObject("CountryTabButton");
+        countryTabGO.transform.SetParent(leaderboardPanel.transform, false);
+        Image countryTabImg = countryTabGO.AddComponent<Image>();
+        countryTabImg.sprite = resultCardSprite;
+        countryTabImg.color = new Color(0.25f, 0.25f, 0.3f);
+        RectTransform countryTabRt = countryTabGO.GetComponent<RectTransform>();
+        countryTabRt.sizeDelta = new Vector2(230, 64);
+        countryTabRt.anchoredPosition = new Vector2(125, 250);
+        Button countryTabBtn = countryTabGO.AddComponent<Button>();
+        countryTabBtn.transition = Selectable.Transition.None;
+        GameObject countryTabLabelGO = CreateLabel("Text", countryTabGO.transform, "MY COUNTRY", 22);
+        countryTabLabelGO.GetComponent<Text>().color = Color.white;
+        countryTabLabelGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        // --- Scrollable ranked list ---
+        GameObject scrollGO = new GameObject("ScrollView");
+        scrollGO.transform.SetParent(leaderboardPanel.transform, false);
+        RectTransform scrollRt = scrollGO.AddComponent<RectTransform>();
+        scrollRt.sizeDelta = new Vector2(900, 700);
+        scrollRt.anchoredPosition = new Vector2(0, -150);
+
+        ScrollRect scrollRect = scrollGO.AddComponent<ScrollRect>();
+        scrollRect.horizontal = false;
+        scrollRect.vertical = true;
+        scrollRect.movementType = ScrollRect.MovementType.Clamped;
+
+        GameObject viewportGO = new GameObject("Viewport");
+        viewportGO.transform.SetParent(scrollGO.transform, false);
+        RectTransform viewportRt = viewportGO.AddComponent<RectTransform>();
+        viewportRt.anchorMin = Vector2.zero;
+        viewportRt.anchorMax = Vector2.one;
+        viewportRt.offsetMin = Vector2.zero;
+        viewportRt.offsetMax = Vector2.zero;
+        viewportGO.AddComponent<RectMask2D>();
+
+        GameObject contentGO = new GameObject("Content");
+        contentGO.transform.SetParent(viewportGO.transform, false);
+        RectTransform contentRt = contentGO.AddComponent<RectTransform>();
+        contentRt.anchorMin = new Vector2(0f, 1f);
+        contentRt.anchorMax = new Vector2(1f, 1f);
+        contentRt.pivot = new Vector2(0.5f, 1f);
+        contentRt.anchoredPosition = Vector2.zero;
+
+        VerticalLayoutGroup vLayout = contentGO.AddComponent<VerticalLayoutGroup>();
+        vLayout.childForceExpandWidth = true;
+        vLayout.childForceExpandHeight = false;
+        vLayout.spacing = 4f;
+
+        ContentSizeFitter contentFitter = contentGO.AddComponent<ContentSizeFitter>();
+        contentFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        scrollRect.content = contentRt;
+        scrollRect.viewport = viewportRt;
+
+        GameObject emptyLabelGO = CreateLabel("EmptyLabel", leaderboardPanel.transform, "No scores yet — be the first!", 26, new Vector2(0, -150));
+        emptyLabelGO.GetComponent<Text>().color = new Color(0.7f, 0.7f, 0.7f);
+        emptyLabelGO.SetActive(false);
+
+        // Wire LeaderboardUI references
+        board.signedOutGroup = signedOutGroup;
+        board.signInButton = signInBtn;
+        board.signInButtonLabel = signInLabelText;
+        board.signedInGroup = signedInGroup;
+        board.nameText = nameDisplayText;
+        board.nameInputField = nameInput;
+        board.saveNameButton = saveNameBtn;
+        board.signOutButton = signOutBtn;
+        board.globalTabButton = globalTabBtn;
+        board.countryTabButton = countryTabBtn;
+        board.globalTabBg = globalTabImg;
+        board.countryTabBg = countryTabImg;
+        board.listContent = contentRt;
+        board.emptyListLabel = emptyLabelGO;
+
+        leaderboardPanel.SetActive(false);
+        return leaderboardPanel;
+    }
+
     private static GameObject BuildGameOverPanel(Transform canvasTransform, Sprite buttonSprite, Sprite resultCardSprite, out Button menuButton, out Button retryButton, out GameObject scoreValueText, out GameObject bestValueText, out UnityEngine.UI.Image medalImage, out GameObject newBestBadge, out RectTransform resultCardTransform)
     {
         // Dusk dark transparent background
@@ -1883,6 +2139,7 @@ public static class FlappyBirdSceneBuilder
         text.fontStyle = FontStyle.Bold;
         text.alignment = TextAnchor.MiddleCenter;
         text.color = new Color(0.95f, 0.55f, 0.1f); // Classic premium golden-orange
+        text.raycastTarget = false; // decorative title shouldn't block tap-to-start or nearby buttons
 
         Outline outline = root.AddComponent<Outline>();
         outline.effectColor = new Color(0.18f, 0.18f, 0.22f, 1f); // Charcoal outline
@@ -1975,6 +2232,10 @@ public static class FlappyBirdSceneBuilder
 
         // Attach ThemeApplier
         go.AddComponent<ThemeApplier>();
+
+        // Attach Firebase-backed auth + leaderboard singletons
+        go.AddComponent<AuthManager>();
+        go.AddComponent<LeaderboardManager>();
 
         // Add ThemeObstacleApplier to the generated prefab so newly spawned pipes apply the theme
         string prefabPath = $"{PrefabFolder}/PipePair.prefab";
@@ -2989,82 +3250,218 @@ public static class FlappyBirdSceneBuilder
                 for (int x = 0; x < w; x++)
                 {
                     Vector2 p = new Vector2(x, y);
-                    if (PointInTriangle(p, a, b, c)) tex.SetPixel(x, y, col);
-                    if (x > w * 0.25f && x < w * 0.75f && y > h * 0.15f && y <= h * 0.5f) tex.SetPixel(x, y, col);
-                    if (x > w * 0.42f && x < w * 0.58f && y > h * 0.15f && y < h * 0.35f) tex.SetPixel(x, y, clear);
+                    bool inRoof = PointInTriangle(p, a, b, c);
+                    bool inBody = (x >= w * 0.22f && x <= w * 0.78f && y >= h * 0.15f && y <= h * 0.5f);
+                    bool inChimney = (x >= w * 0.65f && x <= w * 0.75f && y >= h * 0.5f && y <= h * 0.8f);
+                    
+                    if (inRoof || inBody || inChimney)
+                    {
+                        tex.SetPixel(x, y, col);
+                    }
+                    
+                    // Stencil cutouts
+                    if (x >= w * 0.43f && x <= w * 0.57f && y >= h * 0.15f && y <= h * 0.35f)
+                    {
+                        tex.SetPixel(x, y, clear); // Doorway cutout
+                    }
+                    if (Vector2.Distance(p, new Vector2(w * 0.5f, h * 0.6f)) <= w * 0.07f)
+                    {
+                        tex.SetPixel(x, y, clear); // Attic window cutout
+                    }
                 }
             }
         }
         else if (name == "Shop")
         {
-            Color brown = new Color(0.45f, 0.25f, 0.1f);
-            Color gold = new Color(0.95f, 0.75f, 0.15f);
-            for (int y = 15; y < h - 15; y++)
+            Color roofRed = new Color(0.92f, 0.25f, 0.25f);
+            Color roofWhite = Color.white;
+            Color wallColor = new Color(0.85f, 0.85f, 0.9f);
+            Color baseGold = new Color(0.95f, 0.72f, 0.15f);
+            Color doorColor = new Color(0.2f, 0.2f, 0.25f);
+
+            for (int y = 0; y < h; y++)
             {
-                for (int x = 20; x < w - 20; x++)
+                for (int x = 0; x < w; x++)
                 {
-                    Color col = brown;
-                    if (x < 26 || x > w - 27 || y < 21 || y > h - 22) col = gold;
-                    if (x > w / 2 - 6 && x < w / 2 + 6 && y > h / 2 - 12 && y < h / 2 + 2) col = Color.black;
-                    tex.SetPixel(x, y, col);
+                    // 1. Counter base
+                    if (x >= w * 0.15f && x <= w * 0.85f && y >= h * 0.15f && y <= h * 0.25f)
+                    {
+                        tex.SetPixel(x, y, baseGold);
+                    }
+                    // 2. Pillars/Walls
+                    else if (((x >= w * 0.15f && x <= w * 0.25f) || (x >= w * 0.75f && x <= w * 0.85f)) && y >= h * 0.25f && y <= h * 0.70f)
+                    {
+                        tex.SetPixel(x, y, wallColor);
+                    }
+                    // 3. Shop window display area background
+                    else if (x >= w * 0.25f && x <= w * 0.75f && y >= h * 0.25f && y <= h * 0.70f)
+                    {
+                        // Door
+                        if (x >= w * 0.43f && x <= w * 0.57f && y >= h * 0.25f && y <= h * 0.58f)
+                        {
+                            tex.SetPixel(x, y, doorColor);
+                        }
+                        else
+                        {
+                            tex.SetPixel(x, y, new Color(0.12f, 0.45f, 0.75f, 0.3f));
+                        }
+                    }
+                    // 4. Canopy (trapezoid with stripes)
+                    else if (y >= h * 0.70f && y <= h * 0.90f)
+                    {
+                        float t = (float)(y - h * 0.70f) / (h * 0.20f);
+                        float minX = Mathf.Lerp(w * 0.10f, w * 0.18f, t);
+                        float maxX = Mathf.Lerp(w * 0.90f, w * 0.82f, t);
+                        if (x >= minX && x <= maxX)
+                        {
+                            int stripeIndex = (int)((x - minX) / 14f);
+                            tex.SetPixel(x, y, (stripeIndex % 2 == 0) ? roofRed : roofWhite);
+                        }
+                    }
                 }
             }
         }
         else if (name == "Heroes")
         {
-            Color yellow = new Color(0.95f, 0.85f, 0.15f);
-            Vector2 center = new Vector2(w / 2f, h / 2f);
+            Color gold = new Color(0.95f, 0.72f, 0.15f);
+            Color blue = new Color(0.08f, 0.38f, 0.75f);
+            Color starColor = Color.white;
+
             for (int y = 0; y < h; y++)
             {
                 for (int x = 0; x < w; x++)
                 {
-                    Vector2 p = new Vector2(x, y);
-                    if (Vector2.Distance(p, center) <= w * 0.35f)
+                    if (y >= h * 0.15f && y <= h * 0.85f)
                     {
-                        Color col = yellow;
-                        if (Vector2.Distance(p, new Vector2(w * 0.42f, h * 0.54f)) <= 4f ||
-                            Vector2.Distance(p, new Vector2(w * 0.58f, h * 0.54f)) <= 4f)
+                        float dx = Mathf.Abs(x - w * 0.5f);
+                        float pct = (y - h * 0.15f) / (h * 0.70f);
+                        float maxWidth = w * 0.36f * Mathf.Pow(pct, 0.45f);
+
+                        if (dx <= maxWidth)
                         {
-                            col = Color.black;
+                            float borderThickness = 6f;
+                            bool onBorder = (dx > maxWidth - borderThickness) || (y < h * 0.15f + borderThickness) || (y > h * 0.85f - borderThickness);
+                            
+                            if (onBorder)
+                            {
+                                tex.SetPixel(x, y, gold);
+                            }
+                            else
+                            {
+                                Vector2 p = new Vector2(x, y);
+                                if (PointInStar(p, new Vector2(w * 0.5f, h * 0.52f), 14f, 6f))
+                                {
+                                    tex.SetPixel(x, y, starColor);
+                                }
+                                else
+                                {
+                                    tex.SetPixel(x, y, blue);
+                                }
+                            }
                         }
-                        if (x > w / 2 - 8 && x < w / 2 + 8 && y > h / 2 - 12 && y < h / 2 - 4)
-                        {
-                            col = new Color(0.95f, 0.35f, 0.05f);
-                        }
-                        tex.SetPixel(x, y, col);
                     }
                 }
             }
         }
         else if (name == "Missions")
         {
-            Color board = new Color(0.2f, 0.5f, 0.8f);
+            Color board = new Color(0.18f, 0.22f, 0.32f);
             Color paper = Color.white;
-            for (int y = 15; y < h - 15; y++)
-            {
-                for (int x = 25; x < w - 25; x++)
-                {
-                    Color col = board;
-                    if (x > 32 && x < w - 33 && y > 22 && y < h - 28) col = paper;
-                    if (x > w / 2 - 12 && x < w / 2 + 12 && y > h - 26 && y < h - 18) col = Color.grey;
-                    tex.SetPixel(x, y, col);
-                }
-            }
-        }
-        else if (name == "Themes")
-        {
-            Color blue = new Color(0.12f, 0.45f, 0.85f);
-            Color green = new Color(0.15f, 0.65f, 0.25f);
-            Vector2 center = new Vector2(w / 2f, h / 2f);
+            Color clipHold = new Color(0.95f, 0.72f, 0.15f);
+            Color checkColor = new Color(0.15f, 0.68f, 0.35f);
+            Color lineCol = new Color(0.75f, 0.78f, 0.82f);
+
             for (int y = 0; y < h; y++)
             {
                 for (int x = 0; x < w; x++)
                 {
                     Vector2 p = new Vector2(x, y);
-                    if (Vector2.Distance(p, center) <= w * 0.38f)
+                    bool inBoard = (x >= 28 && x <= w - 28 && y >= 16 && y <= h - 16);
+                    bool inPaper = (x >= 35 && x <= w - 35 && y >= 22 && y <= h - 26);
+                    bool inClip = (x >= w/2 - 16 && x <= w/2 + 16 && y >= h - 22 && y <= h - 12);
+                    bool inClipHole = (x >= w/2 - 6 && x <= w/2 + 6 && y >= h - 18 && y <= h - 14);
+
+                    if (inClip && !inClipHole)
                     {
-                        Color col = blue;
-                        if (Mathf.Sin(x * 0.15f) + Mathf.Cos(y * 0.15f) > 0.3f) col = green;
+                        tex.SetPixel(x, y, clipHold);
+                    }
+                    else if (inPaper)
+                    {
+                        if (IsInCheckmark(p, new Vector2(48f, 70f)))
+                        {
+                            tex.SetPixel(x, y, checkColor);
+                        }
+                        else if (x >= 62 && x <= 90 && y >= 68 && y <= 72)
+                        {
+                            tex.SetPixel(x, y, lineCol);
+                        }
+                        else if (IsInCheckmark(p, new Vector2(48f, 45f)))
+                        {
+                            tex.SetPixel(x, y, checkColor);
+                        }
+                        else if (x >= 62 && x <= 90 && y >= 43 && y <= 47)
+                        {
+                            tex.SetPixel(x, y, lineCol);
+                        }
+                        else
+                        {
+                            tex.SetPixel(x, y, paper);
+                        }
+                    }
+                    else if (inBoard)
+                    {
+                        tex.SetPixel(x, y, board);
+                    }
+                }
+            }
+        }
+        else if (name == "Themes")
+        {
+            Color planetColorOuter = new Color(0.12f, 0.65f, 0.72f);
+            Color planetColorInner = new Color(0.48f, 0.2f, 0.75f);
+            Color ringColor = new Color(0.95f, 0.72f, 0.15f);
+            
+            float cx = w * 0.5f;
+            float cy = h * 0.5f;
+            float r = 26f;
+            
+            float cos = Mathf.Cos(-25f * Mathf.Deg2Rad);
+            float sin = Mathf.Sin(-25f * Mathf.Deg2Rad);
+
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    float dx = x - cx;
+                    float dy = y - cy;
+                    float distSq = dx * dx + dy * dy;
+                    
+                    float rx = dx * cos - dy * sin;
+                    float ry = dx * sin + dy * cos;
+                    
+                    float a = 44f;
+                    float b = 11f;
+                    float val = (rx * rx) / (a * a) + (ry * ry) / (b * b);
+                    bool isRing = (val >= 0.76f && val <= 1.24f);
+                    bool isPlanet = distSq <= r * r;
+                    
+                    if (isRing)
+                    {
+                        if (isPlanet && ry < 0)
+                        {
+                            float t = Mathf.Clamp01(Mathf.Sqrt(distSq) / r);
+                            Color col = Color.Lerp(planetColorInner, planetColorOuter, t);
+                            tex.SetPixel(x, y, col);
+                        }
+                        else
+                        {
+                            tex.SetPixel(x, y, ringColor);
+                        }
+                    }
+                    else if (isPlanet)
+                    {
+                        float t = Mathf.Clamp01(Mathf.Sqrt(distSq) / r);
+                        Color col = Color.Lerp(planetColorInner, planetColorOuter, t);
                         tex.SetPixel(x, y, col);
                     }
                 }
@@ -3089,5 +3486,46 @@ public static class FlappyBirdSceneBuilder
 
         tex.Apply();
         return tex;
+    }
+
+    private static bool PointInStar(Vector2 p, Vector2 center, float outerRadius, float innerRadius)
+    {
+        Vector2 d = p - center;
+        float dist = d.magnitude;
+        if (dist > outerRadius) return false;
+        if (dist < innerRadius) return true;
+        
+        float angle = Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg;
+        if (angle < 0) angle += 360f;
+        
+        float sector = (angle + 18f) % 72f - 36f;
+        float rad = sector * Mathf.Deg2Rad;
+        
+        float maxR = Mathf.Lerp(outerRadius, innerRadius, Mathf.Abs(rad) / (36f * Mathf.Deg2Rad));
+        return dist <= maxR;
+    }
+
+    private static bool PointInLineSegment(Vector2 p, Vector2 start, Vector2 end, float thickness)
+    {
+        Vector2 line = end - start;
+        float len = line.magnitude;
+        if (len == 0f) return Vector2.Distance(p, start) <= thickness;
+        
+        Vector2 dir = line / len;
+        float projection = Vector2.Dot(p - start, dir);
+        if (projection < 0) return Vector2.Distance(p, start) <= thickness;
+        if (projection > len) return Vector2.Distance(p, end) <= thickness;
+        
+        Vector2 closestPoint = start + dir * projection;
+        return Vector2.Distance(p, closestPoint) <= thickness;
+    }
+
+    private static bool IsInCheckmark(Vector2 p, Vector2 center)
+    {
+        Vector2 s1 = new Vector2(center.x - 6f, center.y + 1f);
+        Vector2 s2 = new Vector2(center.x, center.y - 5f);
+        Vector2 s3 = new Vector2(center.x + 9f, center.y + 6f);
+        
+        return PointInLineSegment(p, s1, s2, 2.5f) || PointInLineSegment(p, s2, s3, 2.5f);
     }
 }

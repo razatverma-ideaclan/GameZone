@@ -38,3 +38,10 @@ sysinfo.txt
 
 # macOS
 .DS_Store
+
+# Firebase platform configs — contain per-project API keys/OAuth client IDs.
+# Keep these local only; each developer/CI pulls their own copy from Firebase Console.
+Assets/google-services.json
+Assets/google-services.json.meta
+Assets/GoogleService-Info.plist
+Assets/GoogleService-Info.plist.meta
