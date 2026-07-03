@@ -34,6 +34,23 @@ public class GameManager : MonoBehaviour
     public GameObject newBestBadge;
     public RectTransform resultCardTransform;
 
+    [Header("Optimized Start Screen")]
+    public GameObject toastPanel;
+    public GameObject themeSelectorPanel;
+    public GameObject lobbyPanel;
+    public GameObject heroesPanel;
+    public UnityEngine.UI.Image playIconImage;
+    public Sprite playSprite;
+    public Sprite homeSprite;
+
+    [Header("Navigation Buttons")]
+    public UnityEngine.UI.Button shopButton;
+    public UnityEngine.UI.Button heroesButton;
+    public UnityEngine.UI.Button missionsButton;
+    public UnityEngine.UI.Button themesButton;
+
+    private bool isViewingHeroes = false;
+
     [Header("References")]
     public GameObject bird;
     public PipeSpawner pipeSpawner;
@@ -85,12 +102,48 @@ public class GameManager : MonoBehaviour
 
     void Update()
     {
-        // Spacebar key to start the game for keyboard players
         if (CurrentState == GameState.Start)
         {
             if (Input.GetKeyDown(KeyCode.Space))
             {
                 StartGame();
+                return;
+            }
+
+            if (Input.GetMouseButtonDown(0) || TouchStarted())
+            {
+                Vector2 clickPos = Input.mousePosition;
+                if (Input.touchCount > 0) clickPos = Input.GetTouch(0).position;
+
+                bool onBottomBar = false;
+                if (shopButton != null && shopButton.transform.parent != null)
+                {
+                    RectTransform barRt = shopButton.transform.parent.GetComponent<RectTransform>();
+                    if (barRt != null)
+                    {
+                        onBottomBar = RectTransformUtility.RectangleContainsScreenPoint(barRt, clickPos, null);
+                    }
+                }
+
+                bool onThemePanel = false;
+                if (themeSelectorPanel != null && themeSelectorPanel.activeSelf)
+                {
+                    RectTransform themeRt = themeSelectorPanel.GetComponent<RectTransform>();
+                    if (themeRt != null)
+                    {
+                        onThemePanel = RectTransformUtility.RectangleContainsScreenPoint(themeRt, clickPos, null);
+                    }
+                }
+
+                if (!onBottomBar && !onThemePanel && !isViewingHeroes && !justEnteredStartState)
+                {
+                    if (themeSelectorPanel != null && themeSelectorPanel.activeSelf)
+                    {
+                        themeSelectorPanel.SetActive(false);
+                        SetFocusedButton(null);
+                    }
+                    StartGame();
+                }
             }
         }
     }
@@ -103,14 +156,20 @@ public class GameManager : MonoBehaviour
     public void ShowStartState()
     {
         CurrentState = GameState.Start;
-        Time.timeScale = 1f;
-        score = 0;
+        isViewingHeroes = false;
+        justEnteredStartState = true;
         startStateTime = Time.time; // Record start screen entry time
         UpdateScoreUI();
 
         if (startPanel != null) startPanel.SetActive(true);
+        if (lobbyPanel != null) lobbyPanel.SetActive(true);
+        if (heroesPanel != null) heroesPanel.SetActive(false);
+        if (themeSelectorPanel != null) themeSelectorPanel.SetActive(false);
         if (gameOverPanel != null) gameOverPanel.SetActive(false);
         if (scoreText != null) scoreText.SetActive(false);
+
+        // Reset play button icon to Play arrow
+        if (playIconImage != null && playSprite != null) playIconImage.sprite = playSprite;
 
         // Update high score on start screen
         bestScore = PlayerPrefs.GetInt(HighScoreKey, 0);
@@ -124,6 +183,7 @@ public class GameManager : MonoBehaviour
         if (bird != null)
         {
             bird.SetActive(true);
+            bird.transform.localScale = new Vector3(2.0f, 2.0f, 1f); // Large preview scale
             BirdController birdController = bird.GetComponent<BirdController>();
             if (birdController != null) birdController.ResetBird();
         }
@@ -132,6 +192,10 @@ public class GameManager : MonoBehaviour
 
         // Remove any pipes left over from a previous run.
         ClearExistingPipes();
+
+        // Start flushing click queue to allow play trigger
+        StartCoroutine(ClearTransitionFlag());
+        SetFocusedButton(null);
     }
 
     // Hook this up to the Start button's OnClick() in the Inspector (tapping
@@ -139,17 +203,38 @@ public class GameManager : MonoBehaviour
     public void StartGame()
     {
         if (CurrentState != GameState.Start) return;
-        if (justEnteredStartState) return;
 
         PlayClickSound();
 
+        if (isViewingHeroes)
+        {
+            // Center button acts as HOME button! Return to lobby state
+            isViewingHeroes = false;
+            if (lobbyPanel != null) lobbyPanel.SetActive(true);
+            if (heroesPanel != null) heroesPanel.SetActive(false);
+            if (bird != null)
+            {
+                bird.SetActive(true);
+                bird.transform.localScale = new Vector3(2.0f, 2.0f, 1f);
+                BirdController bc = bird.GetComponent<BirdController>();
+                if (bc != null) bc.UpdateSkin(); // Refresh visual preview
+            }
+            if (playIconImage != null && playSprite != null) playIconImage.sprite = playSprite;
+            SetFocusedButton(null);
+            ShowToast("RETURNED TO LOBBY");
+            return;
+        }
+
+        // Lobby state: start the gameplay!
         CurrentState = GameState.Playing;
+        SetFocusedButton(null);
         if (startPanel != null) startPanel.SetActive(false);
         if (gameOverPanel != null) gameOverPanel.SetActive(false);
         if (scoreText != null) scoreText.SetActive(true);
 
         if (bird != null)
         {
+            bird.transform.localScale = new Vector3(1.2f, 1.2f, 1f); // Standard gameplay scale
             BirdController birdController = bird.GetComponent<BirdController>();
             if (birdController != null) birdController.EnableControl();
         }
@@ -409,5 +494,241 @@ public class GameManager : MonoBehaviour
         }
 
         camTrans.localPosition = originalPos;
+    }
+
+    // --- Bottom Navigation Tab Click Handlers ---
+
+    public void OnShopClicked()
+    {
+        PlayClickSound();
+        SetFocusedButton(shopButton);
+        ShowToast("SHOP COMING SOON!");
+    }
+
+    public void OnHeroesClicked()
+    {
+        PlayClickSound();
+        if (CurrentState != GameState.Start) return;
+
+        isViewingHeroes = true;
+        if (lobbyPanel != null) lobbyPanel.SetActive(false);
+        if (heroesPanel != null) heroesPanel.SetActive(true);
+        if (themeSelectorPanel != null) themeSelectorPanel.SetActive(false); // Hide world select panel
+        if (bird != null) bird.SetActive(false); // Hide bird under character grid screen
+        
+        // Swap play button icon to Home
+        if (playIconImage != null && homeSprite != null) playIconImage.sprite = homeSprite;
+
+        SetFocusedButton(heroesButton);
+        RefreshHeroesPanel();
+        ShowToast("OPENED HERO SELECTION");
+    }
+
+    public void SelectHero(int skinIndex)
+    {
+        PlayClickSound();
+        if (bird != null)
+        {
+            BirdController bc = bird.GetComponent<BirdController>();
+            if (bc != null)
+            {
+                bc.SetSkin(skinIndex);
+                ShowToast("HERO SELECTED!");
+            }
+        }
+        RefreshHeroesPanel();
+    }
+
+    public void RefreshHeroesPanel()
+    {
+        if (heroesPanel == null) return;
+
+        ThemeData currentTheme = ThemeManager.Instance != null ? ThemeManager.Instance.GetCurrentTheme() : null;
+        string themeNameLower = currentTheme != null ? currentTheme.themeName.ToLower() : "classic";
+
+        string[] skinNames = new string[3];
+        Sprite[] skinSprites = new Sprite[3];
+
+        if (themeNameLower == "classic")
+        {
+            skinNames = new string[] { "YELLOW HERO", "BLUE HERO", "RED HERO" };
+            if (bird != null)
+            {
+                BirdController bc = bird.GetComponent<BirdController>();
+                if (bc != null && bc.skins != null && bc.skins.Length >= 3)
+                {
+                    skinSprites[0] = bc.skins[0].flapSprites[1];
+                    skinSprites[1] = bc.skins[1].flapSprites[1];
+                    skinSprites[2] = bc.skins[2].flapSprites[1];
+                }
+            }
+        }
+        else
+        {
+            if (themeNameLower == "space") skinNames = new string[] { "ROCKET SPEEDER", "COSMIC UFO", "COMM SATELLITE" };
+            else if (themeNameLower == "football") skinNames = new string[] { "SOCCER BALL", "BASKETBALL", "TENNIS BALL" };
+            else if (themeNameLower == "dragon") skinNames = new string[] { "RED DRAKE", "EMERALD DRAGON", "GOLD WYVERN" };
+            else if (themeNameLower == "fish") skinNames = new string[] { "GOLDFISH", "BULL SHARK", "PINK JELLYFISH" };
+            else if (themeNameLower == "bee") skinNames = new string[] { "HONEY BEE", "LADYBUG", "BUTTERFLY" };
+            else if (themeNameLower == "ninja") skinNames = new string[] { "SHADOW NINJA", "CRIMSON NINJA", "SILVER SHINOBI" };
+            else skinNames = new string[] { "HERO A", "HERO B", "HERO C" };
+
+            if (currentTheme != null && currentTheme.playerSprites != null)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    int sprIdx = Mathf.Clamp(i, 0, currentTheme.playerSprites.Length - 1);
+                    skinSprites[i] = currentTheme.playerSprites[sprIdx];
+                }
+            }
+        }
+
+        // Header Text update
+        Transform headerTextTrans = heroesPanel.transform.Find("HeaderBar/Text");
+        if (headerTextTrans != null)
+        {
+            UnityEngine.UI.Text headerText = headerTextTrans.GetComponent<UnityEngine.UI.Text>();
+            if (headerText != null)
+            {
+                string nameDisplay = currentTheme != null ? currentTheme.themeName.ToUpper() : "CLASSIC";
+                int currentSel = bird != null ? bird.GetComponent<BirdController>().currentSkinIndex : 0;
+                headerText.text = nameDisplay + " HEROES (" + (currentSel + 1) + "/3)";
+            }
+        }
+
+        // Apply skin name, preview image, and checkmark indicator to each card
+        for (int i = 0; i < 3; i++)
+        {
+            Transform cardTrans = heroesPanel.transform.Find("Grid/Card" + i);
+            if (cardTrans == null) continue;
+
+            // Name
+            Transform nameTrans = cardTrans.Find("NameText");
+            if (nameTrans != null)
+            {
+                UnityEngine.UI.Text txt = nameTrans.GetComponent<UnityEngine.UI.Text>();
+                if (txt != null) txt.text = skinNames[i];
+            }
+
+            // Preview Image
+            Transform imgTrans = cardTrans.Find("PreviewImage");
+            if (imgTrans != null)
+            {
+                UnityEngine.UI.Image img = imgTrans.GetComponent<UnityEngine.UI.Image>();
+                if (img != null && skinSprites[i] != null)
+                {
+                    img.sprite = skinSprites[i];
+                    img.color = Color.white;
+                }
+            }
+
+            // Checkmark
+            Transform checkTrans = cardTrans.Find("Checkmark");
+            if (checkTrans != null)
+            {
+                int currentSel = bird != null ? bird.GetComponent<BirdController>().currentSkinIndex : 0;
+                checkTrans.gameObject.SetActive(i == currentSel);
+            }
+        }
+    }
+
+    public void OnMissionsClicked()
+    {
+        PlayClickSound();
+        SetFocusedButton(missionsButton);
+        string[] missions = {
+            "MISSION: MAKE 90 LOOPS (0/90)",
+            "MISSION: FLY 300 METERS (12/300)",
+            "MISSION: PASS 20 GATES (0/20)",
+            "MISSION: SCORE 50 POINTS (0/50)"
+        };
+        ShowToast(missions[Random.Range(0, missions.Length)]);
+    }
+
+    public void OnThemesClicked()
+    {
+        PlayClickSound();
+        if (themeSelectorPanel != null)
+        {
+            if (isViewingHeroes)
+            {
+                isViewingHeroes = false;
+                if (heroesPanel != null) heroesPanel.SetActive(false);
+                if (lobbyPanel != null) lobbyPanel.SetActive(true);
+                if (bird != null)
+                {
+                    bird.SetActive(true);
+                    bird.transform.localScale = new Vector3(2.0f, 2.0f, 1f);
+                    BirdController bc = bird.GetComponent<BirdController>();
+                    if (bc != null) bc.UpdateSkin();
+                }
+                if (playIconImage != null && playSprite != null) playIconImage.sprite = playSprite;
+            }
+
+            bool nextState = !themeSelectorPanel.activeSelf;
+            themeSelectorPanel.SetActive(nextState);
+            SetFocusedButton(nextState ? themesButton : null);
+            ShowToast(nextState ? "OPENED WORLD SELECT" : "CLOSED WORLD SELECT");
+        }
+    }
+
+    private void SetFocusedButton(UnityEngine.UI.Button focusedBtn)
+    {
+        UnityEngine.UI.Button[] navButtons = { shopButton, heroesButton, missionsButton, themesButton };
+        foreach (var btn in navButtons)
+        {
+            if (btn == null) continue;
+            if (btn == focusedBtn)
+            {
+                btn.transform.localScale = new Vector3(1.15f, 1.15f, 1f);
+                btn.image.color = Color.white;
+            }
+            else
+            {
+                btn.transform.localScale = Vector3.one;
+                btn.image.color = new Color(0.7f, 0.7f, 0.7f, 0.9f);
+            }
+        }
+    }
+
+    // --- Canvas Toast Notification System ---
+
+    public void ShowToast(string message)
+    {
+        // Suppress on-screen logs/toasts to maintain clean aesthetic
+        return;
+    }
+
+    private Coroutine toastCoroutine;
+
+    private System.Collections.IEnumerator AnimateToast()
+    {
+        CanvasGroup cg = toastPanel.GetComponent<CanvasGroup>();
+        if (cg != null)
+        {
+            float t = 0f;
+            while (t < 0.2f)
+            {
+                t += Time.unscaledDeltaTime;
+                cg.alpha = Mathf.Lerp(0f, 1f, t / 0.2f);
+                yield return null;
+            }
+            cg.alpha = 1f;
+        }
+
+        yield return new WaitForSecondsRealtime(1.8f);
+
+        if (cg != null)
+        {
+            float t = 0f;
+            while (t < 0.2f)
+            {
+                t += Time.unscaledDeltaTime;
+                cg.alpha = Mathf.Lerp(1f, 0f, t / 0.2f);
+                yield return null;
+            }
+            cg.alpha = 0f;
+        }
+        toastPanel.SetActive(false);
     }
 }

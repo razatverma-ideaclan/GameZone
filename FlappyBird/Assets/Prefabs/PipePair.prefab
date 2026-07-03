@@ -149,6 +149,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3013721303658322993}
   - component: {fileID: 963396781381623476}
+  - component: {fileID: 7636243668333241713}
   m_Layer: 0
   m_Name: PipePair
   m_TagString: Untagged
@@ -190,6 +191,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PipeMover
   speed: 3
   destroyXPosition: -12
+--- !u!114 &7636243668333241713
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1395639391900837262}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4a7ae6afe817a461d93fff3e7af95df6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemeObstacleApplier
 --- !u!1 &3329346523951642840
 GameObject:
   m_ObjectHideFlags: 0

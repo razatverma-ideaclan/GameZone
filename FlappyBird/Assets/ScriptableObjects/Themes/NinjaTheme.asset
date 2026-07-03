@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a931a1a2c4a43619a4ec184579a944, type: 3}
+  m_Name: NinjaTheme
+  m_EditorClassIdentifier: Assembly-CSharp::ThemeData
+  themeName: Ninja
+  themeColor: {r: 0.1, g: 0.1, b: 0.15, a: 1}
+  playerSprites:
+  - {fileID: 21300000, guid: b87da645d66b74166b7b641585eb4a9d, type: 3}
+  - {fileID: 21300000, guid: b2ae25483ab77444ba2638b63f362b38, type: 3}
+  - {fileID: 21300000, guid: cf2762e97377949ff9ab089167d922b3, type: 3}
+  obstacleTopSprite: {fileID: 21300000, guid: 8db6ccb0d7e4b446095f68a8f0d73c71, type: 3}
+  obstacleBottomSprite: {fileID: 21300000, guid: 8db6ccb0d7e4b446095f68a8f0d73c71, type: 3}
+  obstacleTopCapSprite: {fileID: 21300000, guid: 46b9f6f1977cf43f591c0f647ca25526, type: 3}
+  obstacleBottomCapSprite: {fileID: 21300000, guid: 46b9f6f1977cf43f591c0f647ca25526, type: 3}
+  backgroundSprite: {fileID: 21300000, guid: a544e0b81493247f2832e60328fa67c7, type: 3}
+  groundDirtSprite: {fileID: 21300000, guid: b60e1291432244c67a240e8df6568198, type: 3}
+  groundGrassSprite: {fileID: 21300000, guid: a6003ff9e288540cba71a8504939cc21, type: 3}
+  flapSound: {fileID: 8300000, guid: 5416899b0017c45c380689db898528b3, type: 3}
+  scoreSound: {fileID: 8300000, guid: fe31ad2b8bb7541ee8ec3cda337b725e, type: 3}
+  hitSound: {fileID: 8300000, guid: 898877ff2a88247ea8d8d647fae5f894, type: 3}
+  backgroundMusic: {fileID: 0}
