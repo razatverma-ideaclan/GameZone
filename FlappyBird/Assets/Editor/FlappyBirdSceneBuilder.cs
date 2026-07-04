@@ -1521,10 +1521,10 @@ public static class FlappyBirdSceneBuilder
         wGrid.constraintCount = 3;
 
         ThemeSelectorUI selectorUI = worldsPanel.AddComponent<ThemeSelectorUI>();
-        selectorUI.themeButtons = new Button[8];
+        selectorUI.themeButtons = new Button[9];
 
-        string[] themeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja", "Mario" };
-        for (int i = 0; i < 8; i++)
+        string[] themeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja", "Mario", "Mars" };
+        for (int i = 0; i < 9; i++)
         {
             GameObject cardGO = new GameObject(themeNames[i] + "Card");
             cardGO.transform.SetParent(wGridGO.transform, false);
@@ -2600,11 +2600,11 @@ public static class FlappyBirdSceneBuilder
             AssetDatabase.CreateFolder("Assets/ScriptableObjects", "Themes");
         }
 
-        string[] names = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja", "Mario" };
-        ThemeData[] themeAssets = new ThemeData[8];
+        string[] names = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja", "Mario", "Mars" };
+        ThemeData[] themeAssets = new ThemeData[9];
 
         // Ensure directories for Sprites
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < 9; i++)
         {
             string spriteDir = $"{SpriteFolder}/{names[i]}";
             if (!AssetDatabase.IsValidFolder(spriteDir))
@@ -2613,7 +2613,7 @@ public static class FlappyBirdSceneBuilder
             }
         }
 
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < 9; i++)
         {
             string path = $"{folder}/{names[i]}Theme.asset";
             ThemeData data = AssetDatabase.LoadAssetAtPath<ThemeData>(path);
@@ -2668,6 +2668,7 @@ public static class FlappyBirdSceneBuilder
         else if (index == 5) data.themeColor = new Color(0.78f, 0.72f, 0.38f); // Bee yellow
         else if (index == 6) data.themeColor = new Color(0.1f, 0.1f, 0.15f); // Ninja black
         else if (index == 7) data.themeColor = new Color(0.36f, 0.58f, 0.98f); // Mario sky blue
+        else if (index == 8) data.themeColor = new Color(0.28f, 0.10f, 0.06f); // Mars dark red
 
         // Generate 3 unique skins for this theme
         data.playerSprites = new Sprite[3];
@@ -2690,6 +2691,13 @@ public static class FlappyBirdSceneBuilder
             data.obstacleBottomSprite = GetOrCreateSprite($"{name}/ObstacleBottomPipe", 256, 256, (w, h) => GenerateThemeTexture("MarioPipeBody", index, w, h), 256, FilterMode.Point);
             data.obstacleTopCapSprite = null; // Bricks don't need caps
             data.obstacleBottomCapSprite = GetOrCreateSprite($"{name}/ObstacleBottomCap", 256, 256, (w, h) => GenerateThemeTexture("MarioPipeCap", index, w, h), 256, FilterMode.Point);
+        }
+        else if (index == 8) // Mars: Dark rocky spire columns
+        {
+            data.obstacleTopSprite    = GetOrCreateSprite($"{name}/ObstacleTop",    256, 256, (w, h) => GenerateThemeTexture("ObstacleBody", index, w, h), 256, FilterMode.Point);
+            data.obstacleBottomSprite = data.obstacleTopSprite;
+            data.obstacleTopCapSprite    = GetOrCreateSprite($"{name}/ObstacleCap", 256, 256, (w, h) => GenerateThemeTexture("ObstacleCap",  index, w, h), 256, FilterMode.Point);
+            data.obstacleBottomCapSprite = data.obstacleTopCapSprite;
         }
         else
         {
@@ -3004,6 +3012,7 @@ public static class FlappyBirdSceneBuilder
             else if (index == 5) { bottomColor = new Color(0.55f, 0.85f, 0.35f); topColor = new Color(0.48f, 0.81f, 0.95f); }
             else if (index == 6) { bottomColor = new Color(0.08f, 0.08f, 0.14f); topColor = new Color(0.02f, 0.02f, 0.05f); }
             else if (index == 7) { bottomColor = new Color(0.36f, 0.58f, 0.98f); topColor = new Color(0.36f, 0.58f, 0.98f); } // Mario sky blue
+            else if (index == 8) { bottomColor = new Color(0.30f, 0.12f, 0.06f); topColor = new Color(0.06f, 0.04f, 0.10f); } // Mars: dark red-brown ground to deep indigo sky
 
             for (int y = 0; y < height; y++)
             {
@@ -3109,6 +3118,66 @@ public static class FlappyBirdSceneBuilder
                         else if (insideHill)
                         {
                             tex.SetPixel(x, y, new Color(0.0f, 0.72f, 0.0f)); // classic green
+                        }
+                    }
+                    // Mars: glowing amber/orange sun on horizon + jagged dark rock spire silhouettes
+                    else if (index == 8)
+                    {
+                        // Sun glow — large warm circle at horizontal center-bottom
+                        float sunX = width * 0.5f;
+                        float sunY = height * 0.32f;
+                        float distSun = Mathf.Sqrt((x - sunX)*(x - sunX)*0.6f + (y - sunY)*(y - sunY));
+
+                        // Atmospheric glow falloff
+                        float glow = 1f - Mathf.Clamp01(distSun / (height * 0.38f));
+                        Color skyCol = tex.GetPixel(x, y);
+                        Color glowColor = new Color(0.95f, 0.55f, 0.18f) * (glow * glow * 1.4f);
+                        Color blended = new Color(
+                            Mathf.Clamp01(skyCol.r + glowColor.r),
+                            Mathf.Clamp01(skyCol.g + glowColor.g * 0.5f),
+                            Mathf.Clamp01(skyCol.b + glowColor.b * 0.1f));
+                        tex.SetPixel(x, y, blended);
+
+                        // Crisp white sun disc
+                        if (distSun < height * 0.07f)
+                            tex.SetPixel(x, y, new Color(1f, 0.95f, 0.78f));
+
+                        // Jagged dark rock spire silhouettes on left and right
+                        // Left cluster
+                        float[] lSpireX = { width*0.04f, width*0.10f, width*0.16f, width*0.22f, width*0.02f, width*0.13f };
+                        float[] lSpireH = { height*0.62f, height*0.75f, height*0.58f, height*0.50f, height*0.45f, height*0.68f };
+                        float[] lSpireW = { width*0.04f, width*0.05f, width*0.04f, width*0.035f, width*0.03f, width*0.04f };
+                        // Right cluster
+                        float[] rSpireX = { width*0.78f, width*0.85f, width*0.90f, width*0.96f, width*0.82f, width*0.93f };
+                        float[] rSpireH = { height*0.58f, height*0.72f, height*0.60f, height*0.48f, height*0.50f, height*0.65f };
+                        float[] rSpireW = { width*0.04f, width*0.05f, width*0.04f, width*0.035f, width*0.03f, width*0.04f };
+
+                        bool inSpire = false;
+                        for (int s = 0; s < 6; s++)
+                        {
+                            // Left spires: jagged triangle shape
+                            float dx = Mathf.Abs(x - lSpireX[s]);
+                            float spireEdge = lSpireH[s] * (1f - dx / lSpireW[s]);
+                            if (dx < lSpireW[s] && y < spireEdge) { inSpire = true; break; }
+                            // Right spires
+                            dx = Mathf.Abs(x - rSpireX[s]);
+                            spireEdge = rSpireH[s] * (1f - dx / rSpireW[s]);
+                            if (dx < rSpireW[s] && y < spireEdge) { inSpire = true; break; }
+                        }
+                        if (inSpire)
+                        {
+                            float darkT = (float)y / height;
+                            tex.SetPixel(x, y, new Color(
+                                Mathf.Lerp(0.18f, 0.08f, darkT),
+                                Mathf.Lerp(0.10f, 0.04f, darkT),
+                                Mathf.Lerp(0.12f, 0.06f, darkT)));
+                        }
+
+                        // Sparse stars in upper half
+                        if (y > height * 0.55f)
+                        {
+                            float h1 = Mathf.Abs(Mathf.Sin(x * 197.3f + y * 311.7f) * 43758.5453f % 1f);
+                            if (h1 > 0.997f) tex.SetPixel(x, y, new Color(1f, 0.9f, 0.8f, 0.9f));
                         }
                     }
                 }
@@ -3293,6 +3362,47 @@ public static class FlappyBirdSceneBuilder
                 grassHighlight = new Color(0.5f, 0.6f, 0.5f);
                 grassShadow = new Color(0.2f, 0.3f, 0.2f);
             }
+            else if (index == 8) // Mars: jagged dark rocky rim with faint blue crystal accents
+            {
+                Color rockBase  = new Color(0.22f, 0.08f, 0.04f); // dark maroon rock
+                Color rockDark  = new Color(0.12f, 0.04f, 0.02f);
+                Color crystalTip = new Color(0.15f, 0.65f, 0.80f); // blue crystal glint
+
+                int toothW = Mathf.Max(6, width / 14);
+                float toothH = height * 0.40f;
+                float baseT  = height * 0.50f;
+
+                for (int x = 0; x < width; x++)
+                {
+                    float phase = (x % toothW) / (float)toothW;
+                    // Irregular jagged spire shape (not smooth triangle)
+                    float jagged = (1f - Mathf.Abs(phase - 0.5f) * 2f);
+                    jagged = Mathf.Pow(jagged, 0.6f); // sharper peaks
+                    float edgeY = baseT + jagged * toothH;
+
+                    // Add per-spire noise using sine
+                    edgeY += Mathf.Sin(x * 0.3f) * 6f;
+
+                    for (int y = 0; y < height; y++)
+                    {
+                        if (y > edgeY)
+                        {
+                            tex.SetPixel(x, y, Color.clear);
+                        }
+                        else if (y > edgeY - 5f)
+                        {
+                            // Crystal tip glow on top of tallest spires
+                            tex.SetPixel(x, y, jagged > 0.7f ? crystalTip : rockDark);
+                        }
+                        else
+                        {
+                            tex.SetPixel(x, y, rockBase);
+                        }
+                    }
+                }
+                tex.Apply();
+                return tex;
+            }
             else if (index == 7) // Mario: custom repeating blocky tiles with a flat top black rim
             {
                 Color baseCol = new Color(0.85f, 0.35f, 0.12f);       // orange-brown
@@ -3375,6 +3485,7 @@ public static class FlappyBirdSceneBuilder
         {
             if (index == 1) // Space asteroid rock column
             {
+
                 // Dark asteroid-rock pillar with teal glow trim on the inner edge
                 Color rockBase  = new Color(0.10f, 0.12f, 0.18f); // deep charcoal rock
                 Color rockMid   = new Color(0.15f, 0.18f, 0.26f); // mid rock tone
@@ -3422,6 +3533,33 @@ public static class FlappyBirdSceneBuilder
             else if (index == 4) col = new Color(0.85f, 0.35f, 0.5f);
             else if (index == 5) col = new Color(0.12f, 0.45f, 0.15f);
             else if (index == 6) col = new Color(0.38f, 0.25f, 0.15f);
+            else if (index == 8) // Mars: dark rock spire with blue crystal veins
+            {
+                Color spireBase  = new Color(0.18f, 0.10f, 0.08f);
+                Color spireMid   = new Color(0.24f, 0.14f, 0.10f);
+                Color spireLight = new Color(0.32f, 0.18f, 0.12f);
+                Color spireDark  = new Color(0.10f, 0.05f, 0.04f);
+                Color crystal    = new Color(0.10f, 0.65f, 0.85f);
+                Color crystalDim = new Color(0.06f, 0.35f, 0.50f);
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        float n1 = Mathf.Sin(x * 0.27f + y * 0.19f) * Mathf.Cos(y * 0.23f - x * 0.11f);
+                        float n2 = Mathf.Sin(x * 0.07f + y * 0.41f);
+                        float rock = (n1 + n2) * 0.5f;
+                        Color px = rock > 0.35f ? spireLight : (rock > 0.05f ? spireMid : (rock < -0.35f ? spireDark : spireBase));
+                        float vein = Mathf.Sin(x * 0.18f - y * 0.28f + 1.5f);
+                        if (vein > 0.82f) px = crystal;
+                        else if (vein > 0.72f) px = crystalDim;
+                        if (x < 10) px = Color.Lerp(spireDark, px, x / 10f);
+                        if (x >= width - 5) px = x >= width - 2 ? crystal : crystalDim;
+                        tex.SetPixel(x, y, px);
+                    }
+                }
+                tex.Apply();
+                return tex;
+            }
 
             for (int y = 0; y < height; y++)
             {
@@ -3496,6 +3634,39 @@ public static class FlappyBirdSceneBuilder
             else if (index == 4) col = new Color(0.95f, 0.45f, 0.6f);
             else if (index == 5) col = new Color(0.95f, 0.72f, 0.1f);
             else if (index == 6) col = new Color(0.55f, 0.55f, 0.55f);
+            else if (index == 8) // Mars: glowing blue crystal cluster cap
+            {
+                Color cBright = new Color(0.20f, 0.85f, 1.00f);
+                Color cMid    = new Color(0.10f, 0.55f, 0.78f);
+                Color cDark   = new Color(0.04f, 0.28f, 0.42f);
+                Color rBase   = new Color(0.18f, 0.08f, 0.06f);
+                Color rDark   = new Color(0.08f, 0.04f, 0.03f);
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        Color px = rDark;
+                        int numSpikes = 5;
+                        for (int k = 0; k < numSpikes; k++)
+                        {
+                            float cx = width * (k + 0.5f) / numSpikes;
+                            float halfW = width * 0.07f;
+                            float dx = Mathf.Abs(x - cx);
+                            if (dx < halfW)
+                            {
+                                float spikeH = height * (0.55f + 0.35f * (1f - Mathf.Abs(k - numSpikes/2f) / (numSpikes/2f)));
+                                float taperT = 1f - dx / halfW;
+                                if (y < spikeH * taperT)
+                                    px = taperT > 0.6f ? cBright : (taperT > 0.3f ? cMid : cDark);
+                            }
+                        }
+                        if (y < height * 0.22f) px = rBase;
+                        tex.SetPixel(x, y, px);
+                    }
+                }
+                tex.Apply();
+                return tex;
+            }
 
             for (int y = 0; y < height; y++)
             {
@@ -3830,9 +4001,104 @@ public static class FlappyBirdSceneBuilder
                 }
             }
         }
+        else if (index == 8) // Mars: 3 themed skins
+        {
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Vector2 p = new Vector2(x, y);
+
+                    if (skin == 0) // Astronaut — white spacesuit with gold visor
+                    {
+                        // Helmet large circle
+                        if (Vector2.Distance(p, new Vector2(width * 0.5f, height * 0.65f)) <= width * 0.26f)
+                        {
+                            tex.SetPixel(x, y, new Color(0.92f, 0.92f, 0.93f));
+                            // Gold visor strip
+                            if (y > height * 0.64f && y < height * 0.76f &&
+                                x > width * 0.30f && x < width * 0.70f)
+                                tex.SetPixel(x, y, new Color(0.95f, 0.72f, 0.15f));
+                            // Visor reflection shine
+                            if (y > height * 0.67f && y < height * 0.72f &&
+                                x > width * 0.34f && x < width * 0.42f)
+                                tex.SetPixel(x, y, new Color(1f, 0.95f, 0.6f, 0.75f));
+                        }
+                        // Body suit ellipse lower
+                        if (IsInsideEllipse(p, new Vector2(width * 0.5f, height * 0.32f), width * 0.24f, height * 0.18f))
+                            tex.SetPixel(x, y, new Color(0.88f, 0.88f, 0.90f));
+                        // Backpack rectangle
+                        if (x < width * 0.28f && y > height * 0.28f && y < height * 0.50f)
+                            tex.SetPixel(x, y, new Color(0.70f, 0.70f, 0.74f));
+                        // NASA blue stripe
+                        if (y > height * 0.40f && y < height * 0.44f &&
+                            x > width * 0.35f && x < width * 0.65f)
+                            tex.SetPixel(x, y, new Color(0.12f, 0.35f, 0.85f));
+                    }
+                    else if (skin == 1) // Mars Rover — boxy body + solar panels + wheels
+                    {
+                        // Main rover body
+                        if (x > width * 0.20f && x < width * 0.80f &&
+                            y > height * 0.40f && y < height * 0.62f)
+                            tex.SetPixel(x, y, new Color(0.72f, 0.62f, 0.48f));
+                        // 3 wheels
+                        float[] wX = { 0.28f, 0.50f, 0.72f };
+                        for (int ww = 0; ww < 3; ww++)
+                        {
+                            if (Vector2.Distance(p, new Vector2(width*wX[ww], height*0.30f)) <= width*0.09f)
+                                tex.SetPixel(x, y, new Color(0.22f, 0.20f, 0.16f));
+                            if (Vector2.Distance(p, new Vector2(width*wX[ww], height*0.30f)) <= width*0.05f)
+                                tex.SetPixel(x, y, new Color(0.38f, 0.32f, 0.24f));
+                        }
+                        // Solar panels left + right
+                        if (y > height * 0.60f && y < height * 0.76f)
+                        {
+                            if ((x > width * 0.10f && x < width * 0.32f) ||
+                                (x > width * 0.68f && x < width * 0.90f))
+                            {
+                                tex.SetPixel(x, y, new Color(0.10f, 0.28f, 0.78f));
+                                if (x % 10 < 2 || y % 8 < 1)
+                                    tex.SetPixel(x, y, new Color(0.06f, 0.18f, 0.52f));
+                            }
+                        }
+                        // Camera mast
+                        if (x > width*0.48f && x < width*0.52f && y > height*0.62f && y < height*0.85f)
+                            tex.SetPixel(x, y, new Color(0.52f, 0.48f, 0.40f));
+                        if (Vector2.Distance(p, new Vector2(width*0.5f, height*0.85f)) <= width*0.05f)
+                            tex.SetPixel(x, y, new Color(0.82f, 0.82f, 0.85f));
+                    }
+                    else // skin == 2: Crystal Explorer — dark teal armor + blue crystal backpack
+                    {
+                        // Body suit dark teal
+                        if (Vector2.Distance(p, new Vector2(width*0.5f, height*0.60f)) <= width*0.24f)
+                            tex.SetPixel(x, y, new Color(0.08f, 0.28f, 0.42f));
+                        // Helmet visor glowing cyan
+                        if (Vector2.Distance(p, new Vector2(width*0.5f, height*0.68f)) <= width*0.18f && y > height * 0.60f)
+                            tex.SetPixel(x, y, new Color(0.10f, 0.72f, 0.95f, 0.88f));
+                        // Crystal backpack — 3 spikes on left side
+                        for (int k = 0; k < 3; k++)
+                        {
+                            float bx = width * (0.20f - k * 0.04f);
+                            float by = height * (0.50f + k * 0.06f);
+                            float bh = height * (0.18f - k * 0.03f);
+                            float bw = width * 0.032f;
+                            for (int ky = 0; ky < height; ky++)
+                            {
+                                float taperT = 1f - Mathf.Abs(ky - by) / bh;
+                                if (taperT > 0 && Mathf.Abs(x - bx) < bw * taperT)
+                                    tex.SetPixel(x, ky, k == 0 ?
+                                        new Color(0.20f, 0.85f, 1.00f) :
+                                        new Color(0.10f, 0.55f, 0.78f));
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         tex.Apply();
         return tex;
+
     }
 
     private static Texture2D GenerateIconTexture(string name, int w, int h)
