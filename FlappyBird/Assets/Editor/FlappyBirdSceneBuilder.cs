@@ -3014,11 +3014,36 @@ public static class FlappyBirdSceneBuilder
                     tex.SetPixel(x, y, col);
                     if (index == 1)
                     {
-                        float randomVal = (Mathf.Sin(x * 12.9898f + y * 78.233f) * 43758.5453f) % 1f;
-                        if (randomVal > 0.994f)
+                        // Determine star presence via deterministic hash
+                        float h1 = Mathf.Abs(Mathf.Sin(x * 127.1f + y * 311.7f) * 43758.5453f % 1f);
+                        float h2 = Mathf.Abs(Mathf.Sin(x * 269.5f + y * 183.3f) * 43758.5453f % 1f);
+
+                        // White cross-shaped plus sparkle stars — sparse, only brightest
+                        if (h1 > 0.9985f)
                         {
-                            float brightness = 0.4f + (Mathf.PingPong(x + y, 10f) / 10f) * 0.6f;
-                            tex.SetPixel(x, y, new Color(1f, 1f, 1f, brightness));
+                            float brightness = 0.75f + h2 * 0.25f;
+                            Color starCol = new Color(brightness, brightness, brightness, 1f);
+                            tex.SetPixel(x, y, starCol);
+                            if (x > 0) tex.SetPixel(x - 1, y, starCol * 0.5f);
+                            if (x < width - 1) tex.SetPixel(x + 1, y, starCol * 0.5f);
+                            if (y > 0) tex.SetPixel(x, y - 1, starCol * 0.5f);
+                            if (y < height - 1) tex.SetPixel(x, y + 1, starCol * 0.5f);
+                        }
+                        // Occasional cyan pixel dot accent
+                        else if (h1 > 0.9975f && h2 > 0.6f)
+                        {
+                            tex.SetPixel(x, y, new Color(0.2f, 0.9f, 1f, 0.85f));
+                        }
+                        // Occasional purple pixel dot accent
+                        else if (h1 > 0.9968f && h2 < 0.35f)
+                        {
+                            tex.SetPixel(x, y, new Color(0.7f, 0.3f, 1f, 0.80f));
+                        }
+                        // Dim small background dot stars — reduced count
+                        else if (h1 > 0.994f)
+                        {
+                            float dim = 0.25f + h2 * 0.35f;
+                            tex.SetPixel(x, y, new Color(dim, dim, dim + 0.08f, 1f));
                         }
                     }
                     else if (index == 2)
@@ -3348,6 +3373,48 @@ public static class FlappyBirdSceneBuilder
         }
         else if (type == "ObstacleBody")
         {
+            if (index == 1) // Space asteroid rock column
+            {
+                // Dark asteroid-rock pillar with teal glow trim on the inner edge
+                Color rockBase  = new Color(0.10f, 0.12f, 0.18f); // deep charcoal rock
+                Color rockMid   = new Color(0.15f, 0.18f, 0.26f); // mid rock tone
+                Color rockLight = new Color(0.22f, 0.26f, 0.36f); // lighter rock vein
+                Color rockDark  = new Color(0.06f, 0.07f, 0.10f); // dark shadow crevice
+                Color tealGlow  = new Color(0.05f, 0.75f, 0.80f); // teal inner glow edge
+                Color tealFade  = new Color(0.03f, 0.40f, 0.48f); // teal glow fade
+
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        Color px;
+
+                        // Teal glow strip on the inner (right) edge
+                        if (x >= width - 6)
+                            px = x >= width - 2 ? tealGlow : tealFade;
+                        else
+                        {
+                            // Rocky noise using two sine waves to fake craggy texture
+                            float noise1 = Mathf.Sin(x * 0.31f + y * 0.17f) * Mathf.Cos(y * 0.27f - x * 0.13f);
+                            float noise2 = Mathf.Sin(x * 0.09f + y * 0.43f);
+                            float rock = (noise1 + noise2) * 0.5f;
+
+                            if (rock > 0.35f)       px = rockLight;
+                            else if (rock > 0.05f)  px = rockMid;
+                            else if (rock < -0.35f) px = rockDark;
+                            else                    px = rockBase;
+
+                            // Dark left-edge shadow bevel
+                            if (x < 8)
+                                px = Color.Lerp(rockDark, px, x / 8f);
+                        }
+                        tex.SetPixel(x, y, px);
+                    }
+                }
+                tex.Apply();
+                return tex;
+            }
+
             Color col = Color.green;
             if (index == 1) col = new Color(0.35f, 0.35f, 0.4f);
             else if (index == 2) col = Color.white;
@@ -3376,6 +3443,52 @@ public static class FlappyBirdSceneBuilder
         }
         else if (type == "ObstacleCap")
         {
+            if (index == 1) // Space asteroid rock cap — glowing teal inner rim
+            {
+                Color rockBase  = new Color(0.10f, 0.12f, 0.18f);
+                Color rockMid   = new Color(0.16f, 0.20f, 0.28f);
+                Color rockLight = new Color(0.24f, 0.28f, 0.38f);
+                Color rockDark  = new Color(0.05f, 0.06f, 0.09f);
+                Color tealGlow  = new Color(0.05f, 0.85f, 0.90f);
+                Color tealMid   = new Color(0.03f, 0.55f, 0.62f);
+
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        Color px;
+                        bool topEdge    = (y > height - 10);
+                        bool bottomEdge = (y < 10);
+                        bool sideEdge   = (x < 8 || x > width - 8);
+
+                        if (topEdge)
+                        {
+                            // Top inner glow edge — bright teal bar across full width
+                            float edgeFade = (y - (height - 10f)) / 10f;
+                            px = Color.Lerp(tealMid, tealGlow, edgeFade);
+                        }
+                        else if (bottomEdge || sideEdge)
+                        {
+                            px = rockDark;
+                        }
+                        else
+                        {
+                            float noise1 = Mathf.Sin(x * 0.28f + y * 0.19f) * Mathf.Cos(y * 0.23f - x * 0.11f);
+                            float noise2 = Mathf.Sin(x * 0.11f + y * 0.37f);
+                            float rock = (noise1 + noise2) * 0.5f;
+
+                            if (rock > 0.35f)       px = rockLight;
+                            else if (rock > 0.05f)  px = rockMid;
+                            else if (rock < -0.35f) px = rockDark;
+                            else                    px = rockBase;
+                        }
+                        tex.SetPixel(x, y, px);
+                    }
+                }
+                tex.Apply();
+                return tex;
+            }
+
             Color col = Color.green;
             if (index == 1) col = new Color(0.45f, 0.45f, 0.5f);
             else if (index == 2) col = Color.white;

@@ -377,86 +377,109 @@ public class BackgroundAnimator : MonoBehaviour
         fTex.Apply();
         flagSprite = Sprite.Create(fTex, new Rect(0, 0, 32, 64), new Vector2(0.5f, 0.5f), 100f);
 
-        // 4. Planet Red Sprite (Mars type: rust/red circle with orange swirls)
-        Texture2D rPlanetTex = new Texture2D(128, 128, TextureFormat.RGBA32, false);
-        Vector2 planetCenter = new Vector2(64, 64);
-        Color planetRed = new Color(0.85f, 0.35f, 0.2f);
-        Color planetOrange = new Color(0.95f, 0.6f, 0.15f);
-        for (int y = 0; y < 128; y++)
+        // 4. Planet Red Sprite — TEAL PIXEL CRATER MOON (large, from reference)
+        //    Big teal/cyan planet with 3 dark round craters and a pixelated surface
+        int moonSize = 128;
+        Texture2D rPlanetTex = new Texture2D(moonSize, moonSize, TextureFormat.RGBA32, false);
+        Vector2 planetCenter = new Vector2(moonSize / 2f, moonSize / 2f);
+        float moonRadius = moonSize * 0.42f;
+        Color moonBase    = new Color(0.10f, 0.78f, 0.72f); // bright teal
+        Color moonMid     = new Color(0.07f, 0.60f, 0.58f); // medium teal
+        Color moonDark    = new Color(0.04f, 0.38f, 0.40f); // dark teal shadow
+        Color moonShine   = new Color(0.55f, 0.98f, 0.95f); // bright highlight
+        Color craterColor = new Color(0.04f, 0.30f, 0.34f); // dark crater fill
+        Color craterRim   = new Color(0.06f, 0.42f, 0.48f); // crater inner rim
+
+        // Crater positions (x, y, radius)
+        float[,] craters = { { 42f, 70f, 11f }, { 76f, 52f, 8f }, { 60f, 84f, 7f } };
+
+        for (int y = 0; y < moonSize; y++)
         {
-            for (int x = 0; x < 128; x++)
+            for (int x = 0; x < moonSize; x++)
             {
-                Vector2 p = new Vector2(x, y);
-                float dist = Vector2.Distance(p, planetCenter);
-                if (dist <= 40f)
+                float dist = Vector2.Distance(new Vector2(x, y), planetCenter);
+                if (dist > moonRadius) { rPlanetTex.SetPixel(x, y, clear); continue; }
+
+                // Pixel-art quantised shading: shade based on x position (light left)
+                float shade = Mathf.Clamp01((moonRadius - dist) / moonRadius);
+                float lightX = (float)x / moonSize;
+                Color baseCol = lightX < 0.35f ? moonShine : (lightX < 0.65f ? moonBase : (lightX < 0.85f ? moonMid : moonDark));
+
+                // Horizontal band variation (slight stripes like a pixel planet)
+                int bandY = (int)(y * 4f / moonSize);
+                if (bandY % 2 == 0) baseCol = Color.Lerp(baseCol, moonMid, 0.15f);
+
+                // Draw craters
+                bool inCrater = false;
+                for (int c = 0; c < 3; c++)
                 {
-                    float swirl = Mathf.Sin(x * 0.15f + y * 0.08f);
-                    rPlanetTex.SetPixel(x, y, swirl > 0.3f ? planetOrange : planetRed);
+                    float cd = Vector2.Distance(new Vector2(x, y), new Vector2(craters[c, 0], craters[c, 1]));
+                    if (cd <= craters[c, 2]) { baseCol = craterColor; inCrater = true; break; }
+                    if (cd <= craters[c, 2] + 2.5f && !inCrater) { baseCol = craterRim; }
                 }
-                else
-                {
-                    rPlanetTex.SetPixel(x, y, clear);
-                }
+
+                rPlanetTex.SetPixel(x, y, baseCol);
             }
         }
         rPlanetTex.Apply();
-        planetRedSprite = Sprite.Create(rPlanetTex, new Rect(0, 0, 128, 128), new Vector2(0.5f, 0.5f), 100f);
+        planetRedSprite = Sprite.Create(rPlanetTex, new Rect(0, 0, moonSize, moonSize), new Vector2(0.5f, 0.5f), 100f);
 
-        // 5. Planet Blue Sprite (Neptune type: dark blue circle with light cyan swirls)
+        // 5. Planet Blue Sprite — PINK/PURPLE SATURN (from reference, small with angled ring trail)
         Texture2D bPlanetTex = new Texture2D(128, 128, TextureFormat.RGBA32, false);
-        Color planetBlue = new Color(0.1f, 0.3f, 0.75f);
-        Color planetCyan = new Color(0.3f, 0.75f, 0.95f);
+        Vector2 saturnCenter = new Vector2(64, 64);
+        float saturnRadius = 28f;
+        Color saturnBody  = new Color(0.75f, 0.40f, 0.85f); // pink-purple body
+        Color saturnMid   = new Color(0.60f, 0.28f, 0.72f);
+        Color saturnShine = new Color(0.92f, 0.70f, 1.00f); // highlight
+        Color ringColor   = new Color(0.55f, 0.25f, 0.72f, 0.70f); // purple ring trail
+        Color ringFade    = new Color(0.35f, 0.15f, 0.55f, 0.35f);
+
         for (int y = 0; y < 128; y++)
         {
             for (int x = 0; x < 128; x++)
             {
-                Vector2 p = new Vector2(x, y);
-                float dist = Vector2.Distance(p, planetCenter);
-                if (dist <= 36f)
+                float dist = Vector2.Distance(new Vector2(x, y), saturnCenter);
+                Color px = clear;
+
+                // Angled elliptical ring trail (diagonal lower-left to upper-right)
+                float rx = (x - 64) * 0.85f + (y - 64) * 0.52f;
+                float ry = (y - 64) * 0.85f - (x - 64) * 0.52f;
+                float rDist = Mathf.Sqrt(rx * rx + (ry * 2.8f) * (ry * 2.8f));
+                if (rDist >= 34f && rDist <= 54f)
+                    px = rDist <= 44f ? ringColor : ringFade;
+
+                // Planet body on top
+                if (dist <= saturnRadius)
                 {
-                    float swirl = Mathf.Cos(x * 0.1f - y * 0.15f);
-                    bPlanetTex.SetPixel(x, y, swirl > 0.2f ? planetCyan : planetBlue);
+                    float lx = (float)x / 128f;
+                    px = lx < 0.30f ? saturnShine : (lx < 0.65f ? saturnBody : saturnMid);
                 }
-                else
-                {
-                    bPlanetTex.SetPixel(x, y, clear);
-                }
+
+                bPlanetTex.SetPixel(x, y, px);
             }
         }
         bPlanetTex.Apply();
         planetBlueSprite = Sprite.Create(bPlanetTex, new Rect(0, 0, 128, 128), new Vector2(0.5f, 0.5f), 100f);
 
-        // 6. Planet Yellow Sprite (Saturn type: yellow circle with beautiful rings)
-        Texture2D yPlanetTex = new Texture2D(128, 128, TextureFormat.RGBA32, false);
-        Color planetYellow = new Color(0.92f, 0.8f, 0.35f);
-        Color planetRing = new Color(0.98f, 0.92f, 0.65f, 0.75f);
-        for (int y = 0; y < 128; y++)
+        // 6. Planet Yellow Sprite — BLUE BLOB PLANET (small pure blue dot from reference)
+        Texture2D yPlanetTex = new Texture2D(64, 64, TextureFormat.RGBA32, false);
+        Vector2 blobCenter = new Vector2(32, 32);
+        Color blobBase  = new Color(0.18f, 0.42f, 0.98f);
+        Color blobShine = new Color(0.52f, 0.72f, 1.00f);
+        Color blobDark  = new Color(0.08f, 0.18f, 0.62f);
+        for (int y = 0; y < 64; y++)
         {
-            for (int x = 0; x < 128; x++)
+            for (int x = 0; x < 64; x++)
             {
-                Vector2 p = new Vector2(x, y);
-                float dist = Vector2.Distance(p, planetCenter);
-                Color pixelColor = clear;
-
-                float ringDistX = (x - 64) * 0.6f + (y - 64) * 0.8f;
-                float ringDistY = (y - 64) * 0.6f - (x - 64) * 0.8f;
-                float ringRadiusSq = ringDistX * ringDistX + (ringDistY * 3f) * (ringDistY * 3f);
-
-                if (ringRadiusSq >= 42f * 42f && ringRadiusSq <= 60f * 60f)
-                {
-                    pixelColor = planetRing;
-                }
-
-                if (dist <= 26f)
-                {
-                    pixelColor = planetYellow;
-                }
-
-                yPlanetTex.SetPixel(x, y, pixelColor);
+                float dist = Vector2.Distance(new Vector2(x, y), blobCenter);
+                if (dist > 24f) { yPlanetTex.SetPixel(x, y, clear); continue; }
+                float lx = (float)x / 64f;
+                Color c = lx < 0.30f ? blobShine : (lx < 0.75f ? blobBase : blobDark);
+                yPlanetTex.SetPixel(x, y, c);
             }
         }
         yPlanetTex.Apply();
-        planetYellowSprite = Sprite.Create(yPlanetTex, new Rect(0, 0, 128, 128), new Vector2(0.5f, 0.5f), 100f);
+        planetYellowSprite = Sprite.Create(yPlanetTex, new Rect(0, 0, 64, 64), new Vector2(0.5f, 0.5f), 100f);
 
         // 7. Goomba Sprite (Mario mushroom enemy)
         Texture2D gTex = new Texture2D(64, 64, TextureFormat.RGBA32, false);
