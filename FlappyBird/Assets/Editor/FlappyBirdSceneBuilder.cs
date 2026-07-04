@@ -1551,7 +1551,7 @@ public static class FlappyBirdSceneBuilder
 
         RectTransform badgeRt = scoreBadge.GetComponent<RectTransform>();
         badgeRt.sizeDelta = new Vector2(280, 68);
-        badgeRt.anchoredPosition = new Vector2(0, -140); // moved up to clear the starter-power widget row below it
+        badgeRt.anchoredPosition = new Vector2(0, -110); // moved up to clear the starter-power widget row below it
 
         // Small Gold Medal icon inside badge
         GameObject medalIcon = new GameObject("MedalIcon");
@@ -1575,13 +1575,13 @@ public static class FlappyBirdSceneBuilder
 
         // Starter Power widgets — small icon+count buttons. Tapping one arms it (consumes a charge)
         // to auto-apply at the start of the next run; tapping the same one again un-arms/refunds it.
-        starterMagnetWidget = BuildStarterWidget(lobbyPanel.transform, magnetSprite, new Vector2(-130, -250));
-        starterBoostWidget = BuildStarterWidget(lobbyPanel.transform, boostSprite, new Vector2(-43, -250));
-        starterDoubleWidget = BuildStarterWidget(lobbyPanel.transform, doubleSprite, new Vector2(43, -250));
-        starterHammerWidget = BuildStarterWidget(lobbyPanel.transform, hammerSprite, new Vector2(130, -250));
+        starterMagnetWidget = BuildStarterWidget(lobbyPanel.transform, magnetSprite, new Vector2(-130, -200));
+        starterBoostWidget = BuildStarterWidget(lobbyPanel.transform, boostSprite, new Vector2(-43, -200));
+        starterDoubleWidget = BuildStarterWidget(lobbyPanel.transform, doubleSprite, new Vector2(43, -200));
+        starterHammerWidget = BuildStarterWidget(lobbyPanel.transform, hammerSprite, new Vector2(130, -200));
 
         // Pulsing "TAP TO START" hint text on start screen
-        GameObject tapStartGO = CreateLabel("TapToStartText", lobbyPanel.transform, "TAP TO START", 52, new Vector2(0, -300));
+        GameObject tapStartGO = CreateLabel("TapToStartText", lobbyPanel.transform, "TAP TO START", 52, new Vector2(0, -340));
         Text tapText = tapStartGO.GetComponent<Text>();
         tapText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); // bulky, retro game font
         tapText.color = Color.white;
@@ -2653,9 +2653,9 @@ public static class FlappyBirdSceneBuilder
         coinsIconImg.sprite = coinIcon;
         RectTransform coinsIconRt = coinsIconGO.GetComponent<RectTransform>();
         coinsIconRt.sizeDelta = new Vector2(36, 36);
-        coinsIconRt.anchoredPosition = new Vector2(-185, -170);
+        coinsIconRt.anchoredPosition = new Vector2(-185, -195);
 
-        GameObject coinsVal = CreateLabel("CoinsValue", resultCard.transform, "0", 32, new Vector2(-135, -170));
+        GameObject coinsVal = CreateLabel("CoinsValue", resultCard.transform, "0", 32, new Vector2(-135, -195));
         coinsValueText = coinsVal;
         Text cvText = coinsVal.GetComponent<Text>();
         cvText.color = new Color(0.98f, 0.82f, 0.15f);
