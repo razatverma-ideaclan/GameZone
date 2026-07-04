@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 4074154312837009496}
   - component: {fileID: 331812769521976960}
   - component: {fileID: 6432654842689584735}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: PipeBottom
   m_TagString: Pipe
   m_Icon: {fileID: 0}
@@ -149,7 +149,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3013721303658322993}
   - component: {fileID: 963396781381623476}
-  - component: {fileID: 7969757704662485009}
+  - component: {fileID: -3977458124542376734}
   m_Layer: 0
   m_Name: PipePair
   m_TagString: Untagged
@@ -191,7 +191,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PipeMover
   speed: 3
   destroyXPosition: -12
---- !u!114 &7969757704662485009
+--- !u!114 &-3977458124542376734
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -306,7 +306,7 @@ GameObject:
   - component: {fileID: 2376845529083352492}
   - component: {fileID: 5231533465721288978}
   - component: {fileID: 6656133009391057894}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: PipeTop
   m_TagString: Pipe
   m_Icon: {fileID: 0}

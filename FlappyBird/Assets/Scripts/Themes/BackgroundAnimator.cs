@@ -22,6 +22,11 @@ public class BackgroundAnimator : MonoBehaviour
     private Sprite marsMeteorSprite;
     private Sprite marsSatelliteSprite;
 
+    private Sprite emberSprite;
+    private Sprite bubbleSprite;
+    private Sprite pollenSprite;
+    private Sprite fogSprite;
+
     private float planetSpawnTimer = 0f;
     private float nextPlanetSpawnTime = 8f;
 
@@ -295,6 +300,106 @@ public class BackgroundAnimator : MonoBehaviour
                 flag.AddComponent<SwayComponent>();
 
                 animatedElements.Add(flag);
+            }
+        }
+        else if (tName == "dragon")
+        {
+            // Spawn 5 drifting embers
+            for (int i = 0; i < 5; i++)
+            {
+                GameObject ember = new GameObject("DragonEmber");
+                ember.transform.SetParent(transform, false);
+
+                SpriteRenderer sr = ember.AddComponent<SpriteRenderer>();
+                sr.sprite = emberSprite;
+                sr.sortingOrder = -8;
+
+                float scale = Random.Range(0.6f, 1.4f);
+                ember.transform.localScale = new Vector3(scale, scale, 1f);
+                ember.transform.position = new Vector3(Random.Range(minX, maxX), Random.Range(-2f, 5f), 1f);
+
+                DriftData drift = ember.AddComponent<DriftData>();
+                drift.speed = Random.Range(0.8f, 2.2f);
+                drift.rotSpeed = Random.Range(-15f, 15f);
+                drift.minY = -2f;
+                drift.maxY = 5f;
+
+                animatedElements.Add(ember);
+            }
+        }
+        else if (tName == "fish")
+        {
+            // Spawn 6 drifting bubbles
+            for (int i = 0; i < 6; i++)
+            {
+                GameObject bubble = new GameObject("FishBubble");
+                bubble.transform.SetParent(transform, false);
+
+                SpriteRenderer sr = bubble.AddComponent<SpriteRenderer>();
+                sr.sprite = bubbleSprite;
+                sr.sortingOrder = -8;
+
+                float scale = Random.Range(0.5f, 1.3f);
+                bubble.transform.localScale = new Vector3(scale, scale, 1f);
+                bubble.transform.position = new Vector3(Random.Range(minX, maxX), Random.Range(-3f, 5f), 1f);
+
+                DriftData drift = bubble.AddComponent<DriftData>();
+                drift.speed = Random.Range(0.3f, 1.0f);
+                drift.rotSpeed = 0f;
+                drift.minY = -3f;
+                drift.maxY = 5f;
+
+                animatedElements.Add(bubble);
+            }
+        }
+        else if (tName == "bee")
+        {
+            // Spawn 8 drifting pollen flecks
+            for (int i = 0; i < 8; i++)
+            {
+                GameObject pollen = new GameObject("BeePollen");
+                pollen.transform.SetParent(transform, false);
+
+                SpriteRenderer sr = pollen.AddComponent<SpriteRenderer>();
+                sr.sprite = pollenSprite;
+                sr.sortingOrder = -8;
+
+                float scale = Random.Range(0.8f, 1.6f);
+                pollen.transform.localScale = new Vector3(scale, scale, 1f);
+                pollen.transform.position = new Vector3(Random.Range(minX, maxX), Random.Range(-3f, 5f), 1f);
+
+                DriftData drift = pollen.AddComponent<DriftData>();
+                drift.speed = Random.Range(0.4f, 1.2f);
+                drift.rotSpeed = Random.Range(-30f, 30f);
+                drift.minY = -3f;
+                drift.maxY = 5f;
+
+                animatedElements.Add(pollen);
+            }
+        }
+        else if (tName == "ninja")
+        {
+            // Spawn 4 drifting fog wisps
+            for (int i = 0; i < 4; i++)
+            {
+                GameObject fog = new GameObject("NinjaFog");
+                fog.transform.SetParent(transform, false);
+
+                SpriteRenderer sr = fog.AddComponent<SpriteRenderer>();
+                sr.sprite = fogSprite;
+                sr.sortingOrder = -8;
+
+                float scale = Random.Range(1.0f, 2.0f);
+                fog.transform.localScale = new Vector3(scale, scale, 1f);
+                fog.transform.position = new Vector3(Random.Range(minX, maxX), Random.Range(-2f, 4f), 1f);
+
+                DriftData drift = fog.AddComponent<DriftData>();
+                drift.speed = Random.Range(0.2f, 0.6f);
+                drift.rotSpeed = 0f;
+                drift.minY = -2f;
+                drift.maxY = 4f;
+
+                animatedElements.Add(fog);
             }
         }
     }
@@ -621,6 +726,78 @@ public class BackgroundAnimator : MonoBehaviour
         }
         satTex.Apply();
         marsSatelliteSprite = Sprite.Create(satTex, new Rect(0, 0, 64, 64), new Vector2(0.5f, 0.5f), 100f);
+
+        // 10. Ember Sprite (Dragon) — glowing orange-red circle
+        Texture2D emberTex = new Texture2D(32, 32, TextureFormat.RGBA32, false);
+        Vector2 emberCenter = new Vector2(16, 16);
+        Color emberCore = new Color(1f, 0.85f, 0.2f);
+        Color emberMid = new Color(0.95f, 0.45f, 0.1f);
+        Color emberEdge = new Color(0.75f, 0.15f, 0.05f);
+        for (int y = 0; y < 32; y++)
+        {
+            for (int x = 0; x < 32; x++)
+            {
+                float dist = Vector2.Distance(new Vector2(x, y), emberCenter);
+                if (dist > 14f) { emberTex.SetPixel(x, y, clear); continue; }
+                Color c = dist < 5f ? emberCore : (dist < 10f ? emberMid : emberEdge);
+                emberTex.SetPixel(x, y, c);
+            }
+        }
+        emberTex.Apply();
+        emberSprite = Sprite.Create(emberTex, new Rect(0, 0, 32, 32), new Vector2(0.5f, 0.5f), 100f);
+
+        // 11. Bubble Sprite (Fish) — translucent blue bubble with a bright highlight fleck
+        Texture2D bubbleTex = new Texture2D(48, 48, TextureFormat.RGBA32, false);
+        Vector2 bubbleCenter = new Vector2(24, 24);
+        Color bubbleFill = new Color(0.65f, 0.85f, 1f, 0.35f);
+        Color bubbleRim = new Color(0.85f, 0.95f, 1f, 0.75f);
+        Color bubbleShine = new Color(1f, 1f, 1f, 0.9f);
+        for (int y = 0; y < 48; y++)
+        {
+            for (int x = 0; x < 48; x++)
+            {
+                float dist = Vector2.Distance(new Vector2(x, y), bubbleCenter);
+                if (dist > 20f) { bubbleTex.SetPixel(x, y, clear); continue; }
+                Color c = dist > 17f ? bubbleRim : bubbleFill;
+                if (Vector2.Distance(new Vector2(x, y), new Vector2(17, 31)) <= 4f) c = bubbleShine;
+                bubbleTex.SetPixel(x, y, c);
+            }
+        }
+        bubbleTex.Apply();
+        bubbleSprite = Sprite.Create(bubbleTex, new Rect(0, 0, 48, 48), new Vector2(0.5f, 0.5f), 100f);
+
+        // 12. Pollen Sprite (Bee) — small soft yellow-white fleck
+        Texture2D pollenTex = new Texture2D(20, 20, TextureFormat.RGBA32, false);
+        Vector2 pollenCenter = new Vector2(10, 10);
+        Color pollenCore = new Color(1f, 0.95f, 0.6f);
+        Color pollenEdge = new Color(0.95f, 0.8f, 0.3f, 0.6f);
+        for (int y = 0; y < 20; y++)
+        {
+            for (int x = 0; x < 20; x++)
+            {
+                float dist = Vector2.Distance(new Vector2(x, y), pollenCenter);
+                if (dist > 8f) { pollenTex.SetPixel(x, y, clear); continue; }
+                pollenTex.SetPixel(x, y, dist < 4f ? pollenCore : pollenEdge);
+            }
+        }
+        pollenTex.Apply();
+        pollenSprite = Sprite.Create(pollenTex, new Rect(0, 0, 20, 20), new Vector2(0.5f, 0.5f), 100f);
+
+        // 13. Fog Wisp Sprite (Ninja) — soft translucent grey cloud puff
+        Texture2D fogTex = new Texture2D(96, 48, TextureFormat.RGBA32, false);
+        Color fogColor = new Color(0.55f, 0.55f, 0.6f, 0.45f);
+        for (int y = 0; y < 48; y++)
+        {
+            for (int x = 0; x < 96; x++)
+            {
+                bool inside = Vector2.Distance(new Vector2(x, y), new Vector2(28, 24)) <= 16f ||
+                              Vector2.Distance(new Vector2(x, y), new Vector2(48, 26)) <= 20f ||
+                              Vector2.Distance(new Vector2(x, y), new Vector2(70, 24)) <= 16f;
+                fogTex.SetPixel(x, y, inside ? fogColor : clear);
+            }
+        }
+        fogTex.Apply();
+        fogSprite = Sprite.Create(fogTex, new Rect(0, 0, 96, 48), new Vector2(0.5f, 0.5f), 100f);
     }
 }
 

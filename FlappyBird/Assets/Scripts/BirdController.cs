@@ -73,11 +73,26 @@ public class BirdController : MonoBehaviour
     private bool isIdle = true;
     private float idleTimeOffset;
 
+    private ParticleSystem trailParticles;
+    private float trailBaseRate;
+    private ParticleSystem.MinMaxGradient trailBaseColor;
+
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
         startPosition = transform.position;
+
+        Transform trailTrans = transform.Find("Trail");
+        if (trailTrans != null)
+        {
+            trailParticles = trailTrans.GetComponent<ParticleSystem>();
+            if (trailParticles != null)
+            {
+                trailBaseRate = trailParticles.emission.rateOverTime.constant;
+                trailBaseColor = trailParticles.main.startColor;
+            }
+        }
 
         // Auto-add an AudioSource so sounds work without extra Inspector setup.
         audioSource = GetComponent<AudioSource>();
@@ -240,12 +255,27 @@ public class BirdController : MonoBehaviour
 
         if (other.CompareTag("Ground"))
         {
+            if (GameManager.Instance != null && GameManager.Instance.IsInvulnerable()) return; // Fast Boost active — same pass-through as pipes
             Land();
         }
         else if (other.CompareTag("Pipe") || other.CompareTag("Wall") || other.CompareTag("Ceiling"))
         {
+            if (GameManager.Instance != null && GameManager.Instance.IsInvulnerable()) return; // Fast Boost active — fly straight through
             Die();
         }
+    }
+
+    /// <summary>Intensifies the existing wing-flap trail into a dense golden spark trail while Fast Boost is active.</summary>
+    public void SetBoostTrailActive(bool active)
+    {
+        if (trailParticles == null) return;
+
+        var emission = trailParticles.emission;
+        emission.rateOverTime = active ? trailBaseRate * 6f : trailBaseRate;
+
+        var main = trailParticles.main;
+        main.startColor = active ? new ParticleSystem.MinMaxGradient(new Color(1f, 0.85f, 0.1f), new Color(1f, 0.6f, 0f)) : trailBaseColor;
+        main.startSize = active ? new ParticleSystem.MinMaxCurve(0.14f, 0.22f) : new ParticleSystem.MinMaxCurve(0.12f);
     }
 
     /// <summary>
