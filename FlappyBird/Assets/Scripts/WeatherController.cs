@@ -50,6 +50,44 @@ public class WeatherController : MonoBehaviour
         SetAlpha(skySunset, currentSunset);
         SetAlpha(skyNight, currentNight);
         SetAlpha(skyDawn, currentDawn);
+
+        if (ThemeManager.Instance != null && ThemeManager.Instance.GetCurrentTheme() != null && ThemeManager.Instance.GetCurrentTheme().themeName.ToLower() == "mario")
+        {
+            Color dayCol = Color.white;
+            Color sunsetCol = new Color(0.95f, 0.55f, 0.3f); // sunset orange
+            Color nightCol = new Color(0.0f, 0.65f, 0.75f);  // teal cyan (underground level style)
+            Color dawnCol = new Color(0.8f, 0.5f, 0.9f);    // dawn purple
+
+            Color blendedColor = dayCol * currentDay + sunsetCol * currentSunset + nightCol * currentNight + dawnCol * currentDawn;
+
+            SpriteRenderer[] srs = FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None);
+            foreach (var sr in srs)
+            {
+                if (sr == null) continue;
+                string srName = sr.gameObject.name;
+                // Exclude characters from environmental weather tinting
+                if (srName.Contains("Player") || srName.Contains("Bird") || srName.Contains("Goomba")) continue;
+
+                if (srName.Contains("Ground") || srName.Contains("Obstacle") || srName.Contains("Pipe") || srName.Contains("Background") || srName.Contains("Grass"))
+                {
+                    sr.color = blendedColor;
+                }
+            }
+        }
+        else
+        {
+            // Reset color tints to default white for other themes
+            SpriteRenderer[] srs = FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None);
+            foreach (var sr in srs)
+            {
+                if (sr == null) continue;
+                string srName = sr.gameObject.name;
+                if (srName.Contains("Ground") || srName.Contains("Obstacle") || srName.Contains("Pipe") || srName.Contains("Background") || srName.Contains("Grass"))
+                {
+                    sr.color = Color.white;
+                }
+            }
+        }
     }
 
     /// <summary>

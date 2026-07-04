@@ -1,3 +1,4 @@
+#undef USE_FIREBASE
 using System;
 using System.Threading.Tasks;
 #if USE_FIREBASE

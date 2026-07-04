@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 
@@ -46,6 +47,7 @@ public class GameManager : MonoBehaviour
     public GameObject shopPanel;
     public GameObject questsPanel;
     public GameObject leaderboardPanel;
+    public GameObject screenBackdrop;
     public UnityEngine.UI.Image playIconImage;
     public Sprite playSprite;
     public Sprite homeSprite;
@@ -185,6 +187,7 @@ public class GameManager : MonoBehaviour
         if (shopPanel != null) shopPanel.SetActive(screen == MenuScreen.Shop);
         if (questsPanel != null) questsPanel.SetActive(screen == MenuScreen.Quests);
         if (leaderboardPanel != null) leaderboardPanel.SetActive(screen == MenuScreen.Leaderboard);
+        if (screenBackdrop != null) screenBackdrop.SetActive(!onLobby);
 
         // Bird preview only shows on the Lobby screen.
         if (bird != null)
@@ -316,11 +319,17 @@ public class GameManager : MonoBehaviour
 
     public float GetCurrentSpeedMultiplier()
     {
-        if (CurrentState == GameState.Start) return 1f; // Normal speed on start menu
+        float themeScale = 1f;
+        if (ThemeManager.Instance != null && ThemeManager.Instance.GetCurrentTheme() != null && ThemeManager.Instance.GetCurrentTheme().themeName.ToLower() == "mario")
+        {
+            themeScale = 0.62f; // Slower speed specifically for Mario theme
+        }
+
+        if (CurrentState == GameState.Start) return 1f * themeScale;
         
         int speedTier = score / 10;
         float multiplier = 1f + speedTier * 0.08f; // 8% speed increase per 10 score points
-        return Mathf.Min(multiplier, 1.48f); // Capped at +48% speed for playability
+        return Mathf.Min(multiplier, 1.48f) * themeScale;
     }
 
     private Coroutine gameOverCoroutine;
@@ -647,6 +656,21 @@ public class GameManager : MonoBehaviour
         SetMenuScreen(CurrentScreen == MenuScreen.Worlds ? MenuScreen.Lobby : MenuScreen.Worlds);
     }
 
+    public void OnCenterNavClicked()
+    {
+        PlayClickSound();
+        if (CurrentState != GameState.Start) return;
+
+        if (CurrentScreen != MenuScreen.Lobby)
+        {
+            SetMenuScreen(MenuScreen.Lobby);
+        }
+        else
+        {
+            StartGame();
+        }
+    }
+
     public void OnLeaderboardClicked()
     {
         PlayClickSound();
@@ -700,10 +724,16 @@ public class GameManager : MonoBehaviour
 
             if (navIndicator != null)
             {
+                // Soft translucent capsule highlight behind active icon
+                UnityEngine.UI.Image indImg = navIndicator.GetComponent<UnityEngine.UI.Image>();
+                if (indImg != null)
+                {
+                    indImg.color = new Color(1f, 1f, 1f, 0.16f);
+                }
+
                 RectTransform targetRt = targetBtn.GetComponent<RectTransform>();
                 Vector2 targetPos = targetRt.anchoredPosition;
-                if (isCenter) targetPos.y += 10f;
-                Vector2 targetSize = isCenter ? new Vector2(180, 130) : new Vector2(120, 110);
+                Vector2 targetSize = new Vector2(100, 90);
 
                 if (navIndicator.anchoredPosition == Vector2.zero) // Snap on first layout
                 {
@@ -741,43 +771,65 @@ public class GameManager : MonoBehaviour
     private void SetNavButtonActive(UnityEngine.UI.Button btn, bool active, bool isCenter)
     {
         if (btn == null) return;
-        float targetScale = active ? 1.15f : (isCenter ? 0.9f : 1f);
-        btn.transform.localScale = new Vector3(targetScale, targetScale, 1f);
+
+        // Find MenuThemeConfig for our custom neon theme variables
+        MenuThemeConfig themeConfig = FindFirstObjectByType<MenuThemeConfig>();
 
         Color activeColor = Color.white;
-        if (ThemeManager.Instance != null)
+        if (themeConfig != null)
         {
-            ThemeData currentTheme = ThemeManager.Instance.GetCurrentTheme();
-            if (currentTheme != null)
+            activeColor = themeConfig.playButtonColor;
+        }
+
+        RectTransform rt = btn.GetComponent<RectTransform>();
+        if (rt != null)
+        {
+            // Keep button size uniform and flat at Y: 0 (Liquid Glass style)
+            rt.sizeDelta = new Vector2(80, 80);
+            rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, 0f);
+        }
+
+        // All navigation buttons have transparent backgrounds at all times.
+        // The ActiveIndicator (frosted glass capsule) provides the active highlight background behind them.
+        btn.image.color = Color.clear;
+        btn.image.sprite = null;
+        
+        Outline outline = btn.GetComponent<Outline>();
+        if (outline != null) outline.enabled = false;
+
+        // 1. Style the child icon (Play, Home, Shop, Heroes, Quests, Worlds)
+        Transform iconTrans = btn.transform.Find("Icon");
+        if (iconTrans != null)
+        {
+            RectTransform iconRt = iconTrans.GetComponent<RectTransform>();
+            if (iconRt != null)
             {
-                activeColor = currentTheme.themeColor;
-                float h, s, v;
-                Color.RGBToHSV(activeColor, out h, out s, out v);
-                s = Mathf.Max(s, 0.75f);
-                v = Mathf.Max(v, 0.95f);
-                activeColor = Color.HSVToRGB(h, s, v);
+                iconRt.sizeDelta = active ? new Vector2(76, 76) : new Vector2(62, 62);
+            }
+
+            UnityEngine.UI.Image img = iconTrans.GetComponent<UnityEngine.UI.Image>();
+            if (img != null)
+            {
+                // Active colorful icon is fully colored (white tint), inactive is faded/desaturated (grey tint)
+                img.color = active ? Color.white : new Color(0.6f, 0.6f, 0.6f, 0.75f);
             }
         }
 
-        if (isCenter)
+        // 2. Style the label text
+        Transform labelTrans = btn.transform.Find("Label");
+        if (labelTrans != null)
         {
-            // Keeps its yellow branding, but visibly fades when it's not the active tab
-            // (Play, on Lobby) instead of always reading as highlighted.
-            Color c = btn.image.color;
-            btn.image.color = new Color(c.r, c.g, c.b, active ? 1f : 0.55f);
-        }
-        else
-        {
-            btn.image.color = active ? Color.white : new Color(0.6f, 0.6f, 0.6f, 0.8f);
-
-            Transform labelTrans = btn.transform.Find("Label");
-            if (labelTrans != null)
+            UnityEngine.UI.Text txt = labelTrans.GetComponent<UnityEngine.UI.Text>();
+            if (txt != null)
             {
-                UnityEngine.UI.Text txt = labelTrans.GetComponent<UnityEngine.UI.Text>();
-                if (txt != null)
+                txt.color = active ? activeColor : new Color(0.7f, 0.7f, 0.7f, 0.8f);
+                txt.fontStyle = active ? FontStyle.Bold : FontStyle.Normal;
+
+                RectTransform labelRt = labelTrans.GetComponent<RectTransform>();
+                if (labelRt != null)
                 {
-                    txt.color = active ? activeColor : new Color(0.7f, 0.7f, 0.7f, 0.8f);
-                    txt.fontStyle = active ? FontStyle.Bold : FontStyle.Normal;
+                    // Fixed flat Y position below the icon
+                    labelRt.anchoredPosition = new Vector2(0, -38f);
                 }
             }
         }

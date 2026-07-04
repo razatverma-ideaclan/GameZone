@@ -196,16 +196,42 @@ public class ThemeApplier : MonoBehaviour
         GameObject skyBg = GameObject.Find("SkyBackground");
         if (Camera.main != null)
         {
-            // If theme is not Classic (index 0), use the custom color and hide the weather gradients
+            // Keep SkyBackground active for all themes to allow score-based weather cycles!
+            if (skyBg != null) skyBg.SetActive(true);
+
             if (theme.themeName.ToLower() != "classic")
             {
                 Camera.main.backgroundColor = theme.themeColor;
-                if (skyBg != null) skyBg.SetActive(false);
+
+                // Tint weather sky gradient layers to match theme color tones
+                WeatherController weather = FindFirstObjectByType<WeatherController>();
+                if (weather != null)
+                {
+                    Color themeCol = theme.themeColor;
+                    if (weather.skyDay != null) 
+                        weather.skyDay.color = new Color(themeCol.r, themeCol.g, themeCol.b, weather.skyDay.color.a);
+                    
+                    if (weather.skySunset != null) 
+                        weather.skySunset.color = new Color(Mathf.Clamp01(themeCol.r * 1.3f), Mathf.Clamp01(themeCol.g * 0.7f), Mathf.Clamp01(themeCol.b * 0.4f), weather.skySunset.color.a);
+                    
+                    if (weather.skyNight != null) 
+                        weather.skyNight.color = new Color(Mathf.Clamp01(themeCol.r * 0.2f), Mathf.Clamp01(themeCol.g * 0.2f), Mathf.Clamp01(themeCol.b * 0.4f), weather.skyNight.color.a);
+                    
+                    if (weather.skyDawn != null) 
+                        weather.skyDawn.color = new Color(Mathf.Clamp01(themeCol.r * 0.8f), Mathf.Clamp01(themeCol.g * 0.6f), Mathf.Clamp01(themeCol.b * 0.9f), weather.skyDawn.color.a);
+                }
             }
             else
             {
                 Camera.main.backgroundColor = originalCameraColor;
-                if (skyBg != null) skyBg.SetActive(true);
+                WeatherController weather = FindFirstObjectByType<WeatherController>();
+                if (weather != null)
+                {
+                    if (weather.skyDay != null) weather.skyDay.color = new Color(1f, 1f, 1f, weather.skyDay.color.a);
+                    if (weather.skySunset != null) weather.skySunset.color = new Color(1f, 1f, 1f, weather.skySunset.color.a);
+                    if (weather.skyNight != null) weather.skyNight.color = new Color(1f, 1f, 1f, weather.skyNight.color.a);
+                    if (weather.skyDawn != null) weather.skyDawn.color = new Color(1f, 1f, 1f, weather.skyDawn.color.a);
+                }
             }
         }
 
@@ -243,6 +269,13 @@ public class ThemeApplier : MonoBehaviour
         GameObject bottomBar = GameObject.Find("BottomNavBar");
         if (bottomBar != null)
         {
+            MenuThemeConfig themeConfig = FindFirstObjectByType<MenuThemeConfig>();
+            if (themeConfig != null)
+            {
+                themeConfig.ApplyTheme();
+                return;
+            }
+
             Color themeColor = theme.themeColor;
             
             // Background tint (blend with theme color but very dark for contrast)

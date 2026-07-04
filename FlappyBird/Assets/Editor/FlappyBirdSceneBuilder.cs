@@ -147,9 +147,9 @@ public static class FlappyBirdSceneBuilder
         GameObject lobbyPanel, heroesPanel;
         UnityEngine.UI.Image playIconImageRef;
         Text activeThemeLabelText;
-        GameObject shopPanel, questsPanel, leaderboardPanel;
+        GameObject shopPanel, questsPanel, leaderboardPanel, screenBackdrop;
         Button bestScoreButton;
-        GameObject startPanel = BuildStartPanel(canvas.transform, pillButtonSprite, resultCardSprite, goldMedalSprite, out startButton, out startHighScoreText, birdMidSprites, themeAssets, shopIcon, heroesIcon, missionsIcon, themesIcon, playIcon, homeIcon, out shopButton, out heroesButton, out missionsButton, out themesButton, out toastPanel, out themeSelectorPanelRef, out lobbyPanel, out heroesPanel, out playIconImageRef, out navPlayBtn, out activeThemeLabelText, out shopPanel, out questsPanel, out leaderboardPanel, out bestScoreButton);
+        GameObject startPanel = BuildStartPanel(canvas.transform, pillButtonSprite, resultCardSprite, goldMedalSprite, out startButton, out startHighScoreText, birdMidSprites, themeAssets, shopIcon, heroesIcon, missionsIcon, themesIcon, playIcon, homeIcon, out shopButton, out heroesButton, out missionsButton, out themesButton, out toastPanel, out themeSelectorPanelRef, out lobbyPanel, out heroesPanel, out playIconImageRef, out navPlayBtn, out activeThemeLabelText, out shopPanel, out questsPanel, out leaderboardPanel, out bestScoreButton, out screenBackdrop);
         
         UnityEngine.UI.Image medalImage;
         GameObject newBestBadge;
@@ -168,6 +168,7 @@ public static class FlappyBirdSceneBuilder
         gm.shopPanel = shopPanel;
         gm.questsPanel = questsPanel;
         gm.leaderboardPanel = leaderboardPanel;
+        gm.screenBackdrop = screenBackdrop;
         gm.playIconImage = playIconImageRef;
         gm.playSprite = playIcon;
         gm.homeSprite = homeIcon;
@@ -180,8 +181,37 @@ public static class FlappyBirdSceneBuilder
         ThemeApplier themeApplierRef = gameManagerGO.GetComponent<ThemeApplier>();
         if (themeApplierRef != null) themeApplierRef.themeNameLabel = activeThemeLabelText;
 
+        // Attach and wire the customizable MenuThemeConfig component to the Canvas
+        MenuThemeConfig themeConfig = canvas.gameObject.AddComponent<MenuThemeConfig>();
+        if (startPanel != null)
+        {
+            Transform navBarTrans = startPanel.transform.Find("BottomNavBar");
+            if (navBarTrans != null)
+            {
+                themeConfig.bottomBarBg = navBarTrans.GetComponent<Image>();
+                
+                Transform playBtnTrans = navBarTrans.Find("PlayButton");
+                if (playBtnTrans != null) themeConfig.centerPlayButtonImage = playBtnTrans.GetComponent<Image>();
+                
+                Transform indTrans = navBarTrans.Find("ActiveIndicator");
+                if (indTrans != null) themeConfig.activeIndicatorImage = indTrans.GetComponent<Image>();
+            }
+        }
+        if (lobbyPanel != null)
+        {
+            Transform leadTrans = lobbyPanel.transform.Find("LeaderboardButton");
+            if (leadTrans != null) themeConfig.leaderboardButtonImage = leadTrans.GetComponent<Image>();
+            
+            Transform vertTrans = lobbyPanel.transform.Find("VerticalModeButton");
+            if (vertTrans != null) themeConfig.verticalClimbButtonImage = vertTrans.GetComponent<Image>();
+            
+            Transform badgeTrans = lobbyPanel.transform.Find("HighScoreBadge");
+            if (badgeTrans != null) themeConfig.highScoreBadgeImage = badgeTrans.GetComponent<Image>();
+        }
+        themeConfig.ApplyTheme();
+
         UnityEventTools.AddPersistentListener(startButton.onClick, gm.StartGame);
-        UnityEventTools.AddPersistentListener(navPlayBtn.onClick, gm.StartGame);
+        UnityEventTools.AddPersistentListener(navPlayBtn.onClick, gm.OnCenterNavClicked);
         UnityEventTools.AddPersistentListener(shopButton.onClick, gm.OnShopClicked);
         UnityEventTools.AddPersistentListener(heroesButton.onClick, gm.OnHeroesClicked);
         UnityEventTools.AddPersistentListener(missionsButton.onClick, gm.OnMissionsClicked);
@@ -192,8 +222,8 @@ public static class FlappyBirdSceneBuilder
         UnityEventTools.AddPersistentListener(retryButton.onClick, gm.RetryGame);
 
         // Wire all 21 hero cards (7 worlds x 3 skins) inside heroesPanel to the global selector
-        string[] wireThemeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja" };
-        for (int t = 0; t < 7; t++)
+        string[] wireThemeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja", "Mario" };
+        for (int t = 0; t < 8; t++)
         {
             for (int s = 0; s < 3; s++)
             {
@@ -871,6 +901,8 @@ public static class FlappyBirdSceneBuilder
         ScrollingBackground scroller = bg.AddComponent<ScrollingBackground>();
         scroller.tileB = bg2.transform;
         scroller.scrollSpeed = 0.6f;
+
+        bg.AddComponent<BackgroundAnimator>();
     }
 
     // ---------- Scene objects ----------
@@ -1165,7 +1197,7 @@ public static class FlappyBirdSceneBuilder
         new Color(0.15f, 0.15f, 0.18f) // Premium dark charcoal color
     };
 
-    private static GameObject BuildStartPanel(Transform canvasTransform, Sprite buttonSprite, Sprite resultCardSprite, Sprite goldMedalSprite, out Button startButton, out GameObject startHighScoreText, Sprite[] birdMidSprites, ThemeData[] themeAssets, Sprite shopIcon, Sprite heroesIcon, Sprite missionsIcon, Sprite themesIcon, Sprite playIcon, Sprite homeIcon, out Button shopButton, out Button heroesButton, out Button missionsButton, out Button themesButton, out GameObject toastPanel, out GameObject themeSelectorPanelRef, out GameObject lobbyPanel, out GameObject heroesPanel, out UnityEngine.UI.Image playIconImageRef, out Button navPlayBtn, out Text activeThemeLabelText, out GameObject shopPanel, out GameObject questsPanel, out GameObject leaderboardPanel, out Button bestScoreButton)
+    private static GameObject BuildStartPanel(Transform canvasTransform, Sprite buttonSprite, Sprite resultCardSprite, Sprite goldMedalSprite, out Button startButton, out GameObject startHighScoreText, Sprite[] birdMidSprites, ThemeData[] themeAssets, Sprite shopIcon, Sprite heroesIcon, Sprite missionsIcon, Sprite themesIcon, Sprite playIcon, Sprite homeIcon, out Button shopButton, out Button heroesButton, out Button missionsButton, out Button themesButton, out GameObject toastPanel, out GameObject themeSelectorPanelRef, out GameObject lobbyPanel, out GameObject heroesPanel, out UnityEngine.UI.Image playIconImageRef, out Button navPlayBtn, out Text activeThemeLabelText, out GameObject shopPanel, out GameObject questsPanel, out GameObject leaderboardPanel, out Button bestScoreButton, out GameObject screenBackdrop)
     {
         GameObject panel = CreatePanel("StartPanel", canvasTransform, new Color(0, 0, 0, 0.0f));
 
@@ -1268,6 +1300,21 @@ public static class FlappyBirdSceneBuilder
         pulse.scaleAmount = 0.05f;
         pulse.speed = 3f;
 
+        // --- Shared dim backdrop behind every non-Lobby screen. Without this, the live gameplay
+        // background (whose color depends on whichever world theme is currently active — bright
+        // yellow for Bee, fiery orange for Dragon, etc.) shows through and clashes with whatever
+        // screen is on top. GameManager toggles this alongside CurrentScreen != Lobby.
+        screenBackdrop = new GameObject("ScreenBackdrop");
+        screenBackdrop.transform.SetParent(panel.transform, false);
+        Image backdropImg = screenBackdrop.AddComponent<Image>();
+        backdropImg.color = new Color(0.05f, 0.05f, 0.08f, 0.88f);
+        RectTransform backdropRt = screenBackdrop.GetComponent<RectTransform>();
+        backdropRt.anchorMin = Vector2.zero;
+        backdropRt.anchorMax = Vector2.one;
+        backdropRt.offsetMin = Vector2.zero;
+        backdropRt.offsetMax = Vector2.zero;
+        screenBackdrop.SetActive(false);
+
         // --- Interactive Heroes Selection Screen (Grid) ---
         heroesPanel = new GameObject("HeroesPanel");
         heroesPanel.transform.SetParent(panel.transform, false);
@@ -1346,7 +1393,7 @@ public static class FlappyBirdSceneBuilder
         scrollRect.content = contentRt;
         scrollRect.viewport = viewportRt;
 
-        string[] heroThemeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja" };
+        string[] heroThemeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja", "Mario" };
         string[][] heroNames = new string[][]
         {
             new [] { "YELLOW HERO", "BLUE HERO", "RED HERO" },
@@ -1355,11 +1402,12 @@ public static class FlappyBirdSceneBuilder
             new [] { "RED DRAKE", "EMERALD DRAGON", "GOLD WYVERN" },
             new [] { "GOLDFISH", "BULL SHARK", "PINK JELLYFISH" },
             new [] { "HONEY BEE", "LADYBUG", "BUTTERFLY" },
-            new [] { "SHADOW NINJA", "CRIMSON NINJA", "SILVER SHINOBI" }
+            new [] { "SHADOW NINJA", "CRIMSON NINJA", "SILVER SHINOBI" },
+            new [] { "JUMP MAN", "GREEN PLUMBER", "PRINCESS PEACH" }
         };
 
-        // Instantiate all 7 worlds x 3 skins = 21 hero cards (wired to GameManager.SelectHeroGlobal in BuildScene(), once GameManager exists)
-        for (int t = 0; t < 7; t++)
+        // Instantiate all 8 worlds x 3 skins = 24 hero cards (wired to GameManager.SelectHeroGlobal in BuildScene(), once GameManager exists)
+        for (int t = 0; t < 8; t++)
         {
             for (int s = 0; s < 3; s++)
             {
@@ -1473,10 +1521,10 @@ public static class FlappyBirdSceneBuilder
         wGrid.constraintCount = 3;
 
         ThemeSelectorUI selectorUI = worldsPanel.AddComponent<ThemeSelectorUI>();
-        selectorUI.themeButtons = new Button[7];
+        selectorUI.themeButtons = new Button[8];
 
-        string[] themeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja" };
-        for (int i = 0; i < 7; i++)
+        string[] themeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja", "Mario" };
+        for (int i = 0; i < 8; i++)
         {
             GameObject cardGO = new GameObject(themeNames[i] + "Card");
             cardGO.transform.SetParent(wGridGO.transform, false);
@@ -1527,7 +1575,6 @@ public static class FlappyBirdSceneBuilder
         shopPanel = BuildComingSoonPanel(panel.transform, "SHOP", "Gear, boosts and skins\nare on the way.", resultCardSprite);
         questsPanel = BuildComingSoonPanel(panel.transform, "QUESTS", "Daily challenges and rewards\nare on the way.", resultCardSprite);
 
-        // --- Leaderboard screen ---
         leaderboardPanel = BuildLeaderboardPanel(panel.transform, resultCardSprite, buttonSprite);
 
         // --- Bottom Navigation Bar ---
@@ -1535,79 +1582,87 @@ public static class FlappyBirdSceneBuilder
         bottomBar.transform.SetParent(panel.transform, false);
         Image barImg = bottomBar.AddComponent<Image>();
         barImg.sprite = resultCardSprite;
-        barImg.color = new Color(0.12f, 0.12f, 0.15f, 0.95f); // sleek dark charcoal
+        barImg.color = new Color(0.04f, 0.05f, 0.07f, 0.92f); // darker, sleek translucent glass
         
         RectTransform barRt = bottomBar.GetComponent<RectTransform>();
         barRt.anchorMin = new Vector2(0.5f, 0f);
         barRt.anchorMax = new Vector2(0.5f, 0f);
         barRt.pivot = new Vector2(0.5f, 0.5f);
-        barRt.sizeDelta = new Vector2(980, 150);
-        barRt.anchoredPosition = new Vector2(0, 110); // float elegantly
-
+        barRt.sizeDelta = new Vector2(900, 120);
+        barRt.anchoredPosition = new Vector2(0, 80); // float elegantly closer to the bottom
+        
         Shadow barShadow = bottomBar.AddComponent<Shadow>();
-        barShadow.effectColor = new Color(0f, 0f, 0f, 0.4f);
-        barShadow.effectDistance = new Vector2(0f, -8f);
+        barShadow.effectColor = new Color(0f, 0f, 0f, 0.35f);
+        barShadow.effectDistance = new Vector2(0f, -6f);
 
         Outline barOutline = bottomBar.AddComponent<Outline>();
-        barOutline.effectColor = new Color(1f, 1f, 1f, 0.15f);
+        barOutline.effectColor = new Color(1f, 1f, 1f, 0.12f); // very clean, thin, subtle outline border
         barOutline.effectDistance = new Vector2(1f, -1f);
 
         GameObject indicatorGO = new GameObject("ActiveIndicator");
         indicatorGO.transform.SetParent(bottomBar.transform, false);
         Image indImg = indicatorGO.AddComponent<Image>();
         indImg.sprite = resultCardSprite;
-        indImg.color = new Color(1f, 1f, 1f, 0.15f);
+        indImg.color = new Color(1f, 1f, 1f, 0.16f); // soft translucent capsule overlay
         
         RectTransform indRt = indicatorGO.GetComponent<RectTransform>();
         indRt.anchorMin = new Vector2(0.5f, 0.5f);
         indRt.anchorMax = new Vector2(0.5f, 0.5f);
         indRt.pivot = new Vector2(0.5f, 0.5f);
-        indRt.sizeDelta = new Vector2(180, 130);
-        indRt.anchoredPosition = new Vector2(0, 15);
+        indRt.sizeDelta = new Vector2(100, 90);
+        indRt.anchoredPosition = new Vector2(0, 0);
 
         // 1. Shop Button
         GameObject shopGO = new GameObject("ShopButton");
         shopGO.transform.SetParent(bottomBar.transform, false);
         Image shopImg = shopGO.AddComponent<Image>();
-        shopImg.sprite = shopIcon;
+        shopImg.sprite = resultCardSprite;
+        shopImg.color = Color.clear;
         shopButton = shopGO.AddComponent<Button>();
-        shopButton.transition = Selectable.Transition.None; // don't let Unity's built-in color tint fight our own active-state styling
+        shopButton.transition = Selectable.Transition.None;
         RectTransform shopRt = shopGO.GetComponent<RectTransform>();
-        shopRt.sizeDelta = new Vector2(100, 100);
-        shopRt.anchoredPosition = new Vector2(-340, 0);
+        shopRt.sizeDelta = new Vector2(80, 80);
+        shopRt.anchoredPosition = new Vector2(-300, 0);
 
-        GameObject shopTxt = CreateLabel("Label", shopGO.transform, "SHOP", 18, new Vector2(0, -50));
-        shopTxt.GetComponent<Text>().color = new Color(0.9f, 0.9f, 0.9f);
+        GameObject shopIconGO = new GameObject("Icon");
+        shopIconGO.transform.SetParent(shopGO.transform, false);
+        Image sIconImg = shopIconGO.AddComponent<Image>();
+        sIconImg.sprite = shopIcon;
+        RectTransform sIconRt = shopIconGO.GetComponent<RectTransform>();
+        sIconRt.sizeDelta = new Vector2(62, 62);
+        sIconRt.anchoredPosition = Vector2.zero;
 
         // 2. Heroes Button
         GameObject heroesGO = new GameObject("HeroesButton");
         heroesGO.transform.SetParent(bottomBar.transform, false);
         Image heroesImg = heroesGO.AddComponent<Image>();
-        heroesImg.sprite = heroesIcon;
+        heroesImg.sprite = resultCardSprite;
+        heroesImg.color = Color.clear;
         heroesButton = heroesGO.AddComponent<Button>();
         heroesButton.transition = Selectable.Transition.None;
         RectTransform heroesRt = heroesGO.GetComponent<RectTransform>();
-        heroesRt.sizeDelta = new Vector2(100, 100);
-        heroesRt.anchoredPosition = new Vector2(-170, 0);
+        heroesRt.sizeDelta = new Vector2(80, 80);
+        heroesRt.anchoredPosition = new Vector2(-150, 0);
 
-        GameObject heroesTxt = CreateLabel("Label", heroesGO.transform, "HEROES", 18, new Vector2(0, -50));
-        heroesTxt.GetComponent<Text>().color = new Color(0.9f, 0.9f, 0.9f);
+        GameObject heroesIconGO = new GameObject("Icon");
+        heroesIconGO.transform.SetParent(heroesGO.transform, false);
+        Image hIconImg = heroesIconGO.AddComponent<Image>();
+        hIconImg.sprite = heroesIcon;
+        RectTransform hIconRt = heroesIconGO.GetComponent<RectTransform>();
+        hIconRt.sizeDelta = new Vector2(62, 62);
+        hIconRt.anchoredPosition = Vector2.zero;
 
-        // 3. Play Button (large circular center)
+        // 3. Play Button (Center Home/Play)
         GameObject playGO = new GameObject("PlayButton");
         playGO.transform.SetParent(bottomBar.transform, false);
         Image playImg = playGO.AddComponent<Image>();
         playImg.sprite = resultCardSprite;
-        playImg.color = new Color(0.98f, 0.82f, 0.12f); // yellow
+        playImg.color = Color.clear;
         navPlayBtn = playGO.AddComponent<Button>();
         navPlayBtn.transition = Selectable.Transition.None;
         RectTransform playRt = playGO.GetComponent<RectTransform>();
-        playRt.sizeDelta = new Vector2(170, 170);
-        playRt.anchoredPosition = new Vector2(0, 20); // overlaps top
-
-        Outline playOutline = playGO.AddComponent<Outline>();
-        playOutline.effectColor = Color.white;
-        playOutline.effectDistance = new Vector2(3f, -3f);
+        playRt.sizeDelta = new Vector2(80, 80);
+        playRt.anchoredPosition = new Vector2(0, 0);
 
         GameObject playIconGO = new GameObject("Icon");
         playIconGO.transform.SetParent(playGO.transform, false);
@@ -1615,36 +1670,48 @@ public static class FlappyBirdSceneBuilder
         pIconImg.sprite = playIcon;
         playIconImageRef = pIconImg;
         RectTransform piRt = playIconGO.GetComponent<RectTransform>();
-        piRt.sizeDelta = new Vector2(90, 90);
-        piRt.anchoredPosition = new Vector2(6, 0); // visual centering offset
+        piRt.sizeDelta = new Vector2(62, 62);
+        piRt.anchoredPosition = Vector2.zero;
 
         // 4. Missions Button
         GameObject missionsGO = new GameObject("MissionsButton");
         missionsGO.transform.SetParent(bottomBar.transform, false);
         Image missionsImg = missionsGO.AddComponent<Image>();
-        missionsImg.sprite = missionsIcon;
+        missionsImg.sprite = resultCardSprite;
+        missionsImg.color = Color.clear;
         missionsButton = missionsGO.AddComponent<Button>();
         missionsButton.transition = Selectable.Transition.None;
         RectTransform missionsRt = missionsGO.GetComponent<RectTransform>();
-        missionsRt.sizeDelta = new Vector2(100, 100);
-        missionsRt.anchoredPosition = new Vector2(170, 0);
+        missionsRt.sizeDelta = new Vector2(80, 80);
+        missionsRt.anchoredPosition = new Vector2(150, 0);
 
-        GameObject missionsTxt = CreateLabel("Label", missionsGO.transform, "QUESTS", 18, new Vector2(0, -50));
-        missionsTxt.GetComponent<Text>().color = new Color(0.9f, 0.9f, 0.9f);
+        GameObject missionsIconGO = new GameObject("Icon");
+        missionsIconGO.transform.SetParent(missionsGO.transform, false);
+        Image mIconImg = missionsIconGO.AddComponent<Image>();
+        mIconImg.sprite = missionsIcon;
+        RectTransform mIconRt = missionsIconGO.GetComponent<RectTransform>();
+        mIconRt.sizeDelta = new Vector2(62, 62);
+        mIconRt.anchoredPosition = Vector2.zero;
 
         // 5. Themes Button
         GameObject themesGO = new GameObject("ThemesButton");
         themesGO.transform.SetParent(bottomBar.transform, false);
         Image themesImg = themesGO.AddComponent<Image>();
-        themesImg.sprite = themesIcon;
+        themesImg.sprite = resultCardSprite;
+        themesImg.color = Color.clear;
         themesButton = themesGO.AddComponent<Button>();
         themesButton.transition = Selectable.Transition.None;
         RectTransform themesRt = themesGO.GetComponent<RectTransform>();
-        themesRt.sizeDelta = new Vector2(100, 100);
-        themesRt.anchoredPosition = new Vector2(340, 0);
+        themesRt.sizeDelta = new Vector2(80, 80);
+        themesRt.anchoredPosition = new Vector2(300, 0);
 
-        GameObject themesTxt = CreateLabel("Label", themesGO.transform, "WORLDS", 18, new Vector2(0, -50));
-        themesTxt.GetComponent<Text>().color = new Color(0.9f, 0.9f, 0.9f);
+        GameObject themesIconGO = new GameObject("Icon");
+        themesIconGO.transform.SetParent(themesGO.transform, false);
+        Image tIconImg = themesIconGO.AddComponent<Image>();
+        tIconImg.sprite = themesIcon;
+        RectTransform tIconRt = themesIconGO.GetComponent<RectTransform>();
+        tIconRt.sizeDelta = new Vector2(62, 62);
+        tIconRt.anchoredPosition = Vector2.zero;
 
         // --- Fading Toast Notification Panel ---
         toastPanel = new GameObject("ToastPanel");
@@ -2533,11 +2600,11 @@ public static class FlappyBirdSceneBuilder
             AssetDatabase.CreateFolder("Assets/ScriptableObjects", "Themes");
         }
 
-        string[] names = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja" };
-        ThemeData[] themeAssets = new ThemeData[7];
+        string[] names = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja", "Mario" };
+        ThemeData[] themeAssets = new ThemeData[8];
 
         // Ensure directories for Sprites
-        for (int i = 0; i < 7; i++)
+        for (int i = 0; i < 8; i++)
         {
             string spriteDir = $"{SpriteFolder}/{names[i]}";
             if (!AssetDatabase.IsValidFolder(spriteDir))
@@ -2546,7 +2613,7 @@ public static class FlappyBirdSceneBuilder
             }
         }
 
-        for (int i = 0; i < 7; i++)
+        for (int i = 0; i < 8; i++)
         {
             string path = $"{folder}/{names[i]}Theme.asset";
             ThemeData data = AssetDatabase.LoadAssetAtPath<ThemeData>(path);
@@ -2600,6 +2667,7 @@ public static class FlappyBirdSceneBuilder
         else if (index == 4) data.themeColor = new Color(0.08f, 0.25f, 0.45f); // Fish teal
         else if (index == 5) data.themeColor = new Color(0.78f, 0.72f, 0.38f); // Bee yellow
         else if (index == 6) data.themeColor = new Color(0.1f, 0.1f, 0.15f); // Ninja black
+        else if (index == 7) data.themeColor = new Color(0.36f, 0.58f, 0.98f); // Mario sky blue
 
         // Generate 3 unique skins for this theme
         data.playerSprites = new Sprite[3];
@@ -2615,6 +2683,13 @@ public static class FlappyBirdSceneBuilder
         {
             data.obstacleTopCapSprite = null;
             data.obstacleBottomCapSprite = null;
+        }
+        else if (index == 7) // Mario: Bricks on top, Green Warp Pipe on bottom
+        {
+            data.obstacleTopSprite = GetOrCreateSprite($"{name}/ObstacleTopBricks", 256, 256, (w, h) => GenerateThemeTexture("MarioBricks", index, w, h), 256, FilterMode.Point);
+            data.obstacleBottomSprite = GetOrCreateSprite($"{name}/ObstacleBottomPipe", 256, 256, (w, h) => GenerateThemeTexture("MarioPipeBody", index, w, h), 256, FilterMode.Point);
+            data.obstacleTopCapSprite = null; // Bricks don't need caps
+            data.obstacleBottomCapSprite = GetOrCreateSprite($"{name}/ObstacleBottomCap", 256, 256, (w, h) => GenerateThemeTexture("MarioPipeCap", index, w, h), 256, FilterMode.Point);
         }
         else
         {
@@ -2642,6 +2717,102 @@ public static class FlappyBirdSceneBuilder
                 tex.SetPixel(x, y, clear);
 
         Vector2 center = new Vector2(width / 2f, height / 2f);
+
+        if (type == "MarioBricks")
+        {
+            Color brickCol = new Color(0.85f, 0.35f, 0.12f);
+            Color brickShadow = new Color(0.5f, 0.15f, 0.05f);
+            Color brickHighlight = new Color(0.98f, 0.6f, 0.45f);
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int rowHeight = height / 4;
+                    int row = y / rowHeight;
+                    int colWidth = width / 2;
+                    int colOffset = (row % 2 == 0) ? 0 : colWidth / 2;
+
+                    int localY = y % rowHeight;
+                    int localX = (x + colOffset) % colWidth;
+
+                    if (localY == 0 || localY == rowHeight - 1 || localX == 0 || localX == colWidth - 1)
+                    {
+                        tex.SetPixel(x, y, brickShadow);
+                    }
+                    else if (localY == 1 || localX == 1)
+                    {
+                        tex.SetPixel(x, y, brickHighlight);
+                    }
+                    else
+                    {
+                        tex.SetPixel(x, y, brickCol);
+                    }
+                }
+            }
+            tex.Apply();
+            return tex;
+        }
+        else if (type == "MarioPipeBody")
+        {
+            Color pipeGreen = new Color(0.0f, 0.75f, 0.0f);
+            Color pipeHighlight = new Color(0.5f, 0.95f, 0.5f);
+            Color pipeShadow = new Color(0.0f, 0.4f, 0.0f);
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Color pCol = pipeGreen;
+                    float ratio = (float)x / width;
+
+                    if (ratio < 0.15f) pCol = Color.Lerp(pipeShadow, pipeHighlight, ratio / 0.15f);
+                    else if (ratio < 0.35f) pCol = Color.Lerp(pipeHighlight, pipeGreen, (ratio - 0.15f) / 0.2f);
+                    else if (ratio > 0.7f) pCol = Color.Lerp(pipeGreen, pipeShadow, (ratio - 0.7f) / 0.3f);
+
+                    if (x == (int)(width * 0.22f) || x == (int)(width * 0.28f) || x == (int)(width * 0.78f))
+                    {
+                        pCol = pipeShadow;
+                    }
+
+                    if (x < 12 || x > width - 12) pCol = pipeShadow;
+
+                    tex.SetPixel(x, y, pCol);
+                }
+            }
+            tex.Apply();
+            return tex;
+        }
+        else if (type == "MarioPipeCap")
+        {
+            Color pipeGreen = new Color(0.0f, 0.75f, 0.0f);
+            Color pipeHighlight = new Color(0.5f, 0.95f, 0.5f);
+            Color pipeShadow = new Color(0.0f, 0.4f, 0.0f);
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Color pCol = pipeGreen;
+                    float ratio = (float)x / width;
+
+                    if (ratio < 0.15f) pCol = Color.Lerp(pipeShadow, pipeHighlight, ratio / 0.15f);
+                    else if (ratio < 0.35f) pCol = Color.Lerp(pipeHighlight, pipeGreen, (ratio - 0.15f) / 0.2f);
+                    else if (ratio > 0.7f) pCol = Color.Lerp(pipeGreen, pipeShadow, (ratio - 0.7f) / 0.3f);
+
+                    if (x == (int)(width * 0.22f) || x == (int)(width * 0.28f) || x == (int)(width * 0.78f))
+                    {
+                        pCol = pipeShadow;
+                    }
+
+                    if (x < 8 || x > width - 8 || y < 12 || y > height - 12) pCol = pipeShadow;
+
+                    tex.SetPixel(x, y, pCol);
+                }
+            }
+            tex.Apply();
+            return tex;
+        }
 
         if (type == "Player")
         {
@@ -2832,6 +3003,7 @@ public static class FlappyBirdSceneBuilder
             else if (index == 4) { bottomColor = new Color(0.08f, 0.28f, 0.52f); topColor = new Color(0.04f, 0.12f, 0.25f); }
             else if (index == 5) { bottomColor = new Color(0.55f, 0.85f, 0.35f); topColor = new Color(0.48f, 0.81f, 0.95f); }
             else if (index == 6) { bottomColor = new Color(0.08f, 0.08f, 0.14f); topColor = new Color(0.02f, 0.02f, 0.05f); }
+            else if (index == 7) { bottomColor = new Color(0.36f, 0.58f, 0.98f); topColor = new Color(0.36f, 0.58f, 0.98f); } // Mario sky blue
 
             for (int y = 0; y < height; y++)
             {
@@ -2842,9 +3014,11 @@ public static class FlappyBirdSceneBuilder
                     tex.SetPixel(x, y, col);
                     if (index == 1)
                     {
-                        if ((x * 17 + y * 23) % 401 == 0 && (x % 3 == 0))
+                        float randomVal = (Mathf.Sin(x * 12.9898f + y * 78.233f) * 43758.5453f) % 1f;
+                        if (randomVal > 0.994f)
                         {
-                            tex.SetPixel(x, y, Color.white);
+                            float brightness = 0.4f + (Mathf.PingPong(x + y, 10f) / 10f) * 0.6f;
+                            tex.SetPixel(x, y, new Color(1f, 1f, 1f, brightness));
                         }
                     }
                     else if (index == 2)
@@ -2861,50 +3035,313 @@ public static class FlappyBirdSceneBuilder
                             tex.SetPixel(x, y, new Color(0.95f, 0.85f, 0.2f));
                         }
                     }
+                    else if (index == 7) // Mario retro hills with black outline and black oval eyes
+                    {
+                        // Define three distinct green hills across the screen
+                        float[] centers = { 250f, 750f, 1250f };
+                        float[] halfWidths = { 100f, 150f, 120f };
+                        float[] hillHeights = { 160f, 220f, 180f };
+
+                        bool insideHill = false;
+                        bool isOutline = false;
+                        bool isEye = false;
+
+                        for (int h = 0; h < 3; h++)
+                        {
+                            float dx = x - centers[h];
+                            float hw = halfWidths[h];
+                            float hh = hillHeights[h];
+                            
+                            if (dx >= -hw && dx <= hw)
+                            {
+                                float ratio = dx / hw;
+                                float currentHillY = (1f - ratio * ratio) * hh;
+                                if (y < currentHillY)
+                                {
+                                    insideHill = true;
+                                    if (y > currentHillY - 4f)
+                                    {
+                                        isOutline = true;
+                                    }
+                                    
+                                    // Eye calculations near the peak of the hill
+                                    float eyeYCenter = hh * 0.75f;
+                                    if (Mathf.Abs(y - eyeYCenter) < 12f)
+                                    {
+                                        if (Mathf.Abs(dx - 8f) < 3f || Mathf.Abs(dx + 8f) < 3f)
+                                        {
+                                            isEye = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (isOutline || isEye)
+                        {
+                            tex.SetPixel(x, y, Color.black);
+                        }
+                        else if (insideHill)
+                        {
+                            tex.SetPixel(x, y, new Color(0.0f, 0.72f, 0.0f)); // classic green
+                        }
+                    }
                 }
             }
         }
         else if (type == "GroundDirt")
         {
-            Color dirtColor = Color.grey;
-            if (index == 1) dirtColor = new Color(0.12f, 0.12f, 0.16f);
-            else if (index == 2) dirtColor = new Color(0.38f, 0.22f, 0.08f);
-            else if (index == 3) dirtColor = new Color(0.18f, 0.08f, 0.08f);
-            else if (index == 4) dirtColor = new Color(0.85f, 0.72f, 0.45f);
-            else if (index == 5) dirtColor = new Color(0.28f, 0.15f, 0.05f);
-            else if (index == 6) dirtColor = new Color(0.25f, 0.16f, 0.1f);
+            Color dirtBase = new Color(0.85f, 0.68f, 0.38f);
+            Color hatch = new Color(0.68f, 0.5f, 0.25f);
+            Color lineColor = new Color(0.55f, 0.38f, 0.18f);
+
+            if (index == 1) // Space
+            {
+                dirtBase = new Color(0.12f, 0.12f, 0.16f);
+                hatch = new Color(0.18f, 0.18f, 0.24f);
+                lineColor = new Color(0.08f, 0.08f, 0.1f);
+            }
+            else if (index == 2) // Football
+            {
+                dirtBase = new Color(0.38f, 0.22f, 0.08f);
+                hatch = new Color(0.48f, 0.3f, 0.15f);
+                lineColor = new Color(0.28f, 0.15f, 0.05f);
+            }
+            else if (index == 3) // Dragon
+            {
+                dirtBase = new Color(0.18f, 0.08f, 0.08f);
+                hatch = new Color(0.28f, 0.12f, 0.12f);
+                lineColor = new Color(0.1f, 0.03f, 0.03f);
+            }
+            else if (index == 4) // Fish
+            {
+                dirtBase = new Color(0.85f, 0.72f, 0.45f);
+                hatch = new Color(0.92f, 0.8f, 0.55f);
+                lineColor = new Color(0.7f, 0.58f, 0.32f);
+            }
+            else if (index == 5) // Bee
+            {
+                dirtBase = new Color(0.32f, 0.2f, 0.06f);
+                hatch = new Color(0.42f, 0.28f, 0.1f);
+                lineColor = new Color(0.22f, 0.12f, 0.03f);
+            }
+            else if (index == 6) // Ninja
+            {
+                dirtBase = new Color(0.2f, 0.18f, 0.16f);
+                hatch = new Color(0.28f, 0.25f, 0.22f);
+                lineColor = new Color(0.12f, 0.1f, 0.08f);
+            }
+            else if (index == 7) // Mario
+            {
+                Color baseCol = new Color(0.85f, 0.35f, 0.12f);       // orange-brown
+                Color darkLine = new Color(0.12f, 0.05f, 0.02f);      // dark brown border
+                Color highlightCol = new Color(0.98f, 0.85f, 0.7f);   // white/beige highlight
+                Color shadowCol = new Color(0.55f, 0.2f, 0.05f);      // dark brown shadow
+
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        int bx = x % 32;
+                        int by = y % 32;
+
+                        Color px = baseCol;
+
+                        if (bx == 0 || bx == 31 || by == 0 || by == 31)
+                        {
+                            px = darkLine;
+                        }
+                        else if ((bx <= 3 && by >= 29) || (bx <= 3 && bx == (31 - by)) || (by >= 29 && bx == by))
+                        {
+                            px = highlightCol;
+                        }
+                        else if (bx >= 28 || by <= 3)
+                        {
+                            px = shadowCol;
+                        }
+                        else if ((bx >= 12 && bx <= 14 && by >= 10 && by <= 22) || 
+                                 (by >= 12 && by <= 14 && bx >= 10 && bx <= 22) ||
+                                 (bx >= 20 && bx <= 22 && by >= 16 && by <= 26) ||
+                                 (by >= 20 && by <= 22 && bx >= 16 && bx <= 26))
+                        {
+                            px = darkLine;
+                        }
+
+                        tex.SetPixel(x, y, px);
+                    }
+                }
+                tex.Apply();
+                return tex;
+            }
 
             for (int y = 0; y < height; y++)
             {
                 for (int x = 0; x < width; x++)
                 {
-                    Color col = dirtColor;
-                    if ((x + y * 7) % 19 == 0) col *= 0.85f;
-                    tex.SetPixel(x, y, col);
+                    Color pixel = dirtBase;
+
+                    // Sediment bands
+                    int layer = y / 48;
+                    if (layer % 2 == 0)
+                    {
+                        pixel = Color.Lerp(dirtBase, hatch, 0.4f);
+                    }
+
+                    // Diagonal hatches
+                    int diag = (x + y) % 32;
+                    if (diag < 2)
+                    {
+                        pixel = hatch;
+                    }
+
+                    // Layer divider lines
+                    if (y == 24 || y == 25 || y == 96 || y == 97 || y == 160 || y == 161 || y == 220 || y == 221)
+                    {
+                        pixel = lineColor;
+                    }
+
+                    tex.SetPixel(x, y, pixel);
+                }
+            }
+
+            // Pebble stones
+            System.Random rng = new System.Random(index * 23 + 101);
+            int dotCount = (width * height) / 120;
+            for (int i = 0; i < dotCount; i++)
+            {
+                int cx = rng.Next(0, width);
+                int cy = rng.Next(0, height);
+                int radius = rng.Next(2, 4);
+                Color stoneColor = rng.Next(0, 2) == 0 ? lineColor : hatch;
+                for (int dy = -radius; dy <= radius; dy++)
+                {
+                    for (int dx = -radius; dx <= radius; dx++)
+                    {
+                        if (dx * dx + dy * dy > radius * radius) continue;
+                        int px = cx + dx;
+                        int py = cy + dy;
+                        if (px < 0 || px >= width || py < 0 || py >= height) continue;
+                        tex.SetPixel(px, py, stoneColor);
+                    }
                 }
             }
         }
         else if (type == "GroundGrass")
         {
-            Color grassColor = Color.green;
-            if (index == 1) grassColor = new Color(0f, 0.95f, 0.95f);
-            else if (index == 2) grassColor = Color.white;
-            else if (index == 3) grassColor = new Color(0.95f, 0.25f, 0.05f);
-            else if (index == 4) grassColor = new Color(0.1f, 0.65f, 0.35f);
-            else if (index == 5) grassColor = new Color(0.95f, 0.85f, 0.15f);
-            else if (index == 6) grassColor = new Color(0.45f, 0.45f, 0.5f);
+            Color grass = new Color(0.38f, 0.8f, 0.28f);
+            Color grassHighlight = new Color(0.58f, 0.92f, 0.38f);
+            Color grassShadow = new Color(0.24f, 0.6f, 0.16f);
 
-            for (int y = 0; y < height; y++)
+            if (index == 1) // Space
             {
-                for (int x = 0; x < width; x++)
+                grass = new Color(0f, 0.75f, 0.75f);
+                grassHighlight = new Color(0f, 0.95f, 0.95f);
+                grassShadow = new Color(0f, 0.5f, 0.5f);
+            }
+            else if (index == 2) // Football
+            {
+                grass = new Color(0.15f, 0.65f, 0.15f);
+                grassHighlight = new Color(0.35f, 0.85f, 0.35f);
+                grassShadow = new Color(0.05f, 0.45f, 0.05f);
+            }
+            else if (index == 3) // Dragon
+            {
+                grass = new Color(0.85f, 0.2f, 0.05f);
+                grassHighlight = new Color(0.98f, 0.45f, 0.15f);
+                grassShadow = new Color(0.6f, 0.1f, 0.02f);
+            }
+            else if (index == 4) // Fish
+            {
+                grass = new Color(0.1f, 0.65f, 0.35f);
+                grassHighlight = new Color(0.3f, 0.82f, 0.55f);
+                grassShadow = new Color(0.05f, 0.45f, 0.2f);
+            }
+            else if (index == 5) // Bee
+            {
+                grass = new Color(0.9f, 0.75f, 0.12f);
+                grassHighlight = new Color(0.98f, 0.88f, 0.25f);
+                grassShadow = new Color(0.7f, 0.55f, 0.05f);
+            }
+            else if (index == 6) // Ninja
+            {
+                grass = new Color(0.35f, 0.45f, 0.35f);
+                grassHighlight = new Color(0.5f, 0.6f, 0.5f);
+                grassShadow = new Color(0.2f, 0.3f, 0.2f);
+            }
+            else if (index == 7) // Mario: custom repeating blocky tiles with a flat top black rim
+            {
+                Color baseCol = new Color(0.85f, 0.35f, 0.12f);       // orange-brown
+                Color darkLine = new Color(0.12f, 0.05f, 0.02f);      // dark brown border
+                Color highlightCol = new Color(0.98f, 0.85f, 0.7f);   // white/beige highlight
+                Color shadowCol = new Color(0.55f, 0.2f, 0.05f);      // dark brown shadow
+
+                for (int y = 0; y < height; y++)
                 {
-                    if (y > height - 12)
+                    for (int x = 0; x < width; x++)
                     {
-                        tex.SetPixel(x, y, grassColor);
+                        int bx = x % 32;
+                        int by = y % 32;
+
+                        Color px = baseCol;
+
+                        if (y >= height - 4)
+                        {
+                            px = darkLine;
+                        }
+                        else if (bx == 0 || bx == 31 || by == 0 || by == 31)
+                        {
+                            px = darkLine;
+                        }
+                        else if ((bx <= 3 && by >= 29) || (bx <= 3 && bx == (31 - by)) || (by >= 29 && bx == by))
+                        {
+                            px = highlightCol;
+                        }
+                        else if (bx >= 28 || by <= 3)
+                        {
+                            px = shadowCol;
+                        }
+                        else if ((bx >= 12 && bx <= 14 && by >= 10 && by <= 22) || 
+                                 (by >= 12 && by <= 14 && bx >= 10 && bx <= 22) ||
+                                 (bx >= 20 && bx <= 22 && by >= 16 && by <= 26) ||
+                                 (by >= 20 && by <= 22 && bx >= 16 && bx <= 26))
+                        {
+                            px = darkLine;
+                        }
+
+                        tex.SetPixel(x, y, px);
+                    }
+                }
+                tex.Apply();
+                return tex;
+            }
+
+            int toothWidth = Mathf.Max(4, width / 16);
+            float toothHeight = height * 0.35f;
+            float baseTop = height * 0.55f;
+
+            for (int x = 0; x < width; x++)
+            {
+                float toothPhase = (x % toothWidth) / (float)toothWidth;
+                float triangleHeight = (1f - Mathf.Abs(toothPhase - 0.5f) * 2f) * toothHeight;
+                float edgeY = baseTop + triangleHeight;
+
+                for (int y = 0; y < height; y++)
+                {
+                    if (y > edgeY)
+                    {
+                        tex.SetPixel(x, y, Color.clear);
+                    }
+                    else if (y > edgeY - 6) // Highlight on the teeth tips
+                    {
+                        tex.SetPixel(x, y, grassHighlight);
+                    }
+                    else if (y < 12) // Subtle shadow where the grass meets the dirt
+                    {
+                        tex.SetPixel(x, y, grassShadow);
                     }
                     else
                     {
-                        tex.SetPixel(x, y, new Color(0f, 0f, 0f, 0f));
+                        tex.SetPixel(x, y, grass);
                     }
                 }
             }
@@ -3221,6 +3658,61 @@ public static class FlappyBirdSceneBuilder
                     if (x > width * 0.1f && x < width * 0.25f && y > height * 0.44f && y < height * 0.54f)
                     {
                         tex.SetPixel(x, y, bandCol);
+                    }
+                }
+            }
+        }
+        else if (index == 7) // Mario
+        {
+            Color primaryCol = (skin == 0) ? new Color(0.9f, 0.1f, 0.1f) : (skin == 1 ? new Color(0.1f, 0.75f, 0.15f) : new Color(0.95f, 0.45f, 0.65f)); // red cap, green cap, or pink dress
+            Color overallsCol = (skin == 0) ? new Color(0.1f, 0.35f, 0.85f) : (skin == 1 ? new Color(0.08f, 0.25f, 0.6f) : new Color(0.95f, 0.85f, 0.15f)); // blue/gold
+            Color hairCol = (skin == 2) ? new Color(0.98f, 0.88f, 0.25f) : new Color(0.35f, 0.22f, 0.12f); // blonde/brown
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Vector2 p = new Vector2(x, y);
+                    // Body/Face circle
+                    if (Vector2.Distance(p, center) <= width * 0.32f)
+                    {
+                        tex.SetPixel(x, y, new Color(0.98f, 0.82f, 0.72f)); // skin tone
+                        
+                        // Eyes
+                        if (Vector2.Distance(p, new Vector2(width * 0.58f, height * 0.54f)) <= 4f ||
+                            Vector2.Distance(p, new Vector2(width * 0.66f, height * 0.54f)) <= 4f)
+                        {
+                            tex.SetPixel(x, y, Color.black);
+                        }
+
+                        // Cap (drawn on the upper half)
+                        if (y > height * 0.65f && skin < 2)
+                        {
+                            tex.SetPixel(x, y, primaryCol);
+                        }
+                    }
+
+                    // Overalls / Dress at the bottom
+                    if (Vector2.Distance(p, center) <= width * 0.32f && y < height * 0.38f)
+                    {
+                        tex.SetPixel(x, y, overallsCol);
+                    }
+
+                    // Crown for Princess Peach (skin 2)
+                    if (skin == 2 && y > height * 0.65f && y < height * 0.82f && x > width * 0.4f && x < width * 0.6f)
+                    {
+                        int tx = x - (int)(width * 0.4f);
+                        int tw = (int)(width * 0.2f);
+                        if (y < height * 0.72f || (tx % (tw/2) < 4))
+                        {
+                            tex.SetPixel(x, y, new Color(0.98f, 0.82f, 0.1f)); // gold
+                        }
+                    }
+
+                    // Hair
+                    if (skin == 2 && Vector2.Distance(p, center) <= width * 0.34f && x < width * 0.45f)
+                    {
+                        tex.SetPixel(x, y, hairCol);
                     }
                 }
             }
