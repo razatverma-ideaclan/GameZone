@@ -102,7 +102,7 @@ public class AuthManager : MonoBehaviour
                     onDone?.Invoke(false);
                     return;
                 }
-                user = authTask.Result.User;
+                user = auth.CurrentUser;
                 onDone?.Invoke(true);
             }, mainThread);
         }, mainThread);

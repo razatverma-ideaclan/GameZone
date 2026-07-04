@@ -45,3 +45,31 @@ Assets/google-services.json
 Assets/google-services.json.meta
 Assets/GoogleService-Info.plist
 Assets/GoogleService-Info.plist.meta
+
+# Firebase SDK + Google Sign-In plugin — large third-party binaries re-imported per
+# machine via Assets > Import Package. Not safe to commit in a partial/inconsistent
+# state, and Unity's own plugin version manager (EDM4U) can rewrite these files
+# unexpectedly. These top-level folders contain nothing but generated/imported SDK
+# content — none of them existed in this project before Firebase was added.
+Assets/Firebase/
+Assets/Firebase.meta
+Assets/GoogleSignIn/
+Assets/GoogleSignIn.meta
+Assets/ExternalDependencyManager/
+Assets/ExternalDependencyManager.meta
+Assets/PlayServicesResolver/
+Assets/PlayServicesResolver.meta
+Assets/Editor Default Resources/
+Assets/Editor Default Resources.meta
+Assets/GeneratedLocalRepo/
+Assets/GeneratedLocalRepo.meta
+Assets/Plugins/
+Assets/Plugins.meta
+Assets/StreamingAssets/google-services-desktop.json
+Assets/StreamingAssets/google-services-desktop.json.meta
+Assets/Parse/
+Assets/Parse.meta
+
+# EDM4U's own local resolver state — regenerated automatically per machine.
+ProjectSettings/AndroidResolverDependencies.xml
+ProjectSettings/GvhProjectSettings.xml
