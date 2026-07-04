@@ -99,6 +99,14 @@ public static class FlappyBirdSceneBuilder
         Sprite platinumMedalSprite = GetOrCreateSprite("PlatinumMedal", 128, 128, (w, h) => GenerateMedalTexture(w, h, new Color(0.5f, 0.8f, 0.9f), new Color(0.9f, 0.98f, 1f)), 128);
         Sprite medalPlaceholderSprite = GetOrCreateSprite("MedalPlaceholder", 128, 128, (w, h) => GenerateMedalPlaceholderTexture(w, h), 128);
 
+        // Optimized UI navigation icons
+        Sprite shopIcon = GetOrCreateSprite("ShopIcon", 128, 128, (w, h) => GenerateIconTexture("Shop", w, h), 128);
+        Sprite heroesIcon = GetOrCreateSprite("HeroesIcon", 128, 128, (w, h) => GenerateIconTexture("Heroes", w, h), 128);
+        Sprite missionsIcon = GetOrCreateSprite("MissionsIcon", 128, 128, (w, h) => GenerateIconTexture("Missions", w, h), 128);
+        Sprite themesIcon = GetOrCreateSprite("ThemesIcon", 128, 128, (w, h) => GenerateIconTexture("Themes", w, h), 128);
+        Sprite playIcon = GetOrCreateSprite("PlayIcon", 128, 128, (w, h) => GenerateIconTexture("Play", w, h), 128);
+        Sprite homeIcon = GetOrCreateSprite("HomeIcon", 128, 128, (w, h) => GenerateIconTexture("Home", w, h), 128);
+
         Sprite pipeBodySprite = GetOrCreateSprite("PipeBody", 256, 256, (w, h) => GeneratePipeBodyTexture(w, h), 256, FilterMode.Point);
         Sprite pipeCapSprite = GetOrCreateSprite("PipeCap", 256, 256, (w, h) => GeneratePipeCapTexture(w, h), 256, FilterMode.Point);
         
@@ -117,6 +125,12 @@ public static class FlappyBirdSceneBuilder
         // Start from a fresh empty scene so re-running this is safe.
         EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
+        // Ensure visual theme ScriptableObjects and textures are generated
+        ThemeData[] themeAssets = EnsureThemeSystem();
+        GameObject themeMgrGO = new GameObject("ThemeManager");
+        ThemeManager tm = themeMgrGO.AddComponent<ThemeManager>();
+        tm.themes = themeAssets;
+
         BuildCamera();
         BuildBackground(backgroundSprite, skyDaySprite, skySunsetSprite, skyNightSprite, skyDawnSprite);
         GameObject ground = BuildGround(groundDirtSprite, grassSprite);
@@ -128,7 +142,14 @@ public static class FlappyBirdSceneBuilder
         GameObject scoreTextGO = BuildScoreText(canvas.transform);
         
         GameObject startHighScoreText;
-        GameObject startPanel = BuildStartPanel(canvas.transform, pillButtonSprite, resultCardSprite, goldMedalSprite, out Button startButton, out startHighScoreText, birdMidSprites[0]);
+        Button startButton, shopButton, heroesButton, missionsButton, themesButton, navPlayBtn;
+        GameObject toastPanel, themeSelectorPanelRef;
+        GameObject lobbyPanel, heroesPanel;
+        UnityEngine.UI.Image playIconImageRef;
+        Text activeThemeLabelText;
+        GameObject shopPanel, questsPanel, leaderboardPanel;
+        Button bestScoreButton;
+        GameObject startPanel = BuildStartPanel(canvas.transform, pillButtonSprite, resultCardSprite, goldMedalSprite, out startButton, out startHighScoreText, birdMidSprites, themeAssets, shopIcon, heroesIcon, missionsIcon, themesIcon, playIcon, homeIcon, out shopButton, out heroesButton, out missionsButton, out themesButton, out toastPanel, out themeSelectorPanelRef, out lobbyPanel, out heroesPanel, out playIconImageRef, out navPlayBtn, out activeThemeLabelText, out shopPanel, out questsPanel, out leaderboardPanel, out bestScoreButton);
         
         UnityEngine.UI.Image medalImage;
         GameObject newBestBadge;
@@ -140,9 +161,53 @@ public static class FlappyBirdSceneBuilder
 
         // Wire the buttons now that GameManager exists.
         GameManager gm = gameManagerGO.GetComponent<GameManager>();
+        gm.toastPanel = toastPanel;
+        gm.themeSelectorPanel = themeSelectorPanelRef;
+        gm.lobbyPanel = lobbyPanel;
+        gm.heroesPanel = heroesPanel;
+        gm.shopPanel = shopPanel;
+        gm.questsPanel = questsPanel;
+        gm.leaderboardPanel = leaderboardPanel;
+        gm.playIconImage = playIconImageRef;
+        gm.playSprite = playIcon;
+        gm.homeSprite = homeIcon;
+        gm.shopButton = shopButton;
+        gm.heroesButton = heroesButton;
+        gm.missionsButton = missionsButton;
+        gm.themesButton = themesButton;
+        gm.centerButton = navPlayBtn;
+
+        ThemeApplier themeApplierRef = gameManagerGO.GetComponent<ThemeApplier>();
+        if (themeApplierRef != null) themeApplierRef.themeNameLabel = activeThemeLabelText;
+
         UnityEventTools.AddPersistentListener(startButton.onClick, gm.StartGame);
+        UnityEventTools.AddPersistentListener(navPlayBtn.onClick, gm.StartGame);
+        UnityEventTools.AddPersistentListener(shopButton.onClick, gm.OnShopClicked);
+        UnityEventTools.AddPersistentListener(heroesButton.onClick, gm.OnHeroesClicked);
+        UnityEventTools.AddPersistentListener(missionsButton.onClick, gm.OnMissionsClicked);
+        UnityEventTools.AddPersistentListener(themesButton.onClick, gm.OnThemesClicked);
+        UnityEventTools.AddPersistentListener(bestScoreButton.onClick, gm.OnLeaderboardClicked);
+
         UnityEventTools.AddPersistentListener(menuButton.onClick, gm.RestartGame);
         UnityEventTools.AddPersistentListener(retryButton.onClick, gm.RetryGame);
+
+        // Wire all 21 hero cards (7 worlds x 3 skins) inside heroesPanel to the global selector
+        string[] wireThemeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja" };
+        for (int t = 0; t < 7; t++)
+        {
+            for (int s = 0; s < 3; s++)
+            {
+                Transform cardTrans = heroesPanel.transform.Find("ScrollView/Viewport/Content/" + wireThemeNames[t] + "Card" + s);
+                if (cardTrans != null)
+                {
+                    Button cardBtn = cardTrans.GetComponent<Button>();
+                    if (cardBtn != null)
+                    {
+                        UnityEventTools.AddIntPersistentListener(cardBtn.onClick, gm.SelectHeroGlobal, t * 3 + s);
+                    }
+                }
+            }
+        }
 
 
 
@@ -152,6 +217,7 @@ public static class FlappyBirdSceneBuilder
         }
         EditorSceneManager.SaveScene(SceneManager.GetActiveScene(), ScenePath);
         EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
+        EditorSceneManager.OpenScene(ScenePath);
 
         EditorUtility.DisplayDialog("Flappy Bird", "Scene built and saved to " + ScenePath + ".\nPress Play to test.", "OK");
     }
@@ -957,7 +1023,7 @@ public static class FlappyBirdSceneBuilder
 
         var psRenderer = trail.GetComponent<ParticleSystemRenderer>();
         psRenderer.sortingOrder = 29; // just behind bird
-        psRenderer.material = new Material(Shader.Find("Sprites/Default"));
+        psRenderer.material = AssetDatabase.GetBuiltinExtraResource<Material>("Default-Particle.mat");
 
         return bird;
     }
@@ -1099,68 +1165,68 @@ public static class FlappyBirdSceneBuilder
         new Color(0.15f, 0.15f, 0.18f) // Premium dark charcoal color
     };
 
-    private static GameObject BuildStartPanel(Transform canvasTransform, Sprite buttonSprite, Sprite resultCardSprite, Sprite goldMedalSprite, out Button startButton, out GameObject startHighScoreText, Sprite birdMidSprite)
+    private static GameObject BuildStartPanel(Transform canvasTransform, Sprite buttonSprite, Sprite resultCardSprite, Sprite goldMedalSprite, out Button startButton, out GameObject startHighScoreText, Sprite[] birdMidSprites, ThemeData[] themeAssets, Sprite shopIcon, Sprite heroesIcon, Sprite missionsIcon, Sprite themesIcon, Sprite playIcon, Sprite homeIcon, out Button shopButton, out Button heroesButton, out Button missionsButton, out Button themesButton, out GameObject toastPanel, out GameObject themeSelectorPanelRef, out GameObject lobbyPanel, out GameObject heroesPanel, out UnityEngine.UI.Image playIconImageRef, out Button navPlayBtn, out Text activeThemeLabelText, out GameObject shopPanel, out GameObject questsPanel, out GameObject leaderboardPanel, out Button bestScoreButton)
     {
         GameObject panel = CreatePanel("StartPanel", canvasTransform, new Color(0, 0, 0, 0.0f));
 
-        // Colorful per-letter title near the top with floating animation
-        GameObject titleGO = CreateColoredTitle("TitleText", panel.transform, "FLAPPY BIRD", 110, new Vector2(0, 420));
-        titleGO.AddComponent<UIFloat>().floatAmount = 12f;
-        titleGO.GetComponent<UIFloat>().speed = 2f;
+        // --- Lobby State Panel (groups title, banner, high score badge) ---
+        lobbyPanel = new GameObject("LobbyPanel");
+        lobbyPanel.transform.SetParent(panel.transform, false);
+        RectTransform lpRt = lobbyPanel.AddComponent<RectTransform>();
+        lpRt.anchorMin = Vector2.zero;
+        lpRt.anchorMax = Vector2.one;
+        lpRt.offsetMin = Vector2.zero;
+        lpRt.offsetMax = Vector2.zero;
 
-        // Start Button - Fullscreen transparent catcher to trigger play on tap anywhere
-        GameObject buttonGO = new GameObject("StartButton");
-        buttonGO.transform.SetParent(panel.transform, false);
-        
-        Image startBtnImg = buttonGO.AddComponent<Image>();
-        startBtnImg.color = new Color(0f, 0f, 0f, 0f); // Transparent but catches clicks
-        
-        RectTransform btnRt = buttonGO.GetComponent<RectTransform>();
+        // Full-screen transparent button inside lobbyPanel to trigger tap-to-start
+        GameObject startBtnGO = new GameObject("StartButton");
+        startBtnGO.transform.SetParent(lobbyPanel.transform, false);
+        Image bgTapImg = startBtnGO.AddComponent<Image>();
+        bgTapImg.color = new Color(0, 0, 0, 0); // transparent
+
+        RectTransform btnRt = startBtnGO.GetComponent<RectTransform>();
         btnRt.anchorMin = Vector2.zero;
         btnRt.anchorMax = Vector2.one;
         btnRt.offsetMin = Vector2.zero;
         btnRt.offsetMax = Vector2.zero;
-        startButton = buttonGO.AddComponent<Button>();
 
-        // Pulsating text child object
-        GameObject textGO = new GameObject("StartText");
-        textGO.transform.SetParent(buttonGO.transform, false);
-        
-        Text btnText = textGO.AddComponent<Text>();
-        btnText.text = "TAP TO START";
-        btnText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        btnText.fontSize = 64;
-        btnText.fontStyle = FontStyle.Bold;
-        btnText.alignment = TextAnchor.MiddleCenter;
-        btnText.color = Color.white; // Crisp white text
+        startButton = startBtnGO.AddComponent<Button>();
+        startBtnGO.transform.SetAsFirstSibling(); // render behind other elements
 
-        Outline outline = textGO.AddComponent<Outline>();
-        outline.effectColor = new Color(0.18f, 0.18f, 0.22f, 1f); // Charcoal outline
-        outline.effectDistance = new Vector2(4f, -4f);
+        // Colorful per-letter title near the top with floating animation
+        GameObject titleGO = CreateColoredTitle("TitleText", lobbyPanel.transform, "FLAPPY BIRD", 110, new Vector2(0, 420));
+        titleGO.AddComponent<UIFloat>().floatAmount = 12f;
+        titleGO.GetComponent<UIFloat>().speed = 2f;
 
-        Shadow shadow = textGO.AddComponent<Shadow>();
-        shadow.effectColor = new Color(0f, 0f, 0f, 0.5f);
-        shadow.effectDistance = new Vector2(3f, -5f);
+        // Dedicated Leaderboard corner button — a clear, labeled tap target
+        // (separate from the small BEST badge, which isn't an obvious button).
+        GameObject leaderboardBtnGO = new GameObject("LeaderboardButton");
+        leaderboardBtnGO.transform.SetParent(lobbyPanel.transform, false);
+        Image leaderboardBtnImg = leaderboardBtnGO.AddComponent<Image>();
+        leaderboardBtnImg.sprite = goldMedalSprite;
+        bestScoreButton = leaderboardBtnGO.AddComponent<Button>();
+        bestScoreButton.transition = Selectable.Transition.None;
+        RectTransform leaderboardBtnRt = leaderboardBtnGO.GetComponent<RectTransform>();
+        leaderboardBtnRt.sizeDelta = new Vector2(100, 100);
+        leaderboardBtnRt.anchoredPosition = new Vector2(400, 650); // clear above the wide "FLAPPY BIRD" title
 
-        // Pulsating text animation
-        UIPulse pulse = textGO.AddComponent<UIPulse>();
-        pulse.scaleAmount = 0.08f;
-        pulse.speed = 2.5f;
+        GameObject leaderboardBtnLabel = CreateLabel("Label", leaderboardBtnGO.transform, "RANKS", 20, new Vector2(0, -62));
+        leaderboardBtnLabel.GetComponent<Text>().color = new Color(0.9f, 0.9f, 0.9f);
 
-        RectTransform textRt = textGO.GetComponent<RectTransform>();
-        textRt.sizeDelta = new Vector2(700, 140);
-        textRt.anchoredPosition = new Vector2(0, -420); // near the bottom
+        // World name is no longer shown on the main Lobby screen (it has its own dedicated
+        // Worlds screen now), so ThemeApplier has no label to update here.
+        activeThemeLabelText = null;
 
-        // High Score Badge (UI Change)
+        // High Score Badge (positioned below the central character, clear of the bird preview)
         GameObject scoreBadge = new GameObject("HighScoreBadge");
-        scoreBadge.transform.SetParent(panel.transform, false);
+        scoreBadge.transform.SetParent(lobbyPanel.transform, false);
         Image badgeImg = scoreBadge.AddComponent<Image>();
         badgeImg.sprite = resultCardSprite; // rounded card texture
         badgeImg.color = new Color(0.15f, 0.15f, 0.18f, 0.75f); // dark translucent charcoal
-        
+
         RectTransform badgeRt = scoreBadge.GetComponent<RectTransform>();
         badgeRt.sizeDelta = new Vector2(280, 68);
-        badgeRt.anchoredPosition = new Vector2(0, -280);
+        badgeRt.anchoredPosition = new Vector2(0, -210); // just above "TAP TO START", clear of the bird preview
 
         // Small Gold Medal icon inside badge
         GameObject medalIcon = new GameObject("MedalIcon");
@@ -1182,7 +1248,725 @@ public static class FlappyBirdSceneBuilder
         bestOutline.effectColor = new Color(0.1f, 0.08f, 0.05f, 1f);
         bestOutline.effectDistance = new Vector2(2f, -2f);
 
+        // Pulsing "TAP TO START" hint text on start screen
+        GameObject tapStartGO = CreateLabel("TapToStartText", lobbyPanel.transform, "TAP TO START", 52, new Vector2(0, -300));
+        Text tapText = tapStartGO.GetComponent<Text>();
+        tapText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); // bulky, retro game font
+        tapText.color = Color.white;
+        tapText.fontStyle = FontStyle.Bold;
+        
+        Outline tapOutline = tapStartGO.GetComponent<Outline>();
+        if (tapOutline == null) tapOutline = tapStartGO.AddComponent<Outline>();
+        tapOutline.effectColor = new Color(0.12f, 0.12f, 0.12f, 0.9f);
+        tapOutline.effectDistance = new Vector2(1.5f, -1.5f);
+
+        Shadow tapShadow = tapStartGO.AddComponent<Shadow>();
+        tapShadow.effectColor = new Color(0.12f, 0.12f, 0.12f, 0.9f);
+        tapShadow.effectDistance = new Vector2(2f, -2f);
+
+        UIPulse pulse = tapStartGO.AddComponent<UIPulse>();
+        pulse.scaleAmount = 0.05f;
+        pulse.speed = 3f;
+
+        // --- Interactive Heroes Selection Screen (Grid) ---
+        heroesPanel = new GameObject("HeroesPanel");
+        heroesPanel.transform.SetParent(panel.transform, false);
+        RectTransform hpRt = heroesPanel.AddComponent<RectTransform>();
+        hpRt.anchorMin = new Vector2(0.5f, 0.5f);
+        hpRt.anchorMax = new Vector2(0.5f, 0.5f);
+        hpRt.pivot = new Vector2(0.5f, 0.5f);
+        hpRt.sizeDelta = new Vector2(1000, 1400);
+        hpRt.anchoredPosition = new Vector2(0, 80); // centered vertically above bottom bar
+
+        // Header bar inside HeroesPanel
+        GameObject hbGO = new GameObject("HeaderBar");
+        hbGO.transform.SetParent(heroesPanel.transform, false);
+        Image hbImg = hbGO.AddComponent<Image>();
+        hbImg.sprite = resultCardSprite;
+        hbImg.color = new Color(0.08f, 0.45f, 0.85f, 1f); // bright royal blue
+        
+        Outline hbOutline = hbGO.AddComponent<Outline>();
+        hbOutline.effectColor = Color.white;
+        hbOutline.effectDistance = new Vector2(2f, -2f);
+        
+        RectTransform hbRt = hbGO.GetComponent<RectTransform>();
+        hbRt.sizeDelta = new Vector2(900, 80);
+        hbRt.anchoredPosition = new Vector2(0, 620); // top header position
+
+        GameObject hbTxtGO = CreateLabel("Text", hbGO.transform, "HEROES (1/21)", 28, Vector2.zero);
+        hbTxtGO.GetComponent<Text>().color = Color.white;
+        hbTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+        RectTransform hbtRt = hbTxtGO.GetComponent<RectTransform>();
+        hbtRt.anchorMin = Vector2.zero;
+        hbtRt.anchorMax = Vector2.one;
+        hbtRt.offsetMin = Vector2.zero;
+        hbtRt.offsetMax = Vector2.zero;
+
+        // Scrollable roster: every hero from every world, not just the currently active one.
+        GameObject scrollGO = new GameObject("ScrollView");
+        scrollGO.transform.SetParent(heroesPanel.transform, false);
+        RectTransform scrollRt = scrollGO.AddComponent<RectTransform>();
+        scrollRt.sizeDelta = new Vector2(900, 1100);
+        scrollRt.anchoredPosition = new Vector2(0, -60);
+
+        ScrollRect scrollRect = scrollGO.AddComponent<ScrollRect>();
+        scrollRect.horizontal = false;
+        scrollRect.vertical = true;
+        scrollRect.movementType = ScrollRect.MovementType.Clamped;
+
+        GameObject viewportGO = new GameObject("Viewport");
+        viewportGO.transform.SetParent(scrollGO.transform, false);
+        RectTransform viewportRt = viewportGO.AddComponent<RectTransform>();
+        viewportRt.anchorMin = Vector2.zero;
+        viewportRt.anchorMax = Vector2.one;
+        viewportRt.offsetMin = Vector2.zero;
+        viewportRt.offsetMax = Vector2.zero;
+        viewportGO.AddComponent<RectMask2D>();
+
+        GameObject contentGO = new GameObject("Content");
+        contentGO.transform.SetParent(viewportGO.transform, false);
+        RectTransform contentRt = contentGO.AddComponent<RectTransform>();
+        contentRt.anchorMin = new Vector2(0f, 1f);
+        contentRt.anchorMax = new Vector2(1f, 1f);
+        contentRt.pivot = new Vector2(0.5f, 1f);
+        contentRt.anchoredPosition = Vector2.zero;
+
+        GridLayoutGroup hGrid = contentGO.AddComponent<GridLayoutGroup>();
+        hGrid.cellSize = new Vector2(260, 300);
+        hGrid.spacing = new Vector2(20, 20);
+        hGrid.startCorner = GridLayoutGroup.Corner.UpperLeft;
+        hGrid.startAxis = GridLayoutGroup.Axis.Horizontal;
+        hGrid.childAlignment = TextAnchor.UpperCenter;
+        hGrid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        hGrid.constraintCount = 3;
+
+        ContentSizeFitter contentFitter = contentGO.AddComponent<ContentSizeFitter>();
+        contentFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        scrollRect.content = contentRt;
+        scrollRect.viewport = viewportRt;
+
+        string[] heroThemeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja" };
+        string[][] heroNames = new string[][]
+        {
+            new [] { "YELLOW HERO", "BLUE HERO", "RED HERO" },
+            new [] { "ROCKET SPEEDER", "COSMIC UFO", "COMM SATELLITE" },
+            new [] { "SOCCER BALL", "BASKETBALL", "TENNIS BALL" },
+            new [] { "RED DRAKE", "EMERALD DRAGON", "GOLD WYVERN" },
+            new [] { "GOLDFISH", "BULL SHARK", "PINK JELLYFISH" },
+            new [] { "HONEY BEE", "LADYBUG", "BUTTERFLY" },
+            new [] { "SHADOW NINJA", "CRIMSON NINJA", "SILVER SHINOBI" }
+        };
+
+        // Instantiate all 7 worlds x 3 skins = 21 hero cards (wired to GameManager.SelectHeroGlobal in BuildScene(), once GameManager exists)
+        for (int t = 0; t < 7; t++)
+        {
+            for (int s = 0; s < 3; s++)
+            {
+                GameObject cardGO = new GameObject(heroThemeNames[t] + "Card" + s);
+                cardGO.transform.SetParent(contentGO.transform, false);
+                Image cardImg = cardGO.AddComponent<Image>();
+                cardImg.sprite = resultCardSprite;
+                // Tint each card toward its world's color (darkened for text contrast) so worlds
+                // stay visually distinguishable now that we don't show a separate world label.
+                Color worldTint = themeAssets != null && t < themeAssets.Length ? themeAssets[t].themeColor : new Color(0.3f, 0.3f, 0.35f);
+                Color darkenedTint = Color.Lerp(worldTint, Color.black, 0.72f);
+                cardImg.color = new Color(darkenedTint.r, darkenedTint.g, darkenedTint.b, 0.95f);
+
+                Outline cardOutline = cardGO.AddComponent<Outline>();
+                cardOutline.effectColor = new Color(0.35f, 0.35f, 0.4f);
+                cardOutline.effectDistance = new Vector2(2f, -2f);
+
+                cardGO.AddComponent<Button>();
+
+                // Icon preview image (Classic = the 3 inspector-configured bird colors, other worlds = ThemeData.playerSprites)
+                GameObject iconGO = new GameObject("PreviewImage");
+                iconGO.transform.SetParent(cardGO.transform, false);
+                Image previewImg = iconGO.AddComponent<Image>();
+                previewImg.preserveAspect = true;
+                if (t == 0)
+                {
+                    if (birdMidSprites != null && s < birdMidSprites.Length) previewImg.sprite = birdMidSprites[s];
+                }
+                else if (themeAssets != null && t < themeAssets.Length && themeAssets[t].playerSprites != null && s < themeAssets[t].playerSprites.Length)
+                {
+                    previewImg.sprite = themeAssets[t].playerSprites[s];
+                }
+                RectTransform iconRt = iconGO.GetComponent<RectTransform>();
+                iconRt.sizeDelta = new Vector2(160, 160);
+                iconRt.anchoredPosition = new Vector2(0, 50);
+
+                // Hero name (only — no separate world sub-label; the card's tint conveys the world)
+                GameObject nameTxtGO = CreateLabel("NameText", cardGO.transform, heroNames[t][s], 18, new Vector2(0, -75));
+                nameTxtGO.GetComponent<Text>().color = Color.white;
+                nameTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+                RectTransform ntRt = nameTxtGO.GetComponent<RectTransform>();
+                ntRt.sizeDelta = new Vector2(240, 36);
+
+                // Selection Checkmark overlay badge
+                GameObject checkGO = new GameObject("Checkmark");
+                checkGO.transform.SetParent(cardGO.transform, false);
+                Image checkImg = checkGO.AddComponent<Image>();
+                checkImg.sprite = goldMedalSprite;
+                RectTransform checkRt = checkGO.GetComponent<RectTransform>();
+                checkRt.sizeDelta = new Vector2(40, 40);
+                checkRt.anchoredPosition = new Vector2(95, 115); // top right of card
+
+                checkGO.SetActive(false); // active if this hero is equipped
+            }
+        }
+
+        heroesPanel.SetActive(false);
+
+        // --- Interactive Worlds Selection Screen (Grid) ---
+        // Full-screen sibling of HeroesPanel (same construction pattern) instead of a small
+        // floating button grid — previously this overlaid the still-visible lobby/tap-to-start.
+        GameObject worldsPanel = new GameObject("WorldsPanel");
+        worldsPanel.transform.SetParent(panel.transform, false);
+        themeSelectorPanelRef = worldsPanel;
+
+        RectTransform wpRt = worldsPanel.AddComponent<RectTransform>();
+        wpRt.anchorMin = new Vector2(0.5f, 0.5f);
+        wpRt.anchorMax = new Vector2(0.5f, 0.5f);
+        wpRt.pivot = new Vector2(0.5f, 0.5f);
+        wpRt.sizeDelta = new Vector2(1000, 1400);
+        wpRt.anchoredPosition = new Vector2(0, 80); // centered vertically above bottom bar
+
+        // Header bar inside WorldsPanel
+        GameObject wHbGO = new GameObject("HeaderBar");
+        wHbGO.transform.SetParent(worldsPanel.transform, false);
+        Image wHbImg = wHbGO.AddComponent<Image>();
+        wHbImg.sprite = resultCardSprite;
+        wHbImg.color = new Color(0.08f, 0.45f, 0.85f, 1f); // bright royal blue
+
+        Outline wHbOutline = wHbGO.AddComponent<Outline>();
+        wHbOutline.effectColor = Color.white;
+        wHbOutline.effectDistance = new Vector2(2f, -2f);
+
+        RectTransform wHbRt = wHbGO.GetComponent<RectTransform>();
+        wHbRt.sizeDelta = new Vector2(900, 80);
+        wHbRt.anchoredPosition = new Vector2(0, 620); // top header position
+
+        GameObject wHbTxtGO = CreateLabel("Text", wHbGO.transform, "SELECT WORLD", 28, Vector2.zero);
+        wHbTxtGO.GetComponent<Text>().color = Color.white;
+        wHbTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+        RectTransform wHbtRt = wHbTxtGO.GetComponent<RectTransform>();
+        wHbtRt.anchorMin = Vector2.zero;
+        wHbtRt.anchorMax = Vector2.one;
+        wHbtRt.offsetMin = Vector2.zero;
+        wHbtRt.offsetMax = Vector2.zero;
+
+        // Grid Container inside WorldsPanel
+        GameObject wGridGO = new GameObject("Grid");
+        wGridGO.transform.SetParent(worldsPanel.transform, false);
+        RectTransform wGridRt = wGridGO.AddComponent<RectTransform>();
+        wGridRt.sizeDelta = new Vector2(900, 1000);
+        wGridRt.anchoredPosition = new Vector2(0, 0);
+
+        GridLayoutGroup wGrid = wGridGO.AddComponent<GridLayoutGroup>();
+        wGrid.cellSize = new Vector2(260, 300);
+        wGrid.spacing = new Vector2(20, 20);
+        wGrid.startCorner = GridLayoutGroup.Corner.UpperLeft;
+        wGrid.startAxis = GridLayoutGroup.Axis.Horizontal;
+        wGrid.childAlignment = TextAnchor.UpperCenter;
+        wGrid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        wGrid.constraintCount = 3;
+
+        ThemeSelectorUI selectorUI = worldsPanel.AddComponent<ThemeSelectorUI>();
+        selectorUI.themeButtons = new Button[7];
+
+        string[] themeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja" };
+        for (int i = 0; i < 7; i++)
+        {
+            GameObject cardGO = new GameObject(themeNames[i] + "Card");
+            cardGO.transform.SetParent(wGridGO.transform, false);
+
+            Image cardImg = cardGO.AddComponent<Image>();
+            cardImg.sprite = resultCardSprite;
+            cardImg.color = new Color(0.15f, 0.15f, 0.18f, 0.95f); // dark card body
+
+            Outline cardOutline = cardGO.AddComponent<Outline>();
+            cardOutline.effectColor = new Color(0.35f, 0.35f, 0.4f);
+            cardOutline.effectDistance = new Vector2(2f, -2f);
+
+            Button btn = cardGO.AddComponent<Button>();
+            selectorUI.themeButtons[i] = btn;
+
+            // Preview thumbnail (this world's background art)
+            GameObject previewGO = new GameObject("PreviewImage");
+            previewGO.transform.SetParent(cardGO.transform, false);
+            Image previewImg = previewGO.AddComponent<Image>();
+            previewImg.preserveAspect = true;
+            if (themeAssets != null && i < themeAssets.Length) previewImg.sprite = themeAssets[i].backgroundSprite;
+            RectTransform previewRt = previewGO.GetComponent<RectTransform>();
+            previewRt.sizeDelta = new Vector2(220, 130);
+            previewRt.anchoredPosition = new Vector2(0, 55);
+
+            // Name label
+            GameObject wNameTxtGO = CreateLabel("NameText", cardGO.transform, themeNames[i].ToUpper(), 22, new Vector2(0, -70));
+            wNameTxtGO.GetComponent<Text>().color = Color.white;
+            wNameTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+            RectTransform wNtRt = wNameTxtGO.GetComponent<RectTransform>();
+            wNtRt.sizeDelta = new Vector2(240, 50);
+
+            // Selection checkmark overlay badge (same treatment as Heroes cards)
+            GameObject wCheckGO = new GameObject("Checkmark");
+            wCheckGO.transform.SetParent(cardGO.transform, false);
+            Image wCheckImg = wCheckGO.AddComponent<Image>();
+            wCheckImg.sprite = goldMedalSprite;
+            RectTransform wCheckRt = wCheckGO.GetComponent<RectTransform>();
+            wCheckRt.sizeDelta = new Vector2(46, 46);
+            wCheckRt.anchoredPosition = new Vector2(95, 115); // top right of card
+
+            wCheckGO.SetActive(false); // active if world is selected
+        }
+
+        worldsPanel.SetActive(false);
+
+        // --- Shop / Quests placeholder screens ---
+        shopPanel = BuildComingSoonPanel(panel.transform, "SHOP", "Gear, boosts and skins\nare on the way.", resultCardSprite);
+        questsPanel = BuildComingSoonPanel(panel.transform, "QUESTS", "Daily challenges and rewards\nare on the way.", resultCardSprite);
+
+        // --- Leaderboard screen ---
+        leaderboardPanel = BuildLeaderboardPanel(panel.transform, resultCardSprite, buttonSprite);
+
+        // --- Bottom Navigation Bar ---
+        GameObject bottomBar = new GameObject("BottomNavBar");
+        bottomBar.transform.SetParent(panel.transform, false);
+        Image barImg = bottomBar.AddComponent<Image>();
+        barImg.sprite = resultCardSprite;
+        barImg.color = new Color(0.12f, 0.12f, 0.15f, 0.95f); // sleek dark charcoal
+        
+        RectTransform barRt = bottomBar.GetComponent<RectTransform>();
+        barRt.anchorMin = new Vector2(0.5f, 0f);
+        barRt.anchorMax = new Vector2(0.5f, 0f);
+        barRt.pivot = new Vector2(0.5f, 0.5f);
+        barRt.sizeDelta = new Vector2(980, 150);
+        barRt.anchoredPosition = new Vector2(0, 110); // float elegantly
+
+        Shadow barShadow = bottomBar.AddComponent<Shadow>();
+        barShadow.effectColor = new Color(0f, 0f, 0f, 0.4f);
+        barShadow.effectDistance = new Vector2(0f, -8f);
+
+        Outline barOutline = bottomBar.AddComponent<Outline>();
+        barOutline.effectColor = new Color(1f, 1f, 1f, 0.15f);
+        barOutline.effectDistance = new Vector2(1f, -1f);
+
+        GameObject indicatorGO = new GameObject("ActiveIndicator");
+        indicatorGO.transform.SetParent(bottomBar.transform, false);
+        Image indImg = indicatorGO.AddComponent<Image>();
+        indImg.sprite = resultCardSprite;
+        indImg.color = new Color(1f, 1f, 1f, 0.15f);
+        
+        RectTransform indRt = indicatorGO.GetComponent<RectTransform>();
+        indRt.anchorMin = new Vector2(0.5f, 0.5f);
+        indRt.anchorMax = new Vector2(0.5f, 0.5f);
+        indRt.pivot = new Vector2(0.5f, 0.5f);
+        indRt.sizeDelta = new Vector2(180, 130);
+        indRt.anchoredPosition = new Vector2(0, 15);
+
+        // 1. Shop Button
+        GameObject shopGO = new GameObject("ShopButton");
+        shopGO.transform.SetParent(bottomBar.transform, false);
+        Image shopImg = shopGO.AddComponent<Image>();
+        shopImg.sprite = shopIcon;
+        shopButton = shopGO.AddComponent<Button>();
+        shopButton.transition = Selectable.Transition.None; // don't let Unity's built-in color tint fight our own active-state styling
+        RectTransform shopRt = shopGO.GetComponent<RectTransform>();
+        shopRt.sizeDelta = new Vector2(100, 100);
+        shopRt.anchoredPosition = new Vector2(-340, 0);
+
+        GameObject shopTxt = CreateLabel("Label", shopGO.transform, "SHOP", 18, new Vector2(0, -50));
+        shopTxt.GetComponent<Text>().color = new Color(0.9f, 0.9f, 0.9f);
+
+        // 2. Heroes Button
+        GameObject heroesGO = new GameObject("HeroesButton");
+        heroesGO.transform.SetParent(bottomBar.transform, false);
+        Image heroesImg = heroesGO.AddComponent<Image>();
+        heroesImg.sprite = heroesIcon;
+        heroesButton = heroesGO.AddComponent<Button>();
+        heroesButton.transition = Selectable.Transition.None;
+        RectTransform heroesRt = heroesGO.GetComponent<RectTransform>();
+        heroesRt.sizeDelta = new Vector2(100, 100);
+        heroesRt.anchoredPosition = new Vector2(-170, 0);
+
+        GameObject heroesTxt = CreateLabel("Label", heroesGO.transform, "HEROES", 18, new Vector2(0, -50));
+        heroesTxt.GetComponent<Text>().color = new Color(0.9f, 0.9f, 0.9f);
+
+        // 3. Play Button (large circular center)
+        GameObject playGO = new GameObject("PlayButton");
+        playGO.transform.SetParent(bottomBar.transform, false);
+        Image playImg = playGO.AddComponent<Image>();
+        playImg.sprite = resultCardSprite;
+        playImg.color = new Color(0.98f, 0.82f, 0.12f); // yellow
+        navPlayBtn = playGO.AddComponent<Button>();
+        navPlayBtn.transition = Selectable.Transition.None;
+        RectTransform playRt = playGO.GetComponent<RectTransform>();
+        playRt.sizeDelta = new Vector2(170, 170);
+        playRt.anchoredPosition = new Vector2(0, 20); // overlaps top
+
+        Outline playOutline = playGO.AddComponent<Outline>();
+        playOutline.effectColor = Color.white;
+        playOutline.effectDistance = new Vector2(3f, -3f);
+
+        GameObject playIconGO = new GameObject("Icon");
+        playIconGO.transform.SetParent(playGO.transform, false);
+        Image pIconImg = playIconGO.AddComponent<Image>();
+        pIconImg.sprite = playIcon;
+        playIconImageRef = pIconImg;
+        RectTransform piRt = playIconGO.GetComponent<RectTransform>();
+        piRt.sizeDelta = new Vector2(90, 90);
+        piRt.anchoredPosition = new Vector2(6, 0); // visual centering offset
+
+        // 4. Missions Button
+        GameObject missionsGO = new GameObject("MissionsButton");
+        missionsGO.transform.SetParent(bottomBar.transform, false);
+        Image missionsImg = missionsGO.AddComponent<Image>();
+        missionsImg.sprite = missionsIcon;
+        missionsButton = missionsGO.AddComponent<Button>();
+        missionsButton.transition = Selectable.Transition.None;
+        RectTransform missionsRt = missionsGO.GetComponent<RectTransform>();
+        missionsRt.sizeDelta = new Vector2(100, 100);
+        missionsRt.anchoredPosition = new Vector2(170, 0);
+
+        GameObject missionsTxt = CreateLabel("Label", missionsGO.transform, "QUESTS", 18, new Vector2(0, -50));
+        missionsTxt.GetComponent<Text>().color = new Color(0.9f, 0.9f, 0.9f);
+
+        // 5. Themes Button
+        GameObject themesGO = new GameObject("ThemesButton");
+        themesGO.transform.SetParent(bottomBar.transform, false);
+        Image themesImg = themesGO.AddComponent<Image>();
+        themesImg.sprite = themesIcon;
+        themesButton = themesGO.AddComponent<Button>();
+        themesButton.transition = Selectable.Transition.None;
+        RectTransform themesRt = themesGO.GetComponent<RectTransform>();
+        themesRt.sizeDelta = new Vector2(100, 100);
+        themesRt.anchoredPosition = new Vector2(340, 0);
+
+        GameObject themesTxt = CreateLabel("Label", themesGO.transform, "WORLDS", 18, new Vector2(0, -50));
+        themesTxt.GetComponent<Text>().color = new Color(0.9f, 0.9f, 0.9f);
+
+        // --- Fading Toast Notification Panel ---
+        toastPanel = new GameObject("ToastPanel");
+        toastPanel.transform.SetParent(canvasTransform, false);
+        Image toastImg = toastPanel.AddComponent<Image>();
+        toastImg.sprite = resultCardSprite;
+        toastImg.color = new Color(0.1f, 0.1f, 0.12f, 0.9f);
+        
+        Outline toastOutline = toastPanel.AddComponent<Outline>();
+        toastOutline.effectColor = new Color(0.95f, 0.72f, 0.15f, 0.8f); // gold outline
+        toastOutline.effectDistance = new Vector2(2f, -2f);
+
+        RectTransform toastRt = toastPanel.GetComponent<RectTransform>();
+        toastRt.sizeDelta = new Vector2(650, 90);
+        toastRt.anchoredPosition = new Vector2(0, 640); // high center
+
+        GameObject toastLabel = CreateLabel("Text", toastPanel.transform, "ALERT MESSAGE", 26, Vector2.zero);
+        Text toastLabelText = toastLabel.GetComponent<Text>();
+        toastLabelText.color = Color.white;
+        toastLabelText.fontStyle = FontStyle.Bold;
+        
+        RectTransform tlRt = toastLabel.GetComponent<RectTransform>();
+        tlRt.anchorMin = Vector2.zero;
+        tlRt.anchorMax = Vector2.one;
+        tlRt.offsetMin = Vector2.zero;
+        tlRt.offsetMax = Vector2.zero;
+
+        CanvasGroup cg = toastPanel.AddComponent<CanvasGroup>();
+        cg.alpha = 0f;
+
+        toastPanel.SetActive(false);
+
         return panel;
+    }
+
+    /// <summary>Full-screen placeholder used by Shop/Quests until those systems are built — same construction pattern as WorldsPanel/HeroesPanel.</summary>
+    private static GameObject BuildComingSoonPanel(Transform parent, string title, string message, Sprite resultCardSprite)
+    {
+        GameObject comingSoonPanel = new GameObject(title + "Panel");
+        comingSoonPanel.transform.SetParent(parent, false);
+        RectTransform rt = comingSoonPanel.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0.5f);
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(1000, 1400);
+        rt.anchoredPosition = new Vector2(0, 80);
+
+        GameObject hbGO = new GameObject("HeaderBar");
+        hbGO.transform.SetParent(comingSoonPanel.transform, false);
+        Image hbImg = hbGO.AddComponent<Image>();
+        hbImg.sprite = resultCardSprite;
+        hbImg.color = new Color(0.08f, 0.45f, 0.85f, 1f);
+
+        Outline hbOutline = hbGO.AddComponent<Outline>();
+        hbOutline.effectColor = Color.white;
+        hbOutline.effectDistance = new Vector2(2f, -2f);
+
+        RectTransform hbRt = hbGO.GetComponent<RectTransform>();
+        hbRt.sizeDelta = new Vector2(900, 80);
+        hbRt.anchoredPosition = new Vector2(0, 620);
+
+        GameObject hbTxtGO = CreateLabel("Text", hbGO.transform, title, 28, Vector2.zero);
+        hbTxtGO.GetComponent<Text>().color = Color.white;
+        hbTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+        RectTransform hbtRt = hbTxtGO.GetComponent<RectTransform>();
+        hbtRt.anchorMin = Vector2.zero;
+        hbtRt.anchorMax = Vector2.one;
+        hbtRt.offsetMin = Vector2.zero;
+        hbtRt.offsetMax = Vector2.zero;
+
+        // Centered "coming soon" card
+        GameObject cardGO = new GameObject("Card");
+        cardGO.transform.SetParent(comingSoonPanel.transform, false);
+        Image cardImg = cardGO.AddComponent<Image>();
+        cardImg.sprite = resultCardSprite;
+        cardImg.color = new Color(0.15f, 0.15f, 0.18f, 0.95f);
+        Outline cardOutline = cardGO.AddComponent<Outline>();
+        cardOutline.effectColor = new Color(0.35f, 0.35f, 0.4f);
+        cardOutline.effectDistance = new Vector2(2f, -2f);
+        RectTransform cardRt = cardGO.GetComponent<RectTransform>();
+        cardRt.sizeDelta = new Vector2(700, 420);
+        cardRt.anchoredPosition = new Vector2(0, 80);
+
+        GameObject bigTitleGO = CreateLabel("BigTitle", cardGO.transform, "COMING SOON", 42, new Vector2(0, 70));
+        Text bigTitleTxt = bigTitleGO.GetComponent<Text>();
+        bigTitleTxt.color = new Color(0.95f, 0.72f, 0.15f);
+        bigTitleTxt.fontStyle = FontStyle.Bold;
+        Outline bigTitleOutline = bigTitleGO.GetComponent<Outline>();
+        if (bigTitleOutline == null) bigTitleOutline = bigTitleGO.AddComponent<Outline>();
+        bigTitleOutline.effectColor = new Color(0.1f, 0.08f, 0.05f, 1f);
+        bigTitleOutline.effectDistance = new Vector2(3f, -3f);
+
+        UIFloat titleFloat = bigTitleGO.AddComponent<UIFloat>();
+        titleFloat.floatAmount = 8f;
+        titleFloat.speed = 2f;
+
+        GameObject msgGO = CreateLabel("Message", cardGO.transform, message, 24, new Vector2(0, -70));
+        Text msgTxt = msgGO.GetComponent<Text>();
+        msgTxt.color = new Color(0.85f, 0.85f, 0.85f);
+        RectTransform msgRt = msgGO.GetComponent<RectTransform>();
+        msgRt.sizeDelta = new Vector2(600, 200);
+
+        comingSoonPanel.SetActive(false);
+        return comingSoonPanel;
+    }
+
+    private static GameObject BuildLeaderboardPanel(Transform parent, Sprite resultCardSprite, Sprite buttonSprite)
+    {
+        GameObject leaderboardPanel = new GameObject("LeaderboardPanel");
+        leaderboardPanel.transform.SetParent(parent, false);
+        RectTransform rt = leaderboardPanel.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0.5f);
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(1000, 1400);
+        rt.anchoredPosition = new Vector2(0, 80);
+
+        LeaderboardUI board = leaderboardPanel.AddComponent<LeaderboardUI>();
+
+        // Header bar
+        GameObject hbGO = new GameObject("HeaderBar");
+        hbGO.transform.SetParent(leaderboardPanel.transform, false);
+        Image hbImg = hbGO.AddComponent<Image>();
+        hbImg.sprite = resultCardSprite;
+        hbImg.color = new Color(0.08f, 0.45f, 0.85f, 1f);
+        Outline hbOutline = hbGO.AddComponent<Outline>();
+        hbOutline.effectColor = Color.white;
+        hbOutline.effectDistance = new Vector2(2f, -2f);
+        RectTransform hbRt = hbGO.GetComponent<RectTransform>();
+        hbRt.sizeDelta = new Vector2(900, 80);
+        hbRt.anchoredPosition = new Vector2(0, 620);
+
+        GameObject hbTxtGO = CreateLabel("Text", hbGO.transform, "LEADERBOARD", 28, Vector2.zero);
+        hbTxtGO.GetComponent<Text>().color = Color.white;
+        hbTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+        RectTransform hbtRt = hbTxtGO.GetComponent<RectTransform>();
+        hbtRt.anchorMin = Vector2.zero;
+        hbtRt.anchorMax = Vector2.one;
+        hbtRt.offsetMin = Vector2.zero;
+        hbtRt.offsetMax = Vector2.zero;
+
+        // --- Signed-out group ---
+        GameObject signedOutGroup = new GameObject("SignedOutGroup");
+        signedOutGroup.transform.SetParent(leaderboardPanel.transform, false);
+        RectTransform sogRt = signedOutGroup.AddComponent<RectTransform>();
+        sogRt.anchorMin = new Vector2(0.5f, 0.5f);
+        sogRt.anchorMax = new Vector2(0.5f, 0.5f);
+        sogRt.sizeDelta = Vector2.zero;
+        sogRt.anchoredPosition = Vector2.zero;
+
+        GameObject infoGO = CreateLabel("InfoText", signedOutGroup.transform, "Sign in with Google to save your\nbest score to the global leaderboard!", 24, new Vector2(0, 500));
+        infoGO.GetComponent<Text>().color = new Color(0.85f, 0.85f, 0.85f);
+        infoGO.GetComponent<RectTransform>().sizeDelta = new Vector2(760, 90);
+
+        GameObject signInGO = new GameObject("SignInButton");
+        signInGO.transform.SetParent(signedOutGroup.transform, false);
+        Image signInImg = signInGO.AddComponent<Image>();
+        ApplyButtonLook(signInImg, buttonSprite, new Color(0.85f, 0.25f, 0.2f));
+        RectTransform signInRt = signInGO.GetComponent<RectTransform>();
+        signInRt.sizeDelta = new Vector2(480, 90);
+        signInRt.anchoredPosition = new Vector2(0, 390);
+        Button signInBtn = signInGO.AddComponent<Button>();
+        signInBtn.transition = Selectable.Transition.None;
+        GameObject signInLabelGO = CreateLabel("Text", signInGO.transform, "SIGN IN WITH GOOGLE", 26);
+        Text signInLabelText = signInLabelGO.GetComponent<Text>();
+        signInLabelText.color = Color.white;
+        signInLabelText.fontStyle = FontStyle.Bold;
+
+        // --- Signed-in group ---
+        GameObject signedInGroup = new GameObject("SignedInGroup");
+        signedInGroup.transform.SetParent(leaderboardPanel.transform, false);
+        RectTransform sigRt = signedInGroup.AddComponent<RectTransform>();
+        sigRt.anchorMin = new Vector2(0.5f, 0.5f);
+        sigRt.anchorMax = new Vector2(0.5f, 0.5f);
+        sigRt.sizeDelta = Vector2.zero;
+        sigRt.anchoredPosition = Vector2.zero;
+
+        GameObject nameDisplayGO = CreateLabel("NameText", signedInGroup.transform, "Player", 28, new Vector2(0, 520));
+        Text nameDisplayText = nameDisplayGO.GetComponent<Text>();
+        nameDisplayText.color = new Color(0.95f, 0.72f, 0.15f);
+        nameDisplayText.fontStyle = FontStyle.Bold;
+
+        GameObject nameFieldGO = new GameObject("NameInputField");
+        nameFieldGO.transform.SetParent(signedInGroup.transform, false);
+        Image nameFieldImg = nameFieldGO.AddComponent<Image>();
+        nameFieldImg.color = new Color(1f, 1f, 1f, 0.9f);
+        RectTransform nameFieldRt = nameFieldGO.GetComponent<RectTransform>();
+        nameFieldRt.sizeDelta = new Vector2(540, 70);
+        nameFieldRt.anchoredPosition = new Vector2(-80, 430);
+        InputField nameInput = nameFieldGO.AddComponent<InputField>();
+
+        GameObject nameFieldTextGO = new GameObject("Text");
+        nameFieldTextGO.transform.SetParent(nameFieldGO.transform, false);
+        Text nameFieldText = nameFieldTextGO.AddComponent<Text>();
+        nameFieldText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        nameFieldText.fontSize = 26;
+        nameFieldText.color = Color.black;
+        nameFieldText.alignment = TextAnchor.MiddleLeft;
+        nameFieldText.supportRichText = false;
+        RectTransform nameFieldTextRt = nameFieldTextGO.GetComponent<RectTransform>();
+        nameFieldTextRt.anchorMin = Vector2.zero;
+        nameFieldTextRt.anchorMax = Vector2.one;
+        nameFieldTextRt.offsetMin = new Vector2(16, 4);
+        nameFieldTextRt.offsetMax = new Vector2(-16, -4);
+        nameInput.textComponent = nameFieldText;
+        nameInput.characterLimit = 20;
+
+        GameObject saveNameGO = new GameObject("SaveNameButton");
+        saveNameGO.transform.SetParent(signedInGroup.transform, false);
+        Image saveNameImg = saveNameGO.AddComponent<Image>();
+        ApplyButtonLook(saveNameImg, buttonSprite, new Color(0.4f, 0.82f, 0.4f));
+        RectTransform saveNameRt = saveNameGO.GetComponent<RectTransform>();
+        saveNameRt.sizeDelta = new Vector2(160, 70);
+        saveNameRt.anchoredPosition = new Vector2(300, 430);
+        Button saveNameBtn = saveNameGO.AddComponent<Button>();
+        saveNameBtn.transition = Selectable.Transition.None;
+        GameObject saveNameLabelGO = CreateLabel("Text", saveNameGO.transform, "SAVE", 24);
+        saveNameLabelGO.GetComponent<Text>().color = Color.white;
+
+        GameObject signOutGO = new GameObject("SignOutButton");
+        signOutGO.transform.SetParent(signedInGroup.transform, false);
+        Image signOutImg = signOutGO.AddComponent<Image>();
+        ApplyButtonLook(signOutImg, buttonSprite, new Color(0.55f, 0.6f, 0.65f));
+        RectTransform signOutRt = signOutGO.GetComponent<RectTransform>();
+        signOutRt.sizeDelta = new Vector2(220, 60);
+        signOutRt.anchoredPosition = new Vector2(0, 340);
+        Button signOutBtn = signOutGO.AddComponent<Button>();
+        signOutBtn.transition = Selectable.Transition.None;
+        GameObject signOutLabelGO = CreateLabel("Text", signOutGO.transform, "SIGN OUT", 22);
+        signOutLabelGO.GetComponent<Text>().color = Color.white;
+
+        // --- Global / Country scope tabs ---
+        GameObject globalTabGO = new GameObject("GlobalTabButton");
+        globalTabGO.transform.SetParent(leaderboardPanel.transform, false);
+        Image globalTabImg = globalTabGO.AddComponent<Image>();
+        globalTabImg.sprite = resultCardSprite;
+        globalTabImg.color = new Color(0.95f, 0.72f, 0.15f);
+        RectTransform globalTabRt = globalTabGO.GetComponent<RectTransform>();
+        globalTabRt.sizeDelta = new Vector2(230, 64);
+        globalTabRt.anchoredPosition = new Vector2(-125, 250);
+        Button globalTabBtn = globalTabGO.AddComponent<Button>();
+        globalTabBtn.transition = Selectable.Transition.None;
+        GameObject globalTabLabelGO = CreateLabel("Text", globalTabGO.transform, "GLOBAL", 24);
+        globalTabLabelGO.GetComponent<Text>().color = Color.white;
+        globalTabLabelGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        GameObject countryTabGO = new GameObject("CountryTabButton");
+        countryTabGO.transform.SetParent(leaderboardPanel.transform, false);
+        Image countryTabImg = countryTabGO.AddComponent<Image>();
+        countryTabImg.sprite = resultCardSprite;
+        countryTabImg.color = new Color(0.25f, 0.25f, 0.3f);
+        RectTransform countryTabRt = countryTabGO.GetComponent<RectTransform>();
+        countryTabRt.sizeDelta = new Vector2(230, 64);
+        countryTabRt.anchoredPosition = new Vector2(125, 250);
+        Button countryTabBtn = countryTabGO.AddComponent<Button>();
+        countryTabBtn.transition = Selectable.Transition.None;
+        GameObject countryTabLabelGO = CreateLabel("Text", countryTabGO.transform, "MY COUNTRY", 22);
+        countryTabLabelGO.GetComponent<Text>().color = Color.white;
+        countryTabLabelGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        // --- Scrollable ranked list ---
+        GameObject scrollGO = new GameObject("ScrollView");
+        scrollGO.transform.SetParent(leaderboardPanel.transform, false);
+        RectTransform scrollRt = scrollGO.AddComponent<RectTransform>();
+        scrollRt.sizeDelta = new Vector2(900, 700);
+        scrollRt.anchoredPosition = new Vector2(0, -150);
+
+        ScrollRect scrollRect = scrollGO.AddComponent<ScrollRect>();
+        scrollRect.horizontal = false;
+        scrollRect.vertical = true;
+        scrollRect.movementType = ScrollRect.MovementType.Clamped;
+
+        GameObject viewportGO = new GameObject("Viewport");
+        viewportGO.transform.SetParent(scrollGO.transform, false);
+        RectTransform viewportRt = viewportGO.AddComponent<RectTransform>();
+        viewportRt.anchorMin = Vector2.zero;
+        viewportRt.anchorMax = Vector2.one;
+        viewportRt.offsetMin = Vector2.zero;
+        viewportRt.offsetMax = Vector2.zero;
+        viewportGO.AddComponent<RectMask2D>();
+
+        GameObject contentGO = new GameObject("Content");
+        contentGO.transform.SetParent(viewportGO.transform, false);
+        RectTransform contentRt = contentGO.AddComponent<RectTransform>();
+        contentRt.anchorMin = new Vector2(0f, 1f);
+        contentRt.anchorMax = new Vector2(1f, 1f);
+        contentRt.pivot = new Vector2(0.5f, 1f);
+        contentRt.anchoredPosition = Vector2.zero;
+
+        VerticalLayoutGroup vLayout = contentGO.AddComponent<VerticalLayoutGroup>();
+        vLayout.childForceExpandWidth = true;
+        vLayout.childForceExpandHeight = false;
+        vLayout.spacing = 4f;
+
+        ContentSizeFitter contentFitter = contentGO.AddComponent<ContentSizeFitter>();
+        contentFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        scrollRect.content = contentRt;
+        scrollRect.viewport = viewportRt;
+
+        GameObject emptyLabelGO = CreateLabel("EmptyLabel", leaderboardPanel.transform, "No scores yet — be the first!", 26, new Vector2(0, -150));
+        emptyLabelGO.GetComponent<Text>().color = new Color(0.7f, 0.7f, 0.7f);
+        emptyLabelGO.SetActive(false);
+
+        // Wire LeaderboardUI references
+        board.signedOutGroup = signedOutGroup;
+        board.signInButton = signInBtn;
+        board.signInButtonLabel = signInLabelText;
+        board.signedInGroup = signedInGroup;
+        board.nameText = nameDisplayText;
+        board.nameInputField = nameInput;
+        board.saveNameButton = saveNameBtn;
+        board.signOutButton = signOutBtn;
+        board.globalTabButton = globalTabBtn;
+        board.countryTabButton = countryTabBtn;
+        board.globalTabBg = globalTabImg;
+        board.countryTabBg = countryTabImg;
+        board.listContent = contentRt;
+        board.emptyListLabel = emptyLabelGO;
+
+        leaderboardPanel.SetActive(false);
+        return leaderboardPanel;
     }
 
     private static GameObject BuildGameOverPanel(Transform canvasTransform, Sprite buttonSprite, Sprite resultCardSprite, out Button menuButton, out Button retryButton, out GameObject scoreValueText, out GameObject bestValueText, out UnityEngine.UI.Image medalImage, out GameObject newBestBadge, out RectTransform resultCardTransform)
@@ -1355,6 +2139,7 @@ public static class FlappyBirdSceneBuilder
         text.fontStyle = FontStyle.Bold;
         text.alignment = TextAnchor.MiddleCenter;
         text.color = new Color(0.95f, 0.55f, 0.1f); // Classic premium golden-orange
+        text.raycastTarget = false; // decorative title shouldn't block tap-to-start or nearby buttons
 
         Outline outline = root.AddComponent<Outline>();
         outline.effectColor = new Color(0.18f, 0.18f, 0.22f, 1f); // Charcoal outline
@@ -1406,6 +2191,10 @@ public static class FlappyBirdSceneBuilder
         text.fontSize = fontSize;
         text.alignment = TextAnchor.MiddleCenter;
         text.color = Color.white;
+        // Caption text should never intercept clicks meant for a parent/neighboring button —
+        // without this, this label's default 600x150 hitbox can extend past its small parent
+        // button and steal clicks from an adjacent button (e.g. GameOver's MENU/RETRY pair).
+        text.raycastTarget = false;
         Outline outline = go.AddComponent<Outline>();
         outline.effectColor = new Color(0, 0, 0, 0.8f);
         outline.effectDistance = new Vector2(2f, -2f);
@@ -1440,6 +2229,26 @@ public static class FlappyBirdSceneBuilder
         gm.medalPlaceholder = placeholderSprite;
         gm.newBestBadge = newBestBadge;
         gm.resultCardTransform = resultCardTransform;
+
+        // Attach ThemeApplier
+        go.AddComponent<ThemeApplier>();
+
+        // Attach Firebase-backed auth + leaderboard singletons
+        go.AddComponent<AuthManager>();
+        go.AddComponent<LeaderboardManager>();
+
+        // Add ThemeObstacleApplier to the generated prefab so newly spawned pipes apply the theme
+        string prefabPath = $"{PrefabFolder}/PipePair.prefab";
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+        if (prefab != null)
+        {
+            if (prefab.GetComponent<ThemeObstacleApplier>() == null)
+            {
+                prefab.AddComponent<ThemeObstacleApplier>();
+                EditorUtility.SetDirty(prefab);
+            }
+        }
+
         return go;
     }
 
@@ -1708,5 +2517,1015 @@ public static class FlappyBirdSceneBuilder
 
         float maxD = Mathf.Lerp(r, r * 0.4f, localAngle / (section / 2f));
         return d <= maxD;
+    }
+
+    // ---------- Theme System Support ----------
+
+    private static ThemeData[] EnsureThemeSystem()
+    {
+        string folder = "Assets/ScriptableObjects/Themes";
+        if (!AssetDatabase.IsValidFolder("Assets/ScriptableObjects"))
+        {
+            AssetDatabase.CreateFolder("Assets", "ScriptableObjects");
+        }
+        if (!AssetDatabase.IsValidFolder(folder))
+        {
+            AssetDatabase.CreateFolder("Assets/ScriptableObjects", "Themes");
+        }
+
+        string[] names = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja" };
+        ThemeData[] themeAssets = new ThemeData[7];
+
+        // Ensure directories for Sprites
+        for (int i = 0; i < 7; i++)
+        {
+            string spriteDir = $"{SpriteFolder}/{names[i]}";
+            if (!AssetDatabase.IsValidFolder(spriteDir))
+            {
+                AssetDatabase.CreateFolder(SpriteFolder, names[i]);
+            }
+        }
+
+        for (int i = 0; i < 7; i++)
+        {
+            string path = $"{folder}/{names[i]}Theme.asset";
+            ThemeData data = AssetDatabase.LoadAssetAtPath<ThemeData>(path);
+            if (data == null)
+            {
+                data = ScriptableObject.CreateInstance<ThemeData>();
+                AssetDatabase.CreateAsset(data, path);
+            }
+
+            data.themeName = names[i];
+            
+            PopulateThemeAssets(data, i, names[i]);
+            
+            EditorUtility.SetDirty(data);
+            themeAssets[i] = data;
+        }
+        AssetDatabase.SaveAssets();
+        return themeAssets;
+    }
+
+    private static void PopulateThemeAssets(ThemeData data, int index, string name)
+    {
+        if (index == 0) // Classic
+        {
+            data.themeColor = new Color(0.53f, 0.81f, 0.92f); // Sky blue
+            
+            data.playerSprites = new Sprite[3];
+            data.playerSprites[0] = AssetDatabase.LoadAssetAtPath<Sprite>($"{SpriteFolder}/Bird_Up_0.png");
+            data.playerSprites[1] = AssetDatabase.LoadAssetAtPath<Sprite>($"{SpriteFolder}/Bird_Mid_0.png");
+            data.playerSprites[2] = AssetDatabase.LoadAssetAtPath<Sprite>($"{SpriteFolder}/Bird_Down_0.png");
+
+            data.obstacleTopSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{SpriteFolder}/PipeBody.png");
+            data.obstacleBottomSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{SpriteFolder}/PipeBody.png");
+            data.obstacleTopCapSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{SpriteFolder}/PipeCap.png");
+            data.obstacleBottomCapSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{SpriteFolder}/PipeCap.png");
+
+            data.backgroundSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{SpriteFolder}/Background.png");
+            data.groundDirtSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{SpriteFolder}/GroundDirt.png");
+            data.groundGrassSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{SpriteFolder}/Grass.png");
+
+            data.flapSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Flap.wav");
+            data.scoreSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Score.wav");
+            data.hitSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Hit.wav");
+            return;
+        }
+
+        // Setup theme colors
+        if (index == 1) data.themeColor = new Color(0.04f, 0.04f, 0.12f); // Space dark
+        else if (index == 2) data.themeColor = new Color(0.18f, 0.55f, 0.34f); // Football green
+        else if (index == 3) data.themeColor = new Color(0.25f, 0.08f, 0.08f); // Dragon red
+        else if (index == 4) data.themeColor = new Color(0.08f, 0.25f, 0.45f); // Fish teal
+        else if (index == 5) data.themeColor = new Color(0.78f, 0.72f, 0.38f); // Bee yellow
+        else if (index == 6) data.themeColor = new Color(0.1f, 0.1f, 0.15f); // Ninja black
+
+        // Generate 3 unique skins for this theme
+        data.playerSprites = new Sprite[3];
+        for (int s = 0; s < 3; s++)
+        {
+            data.playerSprites[s] = GetOrCreateSprite($"{name}/Player_{s}", 320, 320, (w, h) => GenerateThemeSkinTexture(index, s, w, h), 320);
+        }
+
+        data.obstacleTopSprite = GetOrCreateSprite($"{name}/ObstacleTop", 256, 256, (w, h) => GenerateThemeTexture("ObstacleBody", index, w, h), 256, FilterMode.Point);
+        data.obstacleBottomSprite = data.obstacleTopSprite;
+
+        if (index == 2) // Football goals don't use caps
+        {
+            data.obstacleTopCapSprite = null;
+            data.obstacleBottomCapSprite = null;
+        }
+        else
+        {
+            data.obstacleTopCapSprite = GetOrCreateSprite($"{name}/ObstacleCap", 256, 256, (w, h) => GenerateThemeTexture("ObstacleCap", index, w, h), 256, FilterMode.Point);
+            data.obstacleBottomCapSprite = data.obstacleTopCapSprite;
+        }
+
+        data.backgroundSprite = GetOrCreateSprite($"{name}/Background", 1536, 864, (w, h) => GenerateThemeTexture("Background", index, w, h), 1536f / 20f, FilterMode.Point);
+        data.groundDirtSprite = GetOrCreateSprite($"{name}/GroundDirt", 256, 256, (w, h) => GenerateThemeTexture("GroundDirt", index, w, h), 256, FilterMode.Point, TextureWrapMode.Repeat);
+        data.groundGrassSprite = GetOrCreateSprite($"{name}/GroundGrass", 256, 256, (w, h) => GenerateThemeTexture("GroundGrass", index, w, h), 512, FilterMode.Point, TextureWrapMode.Repeat);
+
+        // Fallbacks for sounds (use original classic clips)
+        data.flapSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Flap.wav");
+        data.scoreSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Score.wav");
+        data.hitSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Hit.wav");
+    }
+
+    private static Texture2D GenerateThemeTexture(string type, int index, int width, int height)
+    {
+        Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        Color clear = new Color(0f, 0f, 0f, 0f);
+
+        for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+                tex.SetPixel(x, y, clear);
+
+        Vector2 center = new Vector2(width / 2f, height / 2f);
+
+        if (type == "Player")
+        {
+            if (index == 1) // Space (Rocket)
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        Vector2 p = new Vector2(x, y);
+                        if (IsInsideEllipse(p, new Vector2(width * 0.45f, height * 0.5f), width * 0.28f, height * 0.16f))
+                        {
+                            tex.SetPixel(x, y, new Color(0.75f, 0.75f, 0.8f)); // steel body
+                        }
+                        Vector2 a = new Vector2(width * 0.7f, height * 0.66f);
+                        Vector2 b = new Vector2(width * 0.7f, height * 0.34f);
+                        Vector2 c = new Vector2(width * 0.95f, height * 0.5f);
+                        if (PointInTriangle(p, a, b, c))
+                        {
+                            tex.SetPixel(x, y, new Color(0.9f, 0.15f, 0.15f));
+                        }
+                        Vector2 fta = new Vector2(width * 0.25f, height * 0.66f);
+                        Vector2 ftb = new Vector2(width * 0.15f, height * 0.82f);
+                        Vector2 ftc = new Vector2(width * 0.35f, height * 0.5f);
+                        if (PointInTriangle(p, fta, ftb, ftc))
+                        {
+                            tex.SetPixel(x, y, new Color(0.9f, 0.15f, 0.15f));
+                        }
+                        Vector2 fba = new Vector2(width * 0.25f, height * 0.34f);
+                        Vector2 fbb = new Vector2(width * 0.15f, height * 0.18f);
+                        Vector2 fbc = new Vector2(width * 0.35f, height * 0.5f);
+                        if (PointInTriangle(p, fba, fbb, fbc))
+                        {
+                            tex.SetPixel(x, y, new Color(0.9f, 0.15f, 0.15f));
+                        }
+                        if (Vector2.Distance(p, new Vector2(width * 0.48f, height * 0.5f)) <= width * 0.06f)
+                        {
+                            tex.SetPixel(x, y, new Color(0.3f, 0.6f, 0.9f));
+                        }
+                        if (x < width * 0.18f && y > height * 0.42f && y < height * 0.58f)
+                        {
+                            tex.SetPixel(x, y, new Color(0.95f, 0.55f, 0.05f));
+                        }
+                    }
+                }
+            }
+            else if (index == 2) // Football
+            {
+                float r = width * 0.35f;
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        Vector2 p = new Vector2(x, y);
+                        float dist = Vector2.Distance(p, center);
+                        if (dist <= r)
+                        {
+                            float checker = Mathf.Sin(x * 0.15f) * Mathf.Sin(y * 0.15f);
+                            if (checker > 0.1f || dist > r - 6f)
+                            {
+                                tex.SetPixel(x, y, new Color(0.12f, 0.12f, 0.12f));
+                            }
+                            else
+                            {
+                                tex.SetPixel(x, y, Color.white);
+                            }
+                        }
+                    }
+                }
+            }
+            else if (index == 3) // Dragon
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        Vector2 p = new Vector2(x, y);
+                        if (IsInsideEllipse(p, new Vector2(width * 0.45f, height * 0.48f), width * 0.28f, height * 0.22f))
+                        {
+                            tex.SetPixel(x, y, new Color(0.85f, 0.2f, 0.2f));
+                        }
+                        if (IsInsideEllipse(p, new Vector2(width * 0.3f, height * 0.65f), width * 0.18f, height * 0.22f))
+                        {
+                            tex.SetPixel(x, y, new Color(0.95f, 0.55f, 0.1f));
+                        }
+                        if (x < width * 0.25f && y > height * 0.35f && y < height * 0.55f)
+                        {
+                            tex.SetPixel(x, y, new Color(0.85f, 0.2f, 0.2f));
+                        }
+                        if (Vector2.Distance(p, new Vector2(width * 0.62f, height * 0.54f)) <= width * 0.04f)
+                        {
+                            tex.SetPixel(x, y, Color.yellow);
+                        }
+                    }
+                }
+            }
+            else if (index == 4) // Fish
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        Vector2 p = new Vector2(x, y);
+                        if (IsInsideEllipse(p, new Vector2(width * 0.55f, height * 0.5f), width * 0.28f, height * 0.2f))
+                        {
+                            tex.SetPixel(x, y, new Color(0.95f, 0.45f, 0.1f));
+                        }
+                        Vector2 ta = new Vector2(width * 0.38f, height * 0.5f);
+                        Vector2 tb = new Vector2(width * 0.15f, height * 0.72f);
+                        Vector2 tc = new Vector2(width * 0.15f, height * 0.28f);
+                        if (PointInTriangle(p, ta, tb, tc))
+                        {
+                            tex.SetPixel(x, y, new Color(0.95f, 0.65f, 0.15f));
+                        }
+                        if (Vector2.Distance(p, new Vector2(width * 0.68f, height * 0.56f)) <= width * 0.05f)
+                        {
+                            tex.SetPixel(x, y, Color.white);
+                        }
+                        if (Vector2.Distance(p, new Vector2(width * 0.7f, height * 0.56f)) <= width * 0.02f)
+                        {
+                            tex.SetPixel(x, y, Color.black);
+                        }
+                    }
+                }
+            }
+            else if (index == 5) // Bee
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        Vector2 p = new Vector2(x, y);
+                        if (IsInsideEllipse(p, new Vector2(width * 0.48f, height * 0.48f), width * 0.28f, height * 0.2f))
+                        {
+                            int stripe = (x / 25) % 2;
+                            if (stripe == 0)
+                            {
+                                tex.SetPixel(x, y, new Color(0.95f, 0.85f, 0.1f));
+                            }
+                            else
+                            {
+                                tex.SetPixel(x, y, new Color(0.1f, 0.1f, 0.1f));
+                            }
+                        }
+                        if (IsInsideEllipse(p, new Vector2(width * 0.4f, height * 0.7f), width * 0.12f, height * 0.22f))
+                        {
+                            tex.SetPixel(x, y, new Color(1f, 1f, 1f, 0.75f));
+                        }
+                    }
+                }
+            }
+            else if (index == 6) // Ninja
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        Vector2 p = new Vector2(x, y);
+                        if (Vector2.Distance(p, center) <= width * 0.32f)
+                        {
+                            tex.SetPixel(x, y, new Color(0.12f, 0.12f, 0.15f));
+                            if (IsInsideEllipse(p, new Vector2(width * 0.56f, height * 0.54f), width * 0.14f, height * 0.08f))
+                            {
+                                tex.SetPixel(x, y, new Color(0.98f, 0.82f, 0.72f));
+                                if (Vector2.Distance(p, new Vector2(width * 0.52f, height * 0.54f)) <= 3f ||
+                                    Vector2.Distance(p, new Vector2(width * 0.6f, height * 0.54f)) <= 3f)
+                                {
+                                    tex.SetPixel(x, y, Color.black);
+                                }
+                            }
+                        }
+                        if (x > width * 0.1f && x < width * 0.25f && y > height * 0.44f && y < height * 0.54f)
+                        {
+                            tex.SetPixel(x, y, new Color(0.85f, 0.1f, 0.1f));
+                        }
+                    }
+                }
+            }
+        }
+        else if (type == "Background")
+        {
+            Color bottomColor = Color.black;
+            Color topColor = Color.black;
+
+            if (index == 1) { bottomColor = new Color(0.04f, 0.04f, 0.14f); topColor = new Color(0.01f, 0.01f, 0.04f); }
+            else if (index == 2) { bottomColor = new Color(0.18f, 0.55f, 0.34f); topColor = new Color(0.05f, 0.15f, 0.1f); }
+            else if (index == 3) { bottomColor = new Color(0.45f, 0.08f, 0.08f); topColor = new Color(0.1f, 0.04f, 0.04f); }
+            else if (index == 4) { bottomColor = new Color(0.08f, 0.28f, 0.52f); topColor = new Color(0.04f, 0.12f, 0.25f); }
+            else if (index == 5) { bottomColor = new Color(0.55f, 0.85f, 0.35f); topColor = new Color(0.48f, 0.81f, 0.95f); }
+            else if (index == 6) { bottomColor = new Color(0.08f, 0.08f, 0.14f); topColor = new Color(0.02f, 0.02f, 0.05f); }
+
+            for (int y = 0; y < height; y++)
+            {
+                float t = (float)y / height;
+                Color col = Color.Lerp(bottomColor, topColor, t);
+                for (int x = 0; x < width; x++)
+                {
+                    tex.SetPixel(x, y, col);
+                    if (index == 1)
+                    {
+                        if ((x * 17 + y * 23) % 401 == 0 && (x % 3 == 0))
+                        {
+                            tex.SetPixel(x, y, Color.white);
+                        }
+                    }
+                    else if (index == 2)
+                    {
+                        if (y > height * 0.85f && (x % 64 < 12))
+                        {
+                            tex.SetPixel(x, y, Color.white);
+                        }
+                    }
+                    else if (index == 6)
+                    {
+                        if (y < height * 0.3f && (x * 13 + y * 7) % 199 == 0)
+                        {
+                            tex.SetPixel(x, y, new Color(0.95f, 0.85f, 0.2f));
+                        }
+                    }
+                }
+            }
+        }
+        else if (type == "GroundDirt")
+        {
+            Color dirtColor = Color.grey;
+            if (index == 1) dirtColor = new Color(0.12f, 0.12f, 0.16f);
+            else if (index == 2) dirtColor = new Color(0.38f, 0.22f, 0.08f);
+            else if (index == 3) dirtColor = new Color(0.18f, 0.08f, 0.08f);
+            else if (index == 4) dirtColor = new Color(0.85f, 0.72f, 0.45f);
+            else if (index == 5) dirtColor = new Color(0.28f, 0.15f, 0.05f);
+            else if (index == 6) dirtColor = new Color(0.25f, 0.16f, 0.1f);
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Color col = dirtColor;
+                    if ((x + y * 7) % 19 == 0) col *= 0.85f;
+                    tex.SetPixel(x, y, col);
+                }
+            }
+        }
+        else if (type == "GroundGrass")
+        {
+            Color grassColor = Color.green;
+            if (index == 1) grassColor = new Color(0f, 0.95f, 0.95f);
+            else if (index == 2) grassColor = Color.white;
+            else if (index == 3) grassColor = new Color(0.95f, 0.25f, 0.05f);
+            else if (index == 4) grassColor = new Color(0.1f, 0.65f, 0.35f);
+            else if (index == 5) grassColor = new Color(0.95f, 0.85f, 0.15f);
+            else if (index == 6) grassColor = new Color(0.45f, 0.45f, 0.5f);
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    if (y > height - 12)
+                    {
+                        tex.SetPixel(x, y, grassColor);
+                    }
+                    else
+                    {
+                        tex.SetPixel(x, y, new Color(0f, 0f, 0f, 0f));
+                    }
+                }
+            }
+        }
+        else if (type == "ObstacleBody")
+        {
+            Color col = Color.green;
+            if (index == 1) col = new Color(0.35f, 0.35f, 0.4f);
+            else if (index == 2) col = Color.white;
+            else if (index == 3) col = new Color(0.2f, 0.2f, 0.2f);
+            else if (index == 4) col = new Color(0.85f, 0.35f, 0.5f);
+            else if (index == 5) col = new Color(0.12f, 0.45f, 0.15f);
+            else if (index == 6) col = new Color(0.38f, 0.25f, 0.15f);
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Color pCol = col;
+                    if (x < 12 || x > width - 12) pCol *= 0.7f;
+                    if (index == 1 && x > width / 2 - 8 && x < width / 2 + 8)
+                    {
+                        pCol = new Color(0f, 0.95f, 0.95f);
+                    }
+                    else if (index == 3 && (y % 32 < 4))
+                    {
+                        pCol = new Color(0.95f, 0.25f, 0.05f);
+                    }
+                    tex.SetPixel(x, y, pCol);
+                }
+            }
+        }
+        else if (type == "ObstacleCap")
+        {
+            Color col = Color.green;
+            if (index == 1) col = new Color(0.45f, 0.45f, 0.5f);
+            else if (index == 2) col = Color.white;
+            else if (index == 3) col = new Color(0.3f, 0.3f, 0.3f);
+            else if (index == 4) col = new Color(0.95f, 0.45f, 0.6f);
+            else if (index == 5) col = new Color(0.95f, 0.72f, 0.1f);
+            else if (index == 6) col = new Color(0.55f, 0.55f, 0.55f);
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Color pCol = col;
+                    if (x < 8 || x > width - 8 || y < 8 || y > height - 8) pCol *= 0.6f;
+                    if (index == 6)
+                    {
+                        Vector2 a = new Vector2(0, 0);
+                        Vector2 b = new Vector2(width, 0);
+                        Vector2 c = new Vector2(width / 2f, height);
+                        if (!PointInTriangle(new Vector2(x, y), a, b, c))
+                        {
+                            pCol = clear;
+                        }
+                    }
+                    tex.SetPixel(x, y, pCol);
+                }
+            }
+        }
+
+        tex.Apply();
+        return tex;
+    }
+
+    private static Texture2D GenerateThemeSkinTexture(int index, int skin, int width, int height)
+    {
+        Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        Color clear = new Color(0f, 0f, 0f, 0f);
+
+        for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+                tex.SetPixel(x, y, clear);
+
+        Vector2 center = new Vector2(width / 2f, height / 2f);
+
+        if (index == 1) // Space
+        {
+            if (skin == 0) // Rocket
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        Vector2 p = new Vector2(x, y);
+                        if (IsInsideEllipse(p, new Vector2(width * 0.45f, height * 0.5f), width * 0.28f, height * 0.16f))
+                            tex.SetPixel(x, y, new Color(0.75f, 0.75f, 0.8f)); // steel body
+
+                        // Red nose cone
+                        Vector2 a = new Vector2(width * 0.7f, height * 0.66f);
+                        Vector2 b = new Vector2(width * 0.7f, height * 0.34f);
+                        Vector2 c = new Vector2(width * 0.95f, height * 0.5f);
+                        if (PointInTriangle(p, a, b, c)) tex.SetPixel(x, y, new Color(0.9f, 0.15f, 0.15f));
+
+                        // Engine fins
+                        Vector2 fta = new Vector2(width * 0.25f, height * 0.66f);
+                        Vector2 ftb = new Vector2(width * 0.15f, height * 0.82f);
+                        Vector2 ftc = new Vector2(width * 0.35f, height * 0.5f);
+                        if (PointInTriangle(p, fta, ftb, ftc)) tex.SetPixel(x, y, new Color(0.9f, 0.15f, 0.15f));
+
+                        Vector2 fba = new Vector2(width * 0.25f, height * 0.34f);
+                        Vector2 fbb = new Vector2(width * 0.15f, height * 0.18f);
+                        Vector2 fbc = new Vector2(width * 0.35f, height * 0.5f);
+                        if (PointInTriangle(p, fba, fbb, fbc)) tex.SetPixel(x, y, new Color(0.9f, 0.15f, 0.15f));
+
+                        // Window
+                        if (Vector2.Distance(p, new Vector2(width * 0.48f, height * 0.5f)) <= width * 0.06f)
+                            tex.SetPixel(x, y, new Color(0.3f, 0.6f, 0.9f));
+                    }
+                }
+            }
+            else if (skin == 1) // Cosmic UFO
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        Vector2 p = new Vector2(x, y);
+                        if (IsInsideEllipse(p, center, width * 0.38f, height * 0.12f))
+                            tex.SetPixel(x, y, new Color(0.6f, 0.85f, 0.6f)); // green dome
+
+                        if (Vector2.Distance(p, new Vector2(width * 0.5f, height * 0.5f)) <= width * 0.18f && y >= height * 0.5f)
+                            tex.SetPixel(x, y, new Color(0.3f, 0.8f, 0.95f, 0.8f)); // dome glass
+                        
+                        if (y > height * 0.4f && y < height * 0.46f && (x % 32 < 8) && IsInsideEllipse(p, center, width * 0.38f, height * 0.12f))
+                            tex.SetPixel(x, y, Color.yellow);
+                    }
+                }
+            }
+            else if (skin == 2) // Satellite
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        Vector2 p = new Vector2(x, y);
+                        if (x > width * 0.38f && x < width * 0.62f && y > height * 0.38f && y < height * 0.62f)
+                            tex.SetPixel(x, y, new Color(0.85f, 0.85f, 0.85f));
+
+                        if ((x > width * 0.15f && x < width * 0.35f && y > height * 0.44f && y < height * 0.56f) ||
+                            (x > width * 0.65f && x < width * 0.85f && y > height * 0.44f && y < height * 0.56f))
+                        {
+                            tex.SetPixel(x, y, new Color(0.12f, 0.3f, 0.8f));
+                            if (x % 16 < 3 || y % 16 < 3) tex.SetPixel(x, y, Color.white);
+                        }
+                    }
+                }
+            }
+        }
+        else if (index == 2) // Football
+        {
+            float r = width * 0.35f;
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Vector2 p = new Vector2(x, y);
+                    float dist = Vector2.Distance(p, center);
+                    if (dist <= r)
+                    {
+                        if (skin == 0) // Soccer Ball
+                        {
+                            float checker = Mathf.Sin(x * 0.15f) * Mathf.Sin(y * 0.15f);
+                            tex.SetPixel(x, y, (checker > 0.1f || dist > r - 6f) ? new Color(0.12f, 0.12f, 0.12f) : Color.white);
+                        }
+                        else if (skin == 1) // Basketball
+                        {
+                            Color orange = new Color(0.9f, 0.4f, 0.08f);
+                            bool onCurve = Mathf.Abs(p.x - center.x - Mathf.Sin((p.y - center.y) * 0.05f) * 20f) < 4f ||
+                                           Mathf.Abs(p.y - center.y) < 4f || dist > r - 5f;
+                            tex.SetPixel(x, y, onCurve ? Color.black : orange);
+                        }
+                        else if (skin == 2) // Tennis Ball
+                        {
+                            Color lime = new Color(0.75f, 0.95f, 0.15f);
+                            bool onSeam = Mathf.Abs(Mathf.Sin((p.x - p.y) * 0.04f) * 18f - (p.y - center.y)) < 4f || dist > r - 5f;
+                            tex.SetPixel(x, y, onSeam ? Color.white : lime);
+                        }
+                    }
+                }
+            }
+        }
+        else if (index == 3) // Dragon
+        {
+            Color bodyCol = (skin == 0) ? new Color(0.85f, 0.2f, 0.2f) : (skin == 1 ? new Color(0.15f, 0.72f, 0.2f) : new Color(0.95f, 0.8f, 0.1f));
+            Color wingCol = (skin == 0) ? new Color(0.95f, 0.55f, 0.1f) : (skin == 1 ? new Color(0.95f, 0.85f, 0.2f) : new Color(0.6f, 0.15f, 0.65f));
+            Color eyeCol = (skin == 0) ? Color.yellow : (skin == 1 ? Color.red : Color.cyan);
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Vector2 p = new Vector2(x, y);
+                    if (IsInsideEllipse(p, new Vector2(width * 0.45f, height * 0.48f), width * 0.28f, height * 0.22f))
+                        tex.SetPixel(x, y, bodyCol);
+
+                    if (IsInsideEllipse(p, new Vector2(width * 0.3f, height * 0.65f), width * 0.18f, height * 0.22f))
+                        tex.SetPixel(x, y, wingCol);
+
+                    if (x < width * 0.25f && y > height * 0.35f && y < height * 0.55f)
+                        tex.SetPixel(x, y, bodyCol);
+
+                    if (Vector2.Distance(p, new Vector2(width * 0.62f, height * 0.54f)) <= width * 0.04f)
+                        tex.SetPixel(x, y, eyeCol);
+                }
+            }
+        }
+        else if (index == 4) // Fish
+        {
+            Color fishCol = (skin == 0) ? new Color(0.95f, 0.45f, 0.1f) : (skin == 1 ? new Color(0.48f, 0.55f, 0.6f) : new Color(0.95f, 0.6f, 0.75f));
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Vector2 p = new Vector2(x, y);
+                    if (skin == 2)
+                    {
+                        if (x > width * 0.32f && x < width * 0.68f && y < height * 0.5f && (x % 16 < 4))
+                        {
+                            tex.SetPixel(x, y, new Color(0.95f, 0.6f, 0.75f, 0.8f));
+                        }
+                    }
+
+                    if (IsInsideEllipse(p, new Vector2(width * 0.55f, height * 0.52f), width * 0.28f, height * 0.2f))
+                        tex.SetPixel(x, y, fishCol);
+
+                    if (skin < 2)
+                    {
+                        Vector2 ta = new Vector2(width * 0.38f, height * 0.5f);
+                        Vector2 tb = new Vector2(width * 0.15f, height * 0.72f);
+                        Vector2 tc = new Vector2(width * 0.15f, height * 0.28f);
+                        if (PointInTriangle(p, ta, tb, tc)) tex.SetPixel(x, y, fishCol * 1.15f);
+                    }
+
+                    if (Vector2.Distance(p, new Vector2(width * 0.68f, height * 0.56f)) <= width * 0.05f)
+                        tex.SetPixel(x, y, Color.white);
+                    if (Vector2.Distance(p, new Vector2(width * 0.7f, height * 0.56f)) <= width * 0.02f)
+                        tex.SetPixel(x, y, Color.black);
+                }
+            }
+        }
+        else if (index == 5) // Bee
+        {
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Vector2 p = new Vector2(x, y);
+                    if (skin == 0)
+                    {
+                        if (IsInsideEllipse(p, new Vector2(width * 0.48f, height * 0.48f), width * 0.28f, height * 0.2f))
+                        {
+                            int stripe = (x / 25) % 2;
+                            tex.SetPixel(x, y, (stripe == 0) ? new Color(0.95f, 0.85f, 0.1f) : new Color(0.1f, 0.1f, 0.1f));
+                        }
+                        if (IsInsideEllipse(p, new Vector2(width * 0.4f, height * 0.7f), width * 0.12f, height * 0.22f))
+                            tex.SetPixel(x, y, new Color(1f, 1f, 1f, 0.75f));
+                    }
+                    else if (skin == 1)
+                    {
+                        if (Vector2.Distance(p, center) <= width * 0.34f)
+                        {
+                            Color ladyCol = Color.red;
+                            if (Vector2.Distance(p, new Vector2(width * 0.42f, height * 0.62f)) <= 5f ||
+                                Vector2.Distance(p, new Vector2(width * 0.58f, height * 0.38f)) <= 5f ||
+                                Vector2.Distance(p, new Vector2(width * 0.5f, height * 0.5f)) <= 6f ||
+                                Mathf.Abs(p.x - center.x) < 2f)
+                            {
+                                ladyCol = Color.black;
+                            }
+                            tex.SetPixel(x, y, ladyCol);
+                        }
+                    }
+                    else if (skin == 2)
+                    {
+                        if (IsInsideEllipse(p, center, width * 0.08f, height * 0.32f))
+                            tex.SetPixel(x, y, new Color(0.15f, 0.15f, 0.15f));
+
+                        if (IsInsideEllipse(p, new Vector2(width * 0.3f, height * 0.54f), width * 0.22f, height * 0.28f) ||
+                            IsInsideEllipse(p, new Vector2(width * 0.7f, height * 0.54f), width * 0.22f, height * 0.28f))
+                        {
+                            if (tex.GetPixel(x, y).a == 0f) tex.SetPixel(x, y, new Color(0.95f, 0.4f, 0.85f));
+                        }
+                    }
+                }
+            }
+        }
+        else if (index == 6) // Ninja
+        {
+            Color grabCol = (skin == 0) ? new Color(0.12f, 0.12f, 0.15f) : (skin == 1 ? new Color(0.85f, 0.1f, 0.1f) : new Color(0.9f, 0.9f, 0.95f));
+            Color bandCol = (skin == 0) ? new Color(0.85f, 0.1f, 0.1f) : (skin == 1 ? new Color(0.12f, 0.12f, 0.15f) : new Color(0.1f, 0.4f, 0.8f));
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Vector2 p = new Vector2(x, y);
+                    if (Vector2.Distance(p, center) <= width * 0.32f)
+                    {
+                        tex.SetPixel(x, y, grabCol);
+                        if (IsInsideEllipse(p, new Vector2(width * 0.56f, height * 0.54f), width * 0.14f, height * 0.08f))
+                        {
+                            tex.SetPixel(x, y, new Color(0.98f, 0.82f, 0.72f));
+                            if (Vector2.Distance(p, new Vector2(width * 0.52f, height * 0.54f)) <= 3f ||
+                                Vector2.Distance(p, new Vector2(width * 0.6f, height * 0.54f)) <= 3f)
+                            {
+                                tex.SetPixel(x, y, Color.black);
+                            }
+                        }
+                    }
+                    if (x > width * 0.1f && x < width * 0.25f && y > height * 0.44f && y < height * 0.54f)
+                    {
+                        tex.SetPixel(x, y, bandCol);
+                    }
+                }
+            }
+        }
+
+        tex.Apply();
+        return tex;
+    }
+
+    private static Texture2D GenerateIconTexture(string name, int w, int h)
+    {
+        Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        Color clear = new Color(0f, 0f, 0f, 0f);
+
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                tex.SetPixel(x, y, clear);
+
+        if (name == "Home")
+        {
+            Color col = Color.white;
+            Vector2 a = new Vector2(w * 0.5f, h * 0.85f);
+            Vector2 b = new Vector2(w * 0.15f, h * 0.5f);
+            Vector2 c = new Vector2(w * 0.85f, h * 0.5f);
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    Vector2 p = new Vector2(x, y);
+                    bool inRoof = PointInTriangle(p, a, b, c);
+                    bool inBody = (x >= w * 0.22f && x <= w * 0.78f && y >= h * 0.15f && y <= h * 0.5f);
+                    bool inChimney = (x >= w * 0.65f && x <= w * 0.75f && y >= h * 0.5f && y <= h * 0.8f);
+                    
+                    if (inRoof || inBody || inChimney)
+                    {
+                        tex.SetPixel(x, y, col);
+                    }
+                    
+                    // Stencil cutouts
+                    if (x >= w * 0.43f && x <= w * 0.57f && y >= h * 0.15f && y <= h * 0.35f)
+                    {
+                        tex.SetPixel(x, y, clear); // Doorway cutout
+                    }
+                    if (Vector2.Distance(p, new Vector2(w * 0.5f, h * 0.6f)) <= w * 0.07f)
+                    {
+                        tex.SetPixel(x, y, clear); // Attic window cutout
+                    }
+                }
+            }
+        }
+        else if (name == "Shop")
+        {
+            Color roofRed = new Color(0.92f, 0.25f, 0.25f);
+            Color roofWhite = Color.white;
+            Color wallColor = new Color(0.85f, 0.85f, 0.9f);
+            Color baseGold = new Color(0.95f, 0.72f, 0.15f);
+            Color doorColor = new Color(0.2f, 0.2f, 0.25f);
+
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    // 1. Counter base
+                    if (x >= w * 0.15f && x <= w * 0.85f && y >= h * 0.15f && y <= h * 0.25f)
+                    {
+                        tex.SetPixel(x, y, baseGold);
+                    }
+                    // 2. Pillars/Walls
+                    else if (((x >= w * 0.15f && x <= w * 0.25f) || (x >= w * 0.75f && x <= w * 0.85f)) && y >= h * 0.25f && y <= h * 0.70f)
+                    {
+                        tex.SetPixel(x, y, wallColor);
+                    }
+                    // 3. Shop window display area background
+                    else if (x >= w * 0.25f && x <= w * 0.75f && y >= h * 0.25f && y <= h * 0.70f)
+                    {
+                        // Door
+                        if (x >= w * 0.43f && x <= w * 0.57f && y >= h * 0.25f && y <= h * 0.58f)
+                        {
+                            tex.SetPixel(x, y, doorColor);
+                        }
+                        else
+                        {
+                            tex.SetPixel(x, y, new Color(0.12f, 0.45f, 0.75f, 0.3f));
+                        }
+                    }
+                    // 4. Canopy (trapezoid with stripes)
+                    else if (y >= h * 0.70f && y <= h * 0.90f)
+                    {
+                        float t = (float)(y - h * 0.70f) / (h * 0.20f);
+                        float minX = Mathf.Lerp(w * 0.10f, w * 0.18f, t);
+                        float maxX = Mathf.Lerp(w * 0.90f, w * 0.82f, t);
+                        if (x >= minX && x <= maxX)
+                        {
+                            int stripeIndex = (int)((x - minX) / 14f);
+                            tex.SetPixel(x, y, (stripeIndex % 2 == 0) ? roofRed : roofWhite);
+                        }
+                    }
+                }
+            }
+        }
+        else if (name == "Heroes")
+        {
+            Color gold = new Color(0.95f, 0.72f, 0.15f);
+            Color blue = new Color(0.08f, 0.38f, 0.75f);
+            Color starColor = Color.white;
+
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    if (y >= h * 0.15f && y <= h * 0.85f)
+                    {
+                        float dx = Mathf.Abs(x - w * 0.5f);
+                        float pct = (y - h * 0.15f) / (h * 0.70f);
+                        float maxWidth = w * 0.36f * Mathf.Pow(pct, 0.45f);
+
+                        if (dx <= maxWidth)
+                        {
+                            float borderThickness = 6f;
+                            bool onBorder = (dx > maxWidth - borderThickness) || (y < h * 0.15f + borderThickness) || (y > h * 0.85f - borderThickness);
+                            
+                            if (onBorder)
+                            {
+                                tex.SetPixel(x, y, gold);
+                            }
+                            else
+                            {
+                                Vector2 p = new Vector2(x, y);
+                                if (PointInStar(p, new Vector2(w * 0.5f, h * 0.52f), 14f, 6f))
+                                {
+                                    tex.SetPixel(x, y, starColor);
+                                }
+                                else
+                                {
+                                    tex.SetPixel(x, y, blue);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        else if (name == "Missions")
+        {
+            Color board = new Color(0.18f, 0.22f, 0.32f);
+            Color paper = Color.white;
+            Color clipHold = new Color(0.95f, 0.72f, 0.15f);
+            Color checkColor = new Color(0.15f, 0.68f, 0.35f);
+            Color lineCol = new Color(0.75f, 0.78f, 0.82f);
+
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    Vector2 p = new Vector2(x, y);
+                    bool inBoard = (x >= 28 && x <= w - 28 && y >= 16 && y <= h - 16);
+                    bool inPaper = (x >= 35 && x <= w - 35 && y >= 22 && y <= h - 26);
+                    bool inClip = (x >= w/2 - 16 && x <= w/2 + 16 && y >= h - 22 && y <= h - 12);
+                    bool inClipHole = (x >= w/2 - 6 && x <= w/2 + 6 && y >= h - 18 && y <= h - 14);
+
+                    if (inClip && !inClipHole)
+                    {
+                        tex.SetPixel(x, y, clipHold);
+                    }
+                    else if (inPaper)
+                    {
+                        if (IsInCheckmark(p, new Vector2(48f, 70f)))
+                        {
+                            tex.SetPixel(x, y, checkColor);
+                        }
+                        else if (x >= 62 && x <= 90 && y >= 68 && y <= 72)
+                        {
+                            tex.SetPixel(x, y, lineCol);
+                        }
+                        else if (IsInCheckmark(p, new Vector2(48f, 45f)))
+                        {
+                            tex.SetPixel(x, y, checkColor);
+                        }
+                        else if (x >= 62 && x <= 90 && y >= 43 && y <= 47)
+                        {
+                            tex.SetPixel(x, y, lineCol);
+                        }
+                        else
+                        {
+                            tex.SetPixel(x, y, paper);
+                        }
+                    }
+                    else if (inBoard)
+                    {
+                        tex.SetPixel(x, y, board);
+                    }
+                }
+            }
+        }
+        else if (name == "Themes")
+        {
+            Color planetColorOuter = new Color(0.12f, 0.65f, 0.72f);
+            Color planetColorInner = new Color(0.48f, 0.2f, 0.75f);
+            Color ringColor = new Color(0.95f, 0.72f, 0.15f);
+            
+            float cx = w * 0.5f;
+            float cy = h * 0.5f;
+            float r = 26f;
+            
+            float cos = Mathf.Cos(-25f * Mathf.Deg2Rad);
+            float sin = Mathf.Sin(-25f * Mathf.Deg2Rad);
+
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    float dx = x - cx;
+                    float dy = y - cy;
+                    float distSq = dx * dx + dy * dy;
+                    
+                    float rx = dx * cos - dy * sin;
+                    float ry = dx * sin + dy * cos;
+                    
+                    float a = 44f;
+                    float b = 11f;
+                    float val = (rx * rx) / (a * a) + (ry * ry) / (b * b);
+                    bool isRing = (val >= 0.76f && val <= 1.24f);
+                    bool isPlanet = distSq <= r * r;
+                    
+                    if (isRing)
+                    {
+                        if (isPlanet && ry < 0)
+                        {
+                            float t = Mathf.Clamp01(Mathf.Sqrt(distSq) / r);
+                            Color col = Color.Lerp(planetColorInner, planetColorOuter, t);
+                            tex.SetPixel(x, y, col);
+                        }
+                        else
+                        {
+                            tex.SetPixel(x, y, ringColor);
+                        }
+                    }
+                    else if (isPlanet)
+                    {
+                        float t = Mathf.Clamp01(Mathf.Sqrt(distSq) / r);
+                        Color col = Color.Lerp(planetColorInner, planetColorOuter, t);
+                        tex.SetPixel(x, y, col);
+                    }
+                }
+            }
+        }
+        else if (name == "Play")
+        {
+            Vector2 a = new Vector2(w * 0.32f, h * 0.72f);
+            Vector2 b = new Vector2(w * 0.32f, h * 0.28f);
+            Vector2 c = new Vector2(w * 0.72f, h * 0.5f);
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    if (PointInTriangle(new Vector2(x, y), a, b, c))
+                    {
+                        tex.SetPixel(x, y, Color.white);
+                    }
+                }
+            }
+        }
+
+        tex.Apply();
+        return tex;
+    }
+
+    private static bool PointInStar(Vector2 p, Vector2 center, float outerRadius, float innerRadius)
+    {
+        Vector2 d = p - center;
+        float dist = d.magnitude;
+        if (dist > outerRadius) return false;
+        if (dist < innerRadius) return true;
+        
+        float angle = Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg;
+        if (angle < 0) angle += 360f;
+        
+        float sector = (angle + 18f) % 72f - 36f;
+        float rad = sector * Mathf.Deg2Rad;
+        
+        float maxR = Mathf.Lerp(outerRadius, innerRadius, Mathf.Abs(rad) / (36f * Mathf.Deg2Rad));
+        return dist <= maxR;
+    }
+
+    private static bool PointInLineSegment(Vector2 p, Vector2 start, Vector2 end, float thickness)
+    {
+        Vector2 line = end - start;
+        float len = line.magnitude;
+        if (len == 0f) return Vector2.Distance(p, start) <= thickness;
+        
+        Vector2 dir = line / len;
+        float projection = Vector2.Dot(p - start, dir);
+        if (projection < 0) return Vector2.Distance(p, start) <= thickness;
+        if (projection > len) return Vector2.Distance(p, end) <= thickness;
+        
+        Vector2 closestPoint = start + dir * projection;
+        return Vector2.Distance(p, closestPoint) <= thickness;
+    }
+
+    private static bool IsInCheckmark(Vector2 p, Vector2 center)
+    {
+        Vector2 s1 = new Vector2(center.x - 6f, center.y + 1f);
+        Vector2 s2 = new Vector2(center.x, center.y - 5f);
+        Vector2 s3 = new Vector2(center.x + 9f, center.y + 6f);
+        
+        return PointInLineSegment(p, s1, s2, 2.5f) || PointInLineSegment(p, s2, s3, 2.5f);
     }
 }

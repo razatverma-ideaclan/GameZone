@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a931a1a2c4a43619a4ec184579a944, type: 3}
+  m_Name: BeeTheme
+  m_EditorClassIdentifier: Assembly-CSharp::ThemeData
+  themeName: Bee
+  themeColor: {r: 0.78, g: 0.72, b: 0.38, a: 1}
+  playerSprites:
+  - {fileID: 21300000, guid: 2b410f0bd8de34d73b1c48da98d3a78b, type: 3}
+  - {fileID: 21300000, guid: fa46538c1995642b2abef7e584281846, type: 3}
+  - {fileID: 21300000, guid: 7b9f7863dbac747ea895b91162b9a21d, type: 3}
+  obstacleTopSprite: {fileID: 21300000, guid: 0efb9b2a9b3384f5bb34a005afa546da, type: 3}
+  obstacleBottomSprite: {fileID: 21300000, guid: 0efb9b2a9b3384f5bb34a005afa546da, type: 3}
+  obstacleTopCapSprite: {fileID: 21300000, guid: 4fef4bf7895a44125bbc5ae2a6bea445, type: 3}
+  obstacleBottomCapSprite: {fileID: 21300000, guid: 4fef4bf7895a44125bbc5ae2a6bea445, type: 3}
+  backgroundSprite: {fileID: 21300000, guid: ed1853f0578154592870b03547e3bbd2, type: 3}
+  groundDirtSprite: {fileID: 21300000, guid: dfd31627ad8bf41beadf5e614ee4ce06, type: 3}
+  groundGrassSprite: {fileID: 21300000, guid: 1b42f706f1dc9412ebb65877d320579f, type: 3}
+  flapSound: {fileID: 8300000, guid: 5416899b0017c45c380689db898528b3, type: 3}
+  scoreSound: {fileID: 8300000, guid: fe31ad2b8bb7541ee8ec3cda337b725e, type: 3}
+  hitSound: {fileID: 8300000, guid: 898877ff2a88247ea8d8d647fae5f894, type: 3}
+  backgroundMusic: {fileID: 0}

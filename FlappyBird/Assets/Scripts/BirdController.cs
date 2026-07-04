@@ -55,6 +55,13 @@ public class BirdController : MonoBehaviour
     [HideInInspector]
     public Sprite[] flapSprites; // fallback for backwards compatibility
 
+    private Sprite[] themeOverrideSprites;
+
+    public void OverrideSprites(Sprite[] sprites)
+    {
+        themeOverrideSprites = sprites;
+    }
+
     private SpriteRenderer spriteRenderer;
     private Rigidbody2D rb;
     private AudioSource audioSource;
@@ -124,14 +131,17 @@ public class BirdController : MonoBehaviour
     {
         if (spriteRenderer == null) return;
 
-        Sprite[] activeSprites = null;
-        if (skins != null && skins.Length > 0 && currentSkinIndex < skins.Length)
+        Sprite[] activeSprites = themeOverrideSprites;
+        if (activeSprites == null || activeSprites.Length == 0)
         {
-            activeSprites = skins[currentSkinIndex].flapSprites;
-        }
-        else
-        {
-            activeSprites = flapSprites;
+            if (skins != null && skins.Length > 0 && currentSkinIndex < skins.Length)
+            {
+                activeSprites = skins[currentSkinIndex].flapSprites;
+            }
+            else
+            {
+                activeSprites = flapSprites;
+            }
         }
 
         if (activeSprites == null || activeSprites.Length == 0) return;
@@ -190,15 +200,6 @@ public class BirdController : MonoBehaviour
         transform.position = startPosition;
         transform.rotation = Quaternion.identity;
         UpdateSkin();
-    }
-
-    void OnMouseDown()
-    {
-        // Cycle bird skins when clicked directly on the start screen
-        if (isIdle && !controlEnabled)
-        {
-            NextSkin();
-        }
     }
 
     void OnCollisionEnter2D(Collision2D collision)
@@ -350,8 +351,28 @@ public class BirdController : MonoBehaviour
         PlayFlapOrClickSound();
     }
 
+    public void SetSkin(int index)
+    {
+        if (skins == null || skins.Length == 0) return;
+        currentSkinIndex = Mathf.Clamp(index, 0, skins.Length - 1);
+        PlayerPrefs.SetInt("FlappyBird_SelectedSkin", currentSkinIndex);
+        PlayerPrefs.Save();
+        UpdateSkin();
+        if (gameObject.activeInHierarchy)
+        {
+            PlayFlapOrClickSound();
+        }
+    }
+
     public void UpdateSkin()
     {
+        if (themeOverrideSprites != null && themeOverrideSprites.Length > 0 && spriteRenderer != null)
+        {
+            int midIndex = themeOverrideSprites.Length > 1 ? 1 : 0;
+            spriteRenderer.sprite = themeOverrideSprites[midIndex];
+            return;
+        }
+
         if (skins == null || skins.Length == 0 || currentSkinIndex >= skins.Length || spriteRenderer == null) return;
         Sprite[] activeSprites = skins[currentSkinIndex].flapSprites;
         if (activeSprites != null && activeSprites.Length > 1)

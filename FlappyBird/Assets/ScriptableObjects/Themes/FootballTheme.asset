@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a931a1a2c4a43619a4ec184579a944, type: 3}
+  m_Name: FootballTheme
+  m_EditorClassIdentifier: Assembly-CSharp::ThemeData
+  themeName: Football
+  themeColor: {r: 0.18, g: 0.55, b: 0.34, a: 1}
+  playerSprites:
+  - {fileID: 21300000, guid: 2c360f0c30dea4eae92dce293d6c638d, type: 3}
+  - {fileID: 21300000, guid: 68869574506b9494897e05f3e1918fce, type: 3}
+  - {fileID: 21300000, guid: 5a6bde27ee6cc42f88a94fff4b1cb869, type: 3}
+  obstacleTopSprite: {fileID: 21300000, guid: 1dbafd7db84f540cbaa68109aaf710ab, type: 3}
+  obstacleBottomSprite: {fileID: 21300000, guid: 1dbafd7db84f540cbaa68109aaf710ab, type: 3}
+  obstacleTopCapSprite: {fileID: 0}
+  obstacleBottomCapSprite: {fileID: 0}
+  backgroundSprite: {fileID: 21300000, guid: f5584e7ffc70743c3a3ef7ad1404afec, type: 3}
+  groundDirtSprite: {fileID: 21300000, guid: fa9175fae53bf46bd9dc2606c5b88603, type: 3}
+  groundGrassSprite: {fileID: 21300000, guid: 0b4c37c3378ce4820b408ff546f23280, type: 3}
+  flapSound: {fileID: 8300000, guid: 5416899b0017c45c380689db898528b3, type: 3}
+  scoreSound: {fileID: 8300000, guid: fe31ad2b8bb7541ee8ec3cda337b725e, type: 3}
+  hitSound: {fileID: 8300000, guid: 898877ff2a88247ea8d8d647fae5f894, type: 3}
+  backgroundMusic: {fileID: 0}

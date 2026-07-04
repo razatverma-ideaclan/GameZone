@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a931a1a2c4a43619a4ec184579a944, type: 3}
+  m_Name: SpaceTheme
+  m_EditorClassIdentifier: Assembly-CSharp::ThemeData
+  themeName: Space
+  themeColor: {r: 0.04, g: 0.04, b: 0.12, a: 1}
+  playerSprites:
+  - {fileID: 21300000, guid: 8171d81c4866f40b8b33a9a0223b7b16, type: 3}
+  - {fileID: 21300000, guid: c0b16bdf5058846c18855ab0ff59aa40, type: 3}
+  - {fileID: 21300000, guid: da3f590033a7e46aab55599e5b947e76, type: 3}
+  obstacleTopSprite: {fileID: 21300000, guid: 53667e9f1d1854612ba118883ce587ad, type: 3}
+  obstacleBottomSprite: {fileID: 21300000, guid: 53667e9f1d1854612ba118883ce587ad, type: 3}
+  obstacleTopCapSprite: {fileID: 21300000, guid: c55b84fef6cd4431faea4b24f63432da, type: 3}
+  obstacleBottomCapSprite: {fileID: 21300000, guid: c55b84fef6cd4431faea4b24f63432da, type: 3}
+  backgroundSprite: {fileID: 21300000, guid: 84fc05222c1154e5da70be76a7476287, type: 3}
+  groundDirtSprite: {fileID: 21300000, guid: c174016b9fbc4406dbf2d5dded5bb306, type: 3}
+  groundGrassSprite: {fileID: 21300000, guid: 77b0372668a91448b9c2ce4b443ef960, type: 3}
+  flapSound: {fileID: 8300000, guid: 5416899b0017c45c380689db898528b3, type: 3}
+  scoreSound: {fileID: 8300000, guid: fe31ad2b8bb7541ee8ec3cda337b725e, type: 3}
+  hitSound: {fileID: 8300000, guid: 898877ff2a88247ea8d8d647fae5f894, type: 3}
+  backgroundMusic: {fileID: 0}

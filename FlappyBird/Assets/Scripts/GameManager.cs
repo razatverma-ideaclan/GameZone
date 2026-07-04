@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 
 /// <summary>
@@ -12,6 +13,9 @@ public class GameManager : MonoBehaviour
 
     public enum GameState { Start, Playing, GameOver }
     public GameState CurrentState { get; private set; } = GameState.Start;
+
+    public enum MenuScreen { Lobby, Worlds, Heroes, Shop, Quests, Leaderboard }
+    public MenuScreen CurrentScreen { get; private set; } = MenuScreen.Lobby;
 
     [Header("UI Panels")]
     public GameObject startPanel;
@@ -33,6 +37,25 @@ public class GameManager : MonoBehaviour
     public Sprite medalPlaceholder;
     public GameObject newBestBadge;
     public RectTransform resultCardTransform;
+
+    [Header("Optimized Start Screen")]
+    public GameObject toastPanel;
+    public GameObject themeSelectorPanel;
+    public GameObject lobbyPanel;
+    public GameObject heroesPanel;
+    public GameObject shopPanel;
+    public GameObject questsPanel;
+    public GameObject leaderboardPanel;
+    public UnityEngine.UI.Image playIconImage;
+    public Sprite playSprite;
+    public Sprite homeSprite;
+
+    [Header("Navigation Buttons")]
+    public UnityEngine.UI.Button shopButton;
+    public UnityEngine.UI.Button heroesButton;
+    public UnityEngine.UI.Button missionsButton;
+    public UnityEngine.UI.Button themesButton;
+    public UnityEngine.UI.Button centerButton;
 
     [Header("References")]
     public GameObject bird;
@@ -85,12 +108,26 @@ public class GameManager : MonoBehaviour
 
     void Update()
     {
-        // Spacebar key to start the game for keyboard players
         if (CurrentState == GameState.Start)
         {
             if (Input.GetKeyDown(KeyCode.Space))
             {
                 StartGame();
+                return;
+            }
+
+            if (Input.GetMouseButtonDown(0) || TouchStarted())
+            {
+                // Any tap on a UI element (nav bar, badges, the Leaderboard button, etc.) is
+                // handled by that element's own Button.onClick — don't also treat it as tap-to-start.
+                bool overUI = EventSystem.current != null && (Input.touchCount > 0
+                    ? EventSystem.current.IsPointerOverGameObject(Input.GetTouch(0).fingerId)
+                    : EventSystem.current.IsPointerOverGameObject());
+
+                if (!overUI && CurrentScreen == MenuScreen.Lobby && !justEnteredStartState)
+                {
+                    StartGame();
+                }
             }
         }
     }
@@ -103,9 +140,9 @@ public class GameManager : MonoBehaviour
     public void ShowStartState()
     {
         CurrentState = GameState.Start;
-        Time.timeScale = 1f;
-        score = 0;
+        justEnteredStartState = true;
         startStateTime = Time.time; // Record start screen entry time
+        score = 0; // each run starts fresh — this was never reset, so score kept accumulating across retries
         UpdateScoreUI();
 
         if (startPanel != null) startPanel.SetActive(true);
@@ -120,18 +157,110 @@ public class GameManager : MonoBehaviour
         WeatherController weather = FindObjectOfType<WeatherController>();
         if (weather != null) weather.ResetWeather();
 
-        // Freeze bird and pipes until the player starts.
-        if (bird != null)
-        {
-            bird.SetActive(true);
-            BirdController birdController = bird.GetComponent<BirdController>();
-            if (birdController != null) birdController.ResetBird();
-        }
-
         if (pipeSpawner != null) pipeSpawner.StopSpawning();
 
         // Remove any pipes left over from a previous run.
         ClearExistingPipes();
+
+        // Always land back on the Lobby screen (resets bird preview, panels, nav visuals).
+        SetMenuScreen(MenuScreen.Lobby);
+
+        // Start flushing click queue to allow play trigger
+        StartCoroutine(ClearTransitionFlag());
+    }
+
+    /// <summary>
+    /// Single source of truth for which full-screen menu panel is showing
+    /// (Lobby / Worlds / Heroes). Replaces the old scattered SetActive() calls
+    /// and boolean flags so Home/back navigation works uniformly from any screen.
+    /// </summary>
+    public void SetMenuScreen(MenuScreen screen)
+    {
+        CurrentScreen = screen;
+        bool onLobby = screen == MenuScreen.Lobby;
+
+        if (lobbyPanel != null) lobbyPanel.SetActive(onLobby);
+        if (themeSelectorPanel != null) themeSelectorPanel.SetActive(screen == MenuScreen.Worlds);
+        if (heroesPanel != null) heroesPanel.SetActive(screen == MenuScreen.Heroes);
+        if (shopPanel != null) shopPanel.SetActive(screen == MenuScreen.Shop);
+        if (questsPanel != null) questsPanel.SetActive(screen == MenuScreen.Quests);
+        if (leaderboardPanel != null) leaderboardPanel.SetActive(screen == MenuScreen.Leaderboard);
+
+        // Bird preview only shows on the Lobby screen.
+        if (bird != null)
+        {
+            bird.SetActive(onLobby);
+            if (onLobby)
+            {
+                bird.transform.localScale = new Vector3(2.0f, 2.0f, 1f); // Large preview scale
+                BirdController birdController = bird.GetComponent<BirdController>();
+                if (birdController != null) birdController.ResetBird();
+            }
+        }
+
+        // Center nav button doubles as Play (Lobby) / Home (any other screen).
+        if (playIconImage != null)
+        {
+            Sprite iconSprite = onLobby ? playSprite : homeSprite;
+            if (iconSprite != null) playIconImage.sprite = iconSprite;
+        }
+
+        if (screen == MenuScreen.Heroes) RefreshHeroesPanel();
+        if (screen == MenuScreen.Worlds)
+        {
+            ThemeSelectorUI selector = themeSelectorPanel != null ? themeSelectorPanel.GetComponent<ThemeSelectorUI>() : null;
+            if (selector != null) selector.UpdateSelectionUI();
+        }
+        if (screen == MenuScreen.Leaderboard)
+        {
+            LeaderboardUI board = leaderboardPanel != null ? leaderboardPanel.GetComponent<LeaderboardUI>() : null;
+            if (board != null) board.Refresh();
+        }
+
+        UpdateNavVisuals(screen);
+
+        GameObject activePanel;
+        switch (screen)
+        {
+            case MenuScreen.Worlds: activePanel = themeSelectorPanel; break;
+            case MenuScreen.Heroes: activePanel = heroesPanel; break;
+            case MenuScreen.Shop: activePanel = shopPanel; break;
+            case MenuScreen.Quests: activePanel = questsPanel; break;
+            case MenuScreen.Leaderboard: activePanel = leaderboardPanel; break;
+            default: activePanel = lobbyPanel; break;
+        }
+        if (screenTransitionCoroutine != null) StopCoroutine(screenTransitionCoroutine);
+        if (activePanel != null) screenTransitionCoroutine = StartCoroutine(AnimateScreenIn(activePanel));
+    }
+
+    private Coroutine screenTransitionCoroutine;
+
+    /// <summary>Fades/slides a menu screen in on entry. Same ease-out-sine pattern as AnimateGameOverBoard().</summary>
+    private System.Collections.IEnumerator AnimateScreenIn(GameObject screenPanel)
+    {
+        RectTransform rt = screenPanel.GetComponent<RectTransform>();
+        CanvasGroup cg = screenPanel.GetComponent<CanvasGroup>();
+        if (cg == null) cg = screenPanel.AddComponent<CanvasGroup>();
+
+        Vector2 originalPos = rt != null ? rt.anchoredPosition : Vector2.zero;
+        Vector2 startPos = originalPos + new Vector2(0, -40f);
+
+        cg.alpha = 0f;
+        if (rt != null) rt.anchoredPosition = startPos;
+
+        float duration = 0.22f;
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Sin(Mathf.Clamp01(elapsed / duration) * Mathf.PI * 0.5f); // ease out sine
+            cg.alpha = t;
+            if (rt != null) rt.anchoredPosition = Vector2.Lerp(startPos, originalPos, t);
+            yield return null;
+        }
+
+        cg.alpha = 1f;
+        if (rt != null) rt.anchoredPosition = originalPos;
     }
 
     // Hook this up to the Start button's OnClick() in the Inspector (tapping
@@ -139,17 +268,26 @@ public class GameManager : MonoBehaviour
     public void StartGame()
     {
         if (CurrentState != GameState.Start) return;
-        if (justEnteredStartState) return;
 
         PlayClickSound();
 
+        if (CurrentScreen != MenuScreen.Lobby)
+        {
+            // Center button acts as HOME button on any non-Lobby screen (Worlds, Heroes, ...).
+            SetMenuScreen(MenuScreen.Lobby);
+            return;
+        }
+
+        // Lobby state: start the gameplay!
         CurrentState = GameState.Playing;
+
         if (startPanel != null) startPanel.SetActive(false);
         if (gameOverPanel != null) gameOverPanel.SetActive(false);
         if (scoreText != null) scoreText.SetActive(true);
 
         if (bird != null)
         {
+            bird.transform.localScale = new Vector3(1.2f, 1.2f, 1f); // Standard gameplay scale
             BirdController birdController = bird.GetComponent<BirdController>();
             if (birdController != null) birdController.EnableControl();
         }
@@ -209,6 +347,8 @@ public class GameManager : MonoBehaviour
             bestScore = score;
             PlayerPrefs.SetInt(HighScoreKey, bestScore);
             PlayerPrefs.Save();
+
+            if (LeaderboardManager.Instance != null) LeaderboardManager.Instance.SubmitScore(bestScore);
         }
 
         if (gameOverPanel != null)
@@ -409,5 +549,278 @@ public class GameManager : MonoBehaviour
         }
 
         camTrans.localPosition = originalPos;
+    }
+
+    // --- Bottom Navigation Tab Click Handlers ---
+
+    public void OnShopClicked()
+    {
+        PlayClickSound();
+        if (CurrentState != GameState.Start) return;
+
+        SetMenuScreen(CurrentScreen == MenuScreen.Shop ? MenuScreen.Lobby : MenuScreen.Shop);
+    }
+
+    public void OnHeroesClicked()
+    {
+        PlayClickSound();
+        if (CurrentState != GameState.Start) return;
+
+        SetMenuScreen(CurrentScreen == MenuScreen.Heroes ? MenuScreen.Lobby : MenuScreen.Heroes);
+    }
+
+    private static readonly string[] HeroWorldNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja" };
+
+    /// <summary>
+    /// Hooked up to every card in the all-worlds Heroes roster. globalIndex is (worldIndex*3 + skinIndex),
+    /// covering all 7 worlds x 3 skins = 21 heroes. Fully independent of the selected World —
+    /// picking a hero here never changes which world/environment is active, and vice versa.
+    /// </summary>
+    private const string SelectedHeroKey = "FlappyBird_SelectedHeroGlobal";
+
+    public void SelectHeroGlobal(int globalIndex)
+    {
+        PlayClickSound();
+
+        PlayerPrefs.SetInt(SelectedHeroKey, globalIndex);
+        PlayerPrefs.Save();
+
+        if (ThemeApplier.Instance != null) ThemeApplier.Instance.ApplyHeroSprite(globalIndex);
+
+        RefreshHeroesPanel();
+    }
+
+    public void RefreshHeroesPanel()
+    {
+        if (heroesPanel == null) return;
+
+        int currentGlobal = PlayerPrefs.GetInt(SelectedHeroKey, 0);
+        int currentWorld = currentGlobal / 3;
+        int currentSkin = currentGlobal % 3;
+
+        // Header Text update
+        Transform headerTextTrans = heroesPanel.transform.Find("HeaderBar/Text");
+        if (headerTextTrans != null)
+        {
+            UnityEngine.UI.Text headerText = headerTextTrans.GetComponent<UnityEngine.UI.Text>();
+            if (headerText != null) headerText.text = "HEROES (" + (currentGlobal + 1) + "/21)";
+        }
+
+        // Update the selected-state outline/scale/checkmark on all 21 cards (names/sprites are
+        // baked in at build time since the roster never changes).
+        for (int t = 0; t < HeroWorldNames.Length; t++)
+        {
+            for (int s = 0; s < 3; s++)
+            {
+                Transform cardTrans = heroesPanel.transform.Find("ScrollView/Viewport/Content/" + HeroWorldNames[t] + "Card" + s);
+                if (cardTrans == null) continue;
+
+                bool selected = t == currentWorld && s == currentSkin;
+
+                Transform checkTrans = cardTrans.Find("Checkmark");
+                if (checkTrans != null) checkTrans.gameObject.SetActive(selected);
+
+                UnityEngine.UI.Outline cardOutline = cardTrans.GetComponent<UnityEngine.UI.Outline>();
+                if (cardOutline != null)
+                {
+                    cardOutline.effectColor = selected ? new Color(0.95f, 0.72f, 0.15f) : new Color(0.35f, 0.35f, 0.4f);
+                    cardOutline.effectDistance = selected ? new Vector2(4f, -4f) : new Vector2(2f, -2f);
+                }
+                cardTrans.localScale = selected ? new Vector3(1.05f, 1.05f, 1f) : Vector3.one;
+            }
+        }
+    }
+
+    public void OnMissionsClicked()
+    {
+        PlayClickSound();
+        if (CurrentState != GameState.Start) return;
+
+        SetMenuScreen(CurrentScreen == MenuScreen.Quests ? MenuScreen.Lobby : MenuScreen.Quests);
+    }
+
+    public void OnThemesClicked()
+    {
+        PlayClickSound();
+        if (CurrentState != GameState.Start) return;
+
+        SetMenuScreen(CurrentScreen == MenuScreen.Worlds ? MenuScreen.Lobby : MenuScreen.Worlds);
+    }
+
+    public void OnLeaderboardClicked()
+    {
+        PlayClickSound();
+        if (CurrentState != GameState.Start) return;
+
+        SetMenuScreen(CurrentScreen == MenuScreen.Leaderboard ? MenuScreen.Lobby : MenuScreen.Leaderboard);
+    }
+
+    /// <summary>
+    /// Styles all 5 bottom-bar slots so exactly one reads as active, matching CurrentScreen.
+    /// Replaces the old SetFocusedButton, which excluded the center button and left it
+    /// permanently looking "active" regardless of the real screen state.
+    /// </summary>
+    private RectTransform navIndicator;
+    private Coroutine navIndicatorCoroutine;
+
+    /// <summary>
+    /// Styles all 5 bottom-bar slots so exactly one reads as active, matching CurrentScreen.
+    /// Replaces the old SetFocusedButton, which excluded the center button and left it
+    /// permanently looking "active" regardless of the real screen state.
+    /// </summary>
+    private void UpdateNavVisuals(MenuScreen screen)
+    {
+        SetNavButtonActive(shopButton, screen == MenuScreen.Shop, false);
+        SetNavButtonActive(heroesButton, screen == MenuScreen.Heroes, false);
+        SetNavButtonActive(missionsButton, screen == MenuScreen.Quests, false);
+        SetNavButtonActive(themesButton, screen == MenuScreen.Worlds, false);
+        SetNavButtonActive(centerButton, screen == MenuScreen.Lobby, true);
+
+        // Slide the active indicator behind the active button
+        UnityEngine.UI.Button targetBtn = null;
+        bool isCenter = false;
+        switch (screen)
+        {
+            case MenuScreen.Shop: targetBtn = shopButton; break;
+            case MenuScreen.Heroes: targetBtn = heroesButton; break;
+            case MenuScreen.Quests: targetBtn = missionsButton; break;
+            case MenuScreen.Worlds: targetBtn = themesButton; break;
+            case MenuScreen.Lobby: targetBtn = centerButton; isCenter = true; break;
+        }
+
+        if (targetBtn != null)
+        {
+            if (navIndicatorCoroutine != null) StopCoroutine(navIndicatorCoroutine);
+
+            if (navIndicator == null && shopButton != null && shopButton.transform.parent != null)
+            {
+                Transform t = shopButton.transform.parent.Find("ActiveIndicator");
+                if (t != null) navIndicator = t.GetComponent<RectTransform>();
+            }
+
+            if (navIndicator != null)
+            {
+                RectTransform targetRt = targetBtn.GetComponent<RectTransform>();
+                Vector2 targetPos = targetRt.anchoredPosition;
+                if (isCenter) targetPos.y += 10f;
+                Vector2 targetSize = isCenter ? new Vector2(180, 130) : new Vector2(120, 110);
+
+                if (navIndicator.anchoredPosition == Vector2.zero) // Snap on first layout
+                {
+                    navIndicator.anchoredPosition = targetPos;
+                    navIndicator.sizeDelta = targetSize;
+                }
+                else
+                {
+                    navIndicatorCoroutine = StartCoroutine(AnimateNavIndicator(targetPos, targetSize));
+                }
+            }
+        }
+    }
+
+    private System.Collections.IEnumerator AnimateNavIndicator(Vector2 targetPos, Vector2 targetSize)
+    {
+        float t = 0f;
+        float duration = 0.22f;
+        Vector2 startPos = navIndicator.anchoredPosition;
+        Vector2 startSize = navIndicator.sizeDelta;
+
+        while (t < duration)
+        {
+            t += Time.unscaledDeltaTime;
+            float progress = Mathf.Sin((t / duration) * Mathf.PI * 0.5f); // ease-out-sine
+            navIndicator.anchoredPosition = Vector2.Lerp(startPos, targetPos, progress);
+            navIndicator.sizeDelta = Vector2.Lerp(startSize, targetSize, progress);
+            yield return null;
+        }
+
+        navIndicator.anchoredPosition = targetPos;
+        navIndicator.sizeDelta = targetSize;
+    }
+
+    private void SetNavButtonActive(UnityEngine.UI.Button btn, bool active, bool isCenter)
+    {
+        if (btn == null) return;
+        float targetScale = active ? 1.15f : (isCenter ? 0.9f : 1f);
+        btn.transform.localScale = new Vector3(targetScale, targetScale, 1f);
+
+        Color activeColor = Color.white;
+        if (ThemeManager.Instance != null)
+        {
+            ThemeData currentTheme = ThemeManager.Instance.GetCurrentTheme();
+            if (currentTheme != null)
+            {
+                activeColor = currentTheme.themeColor;
+                float h, s, v;
+                Color.RGBToHSV(activeColor, out h, out s, out v);
+                s = Mathf.Max(s, 0.75f);
+                v = Mathf.Max(v, 0.95f);
+                activeColor = Color.HSVToRGB(h, s, v);
+            }
+        }
+
+        if (isCenter)
+        {
+            // Keeps its yellow branding, but visibly fades when it's not the active tab
+            // (Play, on Lobby) instead of always reading as highlighted.
+            Color c = btn.image.color;
+            btn.image.color = new Color(c.r, c.g, c.b, active ? 1f : 0.55f);
+        }
+        else
+        {
+            btn.image.color = active ? Color.white : new Color(0.6f, 0.6f, 0.6f, 0.8f);
+
+            Transform labelTrans = btn.transform.Find("Label");
+            if (labelTrans != null)
+            {
+                UnityEngine.UI.Text txt = labelTrans.GetComponent<UnityEngine.UI.Text>();
+                if (txt != null)
+                {
+                    txt.color = active ? activeColor : new Color(0.7f, 0.7f, 0.7f, 0.8f);
+                    txt.fontStyle = active ? FontStyle.Bold : FontStyle.Normal;
+                }
+            }
+        }
+    }
+
+    // --- Canvas Toast Notification System ---
+
+    public void ShowToast(string message)
+    {
+        // Suppress on-screen logs/toasts to maintain clean aesthetic
+        return;
+    }
+
+    private Coroutine toastCoroutine;
+
+    private System.Collections.IEnumerator AnimateToast()
+    {
+        CanvasGroup cg = toastPanel.GetComponent<CanvasGroup>();
+        if (cg != null)
+        {
+            float t = 0f;
+            while (t < 0.2f)
+            {
+                t += Time.unscaledDeltaTime;
+                cg.alpha = Mathf.Lerp(0f, 1f, t / 0.2f);
+                yield return null;
+            }
+            cg.alpha = 1f;
+        }
+
+        yield return new WaitForSecondsRealtime(1.8f);
+
+        if (cg != null)
+        {
+            float t = 0f;
+            while (t < 0.2f)
+            {
+                t += Time.unscaledDeltaTime;
+                cg.alpha = Mathf.Lerp(1f, 0f, t / 0.2f);
+                yield return null;
+            }
+            cg.alpha = 0f;
+        }
+        toastPanel.SetActive(false);
     }
 }
