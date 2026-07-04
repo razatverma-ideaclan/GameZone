@@ -578,11 +578,11 @@ public class GameManager : MonoBehaviour
         SetMenuScreen(CurrentScreen == MenuScreen.Heroes ? MenuScreen.Lobby : MenuScreen.Heroes);
     }
 
-    private static readonly string[] HeroWorldNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja" };
+    private static readonly string[] HeroWorldNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja", "Mario", "Mars" };
 
     /// <summary>
     /// Hooked up to every card in the all-worlds Heroes roster. globalIndex is (worldIndex*3 + skinIndex),
-    /// covering all 7 worlds x 3 skins = 21 heroes. Fully independent of the selected World —
+    /// covering all 9 worlds x 3 skins = 27 heroes. Fully independent of the selected World —
     /// picking a hero here never changes which world/environment is active, and vice versa.
     /// </summary>
     private const string SelectedHeroKey = "FlappyBird_SelectedHeroGlobal";
@@ -612,10 +612,10 @@ public class GameManager : MonoBehaviour
         if (headerTextTrans != null)
         {
             UnityEngine.UI.Text headerText = headerTextTrans.GetComponent<UnityEngine.UI.Text>();
-            if (headerText != null) headerText.text = "HEROES (" + (currentGlobal + 1) + "/21)";
+            if (headerText != null) headerText.text = "HEROES (" + (currentGlobal + 1) + "/27)";
         }
 
-        // Update the selected-state outline/scale/checkmark on all 21 cards (names/sprites are
+        // Update the selected-state outline/scale/checkmark on all 27 cards (names/sprites are
         // baked in at build time since the roster never changes).
         for (int t = 0; t < HeroWorldNames.Length; t++)
         {

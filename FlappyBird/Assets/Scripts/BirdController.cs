@@ -63,6 +63,7 @@ public class BirdController : MonoBehaviour
     }
 
     private SpriteRenderer spriteRenderer;
+    private SpriteRenderer shadowSpriteRenderer; // Minor shadow for better visual separation
     private Rigidbody2D rb;
     private AudioSource audioSource;
     private Vector3 startPosition;
@@ -82,6 +83,16 @@ public class BirdController : MonoBehaviour
         audioSource = GetComponent<AudioSource>();
         if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
         audioSource.playOnAwake = false;
+
+        // Create the minor shadow SpriteRenderer
+        GameObject shadowGO = new GameObject("PlayerShadow");
+        shadowGO.transform.SetParent(transform, false);
+        // Minor offset down and back slightly
+        shadowGO.transform.localPosition = new Vector3(0.05f, -0.05f, 0.01f);
+        shadowGO.transform.localScale = Vector3.one;
+        shadowSpriteRenderer = shadowGO.AddComponent<SpriteRenderer>();
+        shadowSpriteRenderer.color = new Color(0f, 0f, 0f, 0.35f); // subtle dark shadow
+        shadowSpriteRenderer.sortingOrder = spriteRenderer != null ? spriteRenderer.sortingOrder - 1 : 29;
 
         // Randomizes the bob cycle slightly so a restarted bird doesn't look robotic.
         idleTimeOffset = Random.Range(0f, 10f);
@@ -125,6 +136,16 @@ public class BirdController : MonoBehaviour
 
         UpdateTilt();
         AnimateWings(animationSpeed);
+    }
+
+    void LateUpdate()
+    {
+        if (shadowSpriteRenderer != null && spriteRenderer != null)
+        {
+            shadowSpriteRenderer.sprite = spriteRenderer.sprite;
+            shadowSpriteRenderer.flipX = spriteRenderer.flipX;
+            shadowSpriteRenderer.flipY = spriteRenderer.flipY;
+        }
     }
 
     private void AnimateWings(float speed)

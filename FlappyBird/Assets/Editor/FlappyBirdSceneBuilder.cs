@@ -221,9 +221,9 @@ public static class FlappyBirdSceneBuilder
         UnityEventTools.AddPersistentListener(menuButton.onClick, gm.RestartGame);
         UnityEventTools.AddPersistentListener(retryButton.onClick, gm.RetryGame);
 
-        // Wire all 21 hero cards (7 worlds x 3 skins) inside heroesPanel to the global selector
-        string[] wireThemeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja", "Mario" };
-        for (int t = 0; t < 8; t++)
+        // Wire all 27 hero cards (9 worlds x 3 skins) inside heroesPanel to the global selector
+        string[] wireThemeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja", "Mario", "Mars" };
+        for (int t = 0; t < 9; t++)
         {
             for (int s = 0; s < 3; s++)
             {
@@ -1340,7 +1340,7 @@ public static class FlappyBirdSceneBuilder
         hbRt.sizeDelta = new Vector2(900, 80);
         hbRt.anchoredPosition = new Vector2(0, 620); // top header position
 
-        GameObject hbTxtGO = CreateLabel("Text", hbGO.transform, "HEROES (1/21)", 28, Vector2.zero);
+        GameObject hbTxtGO = CreateLabel("Text", hbGO.transform, "HEROES (1/27)", 28, Vector2.zero);
         hbTxtGO.GetComponent<Text>().color = Color.white;
         hbTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
         RectTransform hbtRt = hbTxtGO.GetComponent<RectTransform>();
@@ -1393,7 +1393,7 @@ public static class FlappyBirdSceneBuilder
         scrollRect.content = contentRt;
         scrollRect.viewport = viewportRt;
 
-        string[] heroThemeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja", "Mario" };
+        string[] heroThemeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja", "Mario", "Mars" };
         string[][] heroNames = new string[][]
         {
             new [] { "YELLOW HERO", "BLUE HERO", "RED HERO" },
@@ -1403,31 +1403,44 @@ public static class FlappyBirdSceneBuilder
             new [] { "GOLDFISH", "BULL SHARK", "PINK JELLYFISH" },
             new [] { "HONEY BEE", "LADYBUG", "BUTTERFLY" },
             new [] { "SHADOW NINJA", "CRIMSON NINJA", "SILVER SHINOBI" },
-            new [] { "JUMP MAN", "GREEN PLUMBER", "PRINCESS PEACH" }
+            new [] { "JUMP MAN", "GREEN PLUMBER", "PRINCESS PEACH" },
+            new [] { "ASTRONAUT", "MARS ROVER", "CRYSTAL EXPLORER" }
         };
 
-        // Instantiate all 8 worlds x 3 skins = 24 hero cards (wired to GameManager.SelectHeroGlobal in BuildScene(), once GameManager exists)
-        for (int t = 0; t < 8; t++)
+        // Instantiate all 9 worlds x 3 skins = 27 hero cards
+        for (int t = 0; t < 9; t++)
         {
             for (int s = 0; s < 3; s++)
             {
                 GameObject cardGO = new GameObject(heroThemeNames[t] + "Card" + s);
                 cardGO.transform.SetParent(contentGO.transform, false);
+
+                // --- NO opaque background panel: card is fully transparent ---
+                // A very subtle rounded border gives visual separation without a dark box.
                 Image cardImg = cardGO.AddComponent<Image>();
                 cardImg.sprite = resultCardSprite;
-                // Tint each card toward its world's color (darkened for text contrast) so worlds
-                // stay visually distinguishable now that we don't show a separate world label.
-                Color worldTint = themeAssets != null && t < themeAssets.Length ? themeAssets[t].themeColor : new Color(0.3f, 0.3f, 0.35f);
-                Color darkenedTint = Color.Lerp(worldTint, Color.black, 0.72f);
-                cardImg.color = new Color(darkenedTint.r, darkenedTint.g, darkenedTint.b, 0.95f);
+                cardImg.color = new Color(1f, 1f, 1f, 0f); // fully transparent fill
 
+                // Faint coloured outline ring using the world theme colour
                 Outline cardOutline = cardGO.AddComponent<Outline>();
-                cardOutline.effectColor = new Color(0.35f, 0.35f, 0.4f);
-                cardOutline.effectDistance = new Vector2(2f, -2f);
+                Color worldTint = themeAssets != null && t < themeAssets.Length ? themeAssets[t].themeColor : new Color(0.5f, 0.5f, 0.6f);
+                cardOutline.effectColor = new Color(worldTint.r, worldTint.g, worldTint.b, 0.55f);
+                cardOutline.effectDistance = new Vector2(3f, -3f);
 
                 cardGO.AddComponent<Button>();
 
-                // Icon preview image (Classic = the 3 inspector-configured bird colors, other worlds = ThemeData.playerSprites)
+                // --- Subtle dark shadow disc behind the character icon ---
+                // Ensures light-coloured characters are always visible on any theme background.
+                GameObject shadowGO = new GameObject("ShadowDisc");
+                shadowGO.transform.SetParent(cardGO.transform, false);
+                Image shadowImg = shadowGO.AddComponent<Image>();
+                // Use a circular sprite by drawing it as a white image and tinting it dark
+                shadowImg.color = new Color(0f, 0f, 0f, 0.22f);
+                RectTransform shadowRt = shadowGO.GetComponent<RectTransform>();
+                shadowRt.sizeDelta = new Vector2(155, 155);
+                shadowRt.anchoredPosition = new Vector2(3f, 46f); // slightly offset down-right for drop-shadow feel
+
+                // --- Character icon preview ---
                 GameObject iconGO = new GameObject("PreviewImage");
                 iconGO.transform.SetParent(cardGO.transform, false);
                 Image previewImg = iconGO.AddComponent<Image>();
@@ -1444,23 +1457,29 @@ public static class FlappyBirdSceneBuilder
                 iconRt.sizeDelta = new Vector2(160, 160);
                 iconRt.anchoredPosition = new Vector2(0, 50);
 
-                // Hero name (only — no separate world sub-label; the card's tint conveys the world)
-                GameObject nameTxtGO = CreateLabel("NameText", cardGO.transform, heroNames[t][s], 18, new Vector2(0, -75));
-                nameTxtGO.GetComponent<Text>().color = Color.white;
-                nameTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+                // Hero name label — white with subtle dark shadow for legibility
+                GameObject nameTxtGO = CreateLabel("NameText", cardGO.transform, heroNames[t][s], 17, new Vector2(0, -75));
+                Text nameText = nameTxtGO.GetComponent<Text>();
+                nameText.color = Color.white;
+                nameText.fontStyle = FontStyle.Bold;
+                // Add text shadow for contrast on light backgrounds
+                Shadow nameShadow = nameTxtGO.AddComponent<Shadow>();
+                nameShadow.effectColor = new Color(0f, 0f, 0f, 0.7f);
+                nameShadow.effectDistance = new Vector2(1f, -1f);
                 RectTransform ntRt = nameTxtGO.GetComponent<RectTransform>();
                 ntRt.sizeDelta = new Vector2(240, 36);
 
-                // Selection Checkmark overlay badge
+
+                // Selection Checkmark overlay badge (top right)
                 GameObject checkGO = new GameObject("Checkmark");
                 checkGO.transform.SetParent(cardGO.transform, false);
                 Image checkImg = checkGO.AddComponent<Image>();
                 checkImg.sprite = goldMedalSprite;
                 RectTransform checkRt = checkGO.GetComponent<RectTransform>();
                 checkRt.sizeDelta = new Vector2(40, 40);
-                checkRt.anchoredPosition = new Vector2(95, 115); // top right of card
+                checkRt.anchoredPosition = new Vector2(95, 115);
 
-                checkGO.SetActive(false); // active if this hero is equipped
+                checkGO.SetActive(false); // activated by GameManager when hero is selected
             }
         }
 
@@ -1529,13 +1548,16 @@ public static class FlappyBirdSceneBuilder
             GameObject cardGO = new GameObject(themeNames[i] + "Card");
             cardGO.transform.SetParent(wGridGO.transform, false);
 
+            // Transparent card background (just like Heroes cards)
             Image cardImg = cardGO.AddComponent<Image>();
             cardImg.sprite = resultCardSprite;
-            cardImg.color = new Color(0.15f, 0.15f, 0.18f, 0.95f); // dark card body
+            cardImg.color = new Color(1f, 1f, 1f, 0f); // fully transparent fill
 
+            // Card outline border styled with world theme color
             Outline cardOutline = cardGO.AddComponent<Outline>();
-            cardOutline.effectColor = new Color(0.35f, 0.35f, 0.4f);
-            cardOutline.effectDistance = new Vector2(2f, -2f);
+            Color worldTint = themeAssets != null && i < themeAssets.Length ? themeAssets[i].themeColor : new Color(0.5f, 0.5f, 0.6f);
+            cardOutline.effectColor = new Color(worldTint.r, worldTint.g, worldTint.b, 0.55f);
+            cardOutline.effectDistance = new Vector2(3f, -3f);
 
             Button btn = cardGO.AddComponent<Button>();
             selectorUI.themeButtons[i] = btn;
@@ -1546,14 +1568,26 @@ public static class FlappyBirdSceneBuilder
             Image previewImg = previewGO.AddComponent<Image>();
             previewImg.preserveAspect = true;
             if (themeAssets != null && i < themeAssets.Length) previewImg.sprite = themeAssets[i].backgroundSprite;
+            
+            // Add a subtle dark frame to the preview image
+            Outline previewOutline = previewGO.AddComponent<Outline>();
+            previewOutline.effectColor = new Color(0f, 0f, 0f, 0.5f);
+            previewOutline.effectDistance = new Vector2(2f, -2f);
+
             RectTransform previewRt = previewGO.GetComponent<RectTransform>();
             previewRt.sizeDelta = new Vector2(220, 130);
             previewRt.anchoredPosition = new Vector2(0, 55);
 
-            // Name label
+            // Name label - white with shadow for contrast
             GameObject wNameTxtGO = CreateLabel("NameText", cardGO.transform, themeNames[i].ToUpper(), 22, new Vector2(0, -70));
-            wNameTxtGO.GetComponent<Text>().color = Color.white;
-            wNameTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+            Text wNameText = wNameTxtGO.GetComponent<Text>();
+            wNameText.color = Color.white;
+            wNameText.fontStyle = FontStyle.Bold;
+
+            Shadow wNameShadow = wNameTxtGO.AddComponent<Shadow>();
+            wNameShadow.effectColor = new Color(0f, 0f, 0f, 0.75f);
+            wNameShadow.effectDistance = new Vector2(1.5f, -1.5f);
+
             RectTransform wNtRt = wNameTxtGO.GetComponent<RectTransform>();
             wNtRt.sizeDelta = new Vector2(240, 50);
 

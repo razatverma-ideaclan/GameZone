@@ -19,6 +19,9 @@ public class BackgroundAnimator : MonoBehaviour
     private Sprite planetBlueSprite;
     private Sprite planetYellowSprite;
 
+    private Sprite marsMeteorSprite;
+    private Sprite marsSatelliteSprite;
+
     private float planetSpawnTimer = 0f;
     private float nextPlanetSpawnTime = 8f;
 
@@ -175,6 +178,49 @@ public class BackgroundAnimator : MonoBehaviour
             planetSpawnTimer = 0f;
             nextPlanetSpawnTime = Random.Range(10f, 18f);
             SpawnRandomPlanet(true);
+        }
+        else if (tName == "mars")
+        {
+            // Spawn 4 drifting and rotating Mars meteors
+            for (int i = 0; i < 4; i++)
+            {
+                GameObject met = new GameObject("MarsMeteor");
+                met.transform.SetParent(transform, false);
+                
+                SpriteRenderer sr = met.AddComponent<SpriteRenderer>();
+                sr.sprite = marsMeteorSprite;
+                sr.sortingOrder = -8; // behind players and pipes
+
+                float scale = Random.Range(0.6f, 1.3f);
+                met.transform.localScale = new Vector3(scale, scale, 1f);
+                met.transform.position = new Vector3(Random.Range(minX, maxX), Random.Range(-2f, 5f), 1f);
+
+                DriftData drift = met.AddComponent<DriftData>();
+                drift.speed = Random.Range(0.6f, 1.8f);
+                drift.rotSpeed = Random.Range(-20f, 20f);
+                drift.minY = -2f;
+                drift.maxY = 5f;
+
+                animatedElements.Add(met);
+            }
+
+            // Spawn 1 orbiting satellite
+            GameObject sat = new GameObject("MarsSatellite");
+            sat.transform.SetParent(transform, false);
+            SpriteRenderer satSr = sat.AddComponent<SpriteRenderer>();
+            satSr.sprite = marsSatelliteSprite;
+            satSr.sortingOrder = -9; // behind meteors
+
+            sat.transform.localScale = new Vector3(1.2f, 1.2f, 1f);
+            sat.transform.position = new Vector3(Random.Range(minX, maxX), Random.Range(2f, 5f), 1.2f);
+
+            DriftData satDrift = sat.AddComponent<DriftData>();
+            satDrift.speed = 0.3f; // drifts very slowly
+            satDrift.rotSpeed = 2f; // very slight rotation
+            satDrift.minY = 2f;
+            satDrift.maxY = 5f;
+
+            animatedElements.Add(sat);
         }
         else if (tName == "mario")
         {
@@ -512,6 +558,69 @@ public class BackgroundAnimator : MonoBehaviour
         }
         gTex.Apply();
         goombaSprite = Sprite.Create(gTex, new Rect(0, 0, 64, 64), new Vector2(0.5f, 0.5f), 100f);
+
+        // 8. Mars Meteor Sprite (rusty red/brown rock with darker crater holes)
+        Texture2D marsMetTex = new Texture2D(64, 64, TextureFormat.RGBA32, false);
+        Color marsMetColor = new Color(0.38f, 0.18f, 0.12f); // rusty red-brown
+        Color marsDarkHole = new Color(0.20f, 0.08f, 0.05f); // deeper shadow
+        for (int y = 0; y < 64; y++)
+        {
+            for (int x = 0; x < 64; x++)
+            {
+                Vector2 p = new Vector2(x, y);
+                float d = Vector2.Distance(p, new Vector2(32, 32));
+                float noise = Mathf.Sin(x * 0.22f) * Mathf.Cos(y * 0.22f) * 3f;
+                if (d <= 23f + noise)
+                {
+                    float cr1 = Vector2.Distance(p, new Vector2(24, 38));
+                    float cr2 = Vector2.Distance(p, new Vector2(38, 22));
+                    if (cr1 <= 6f || cr2 <= 5f)
+                    {
+                        marsMetTex.SetPixel(x, y, marsDarkHole);
+                    }
+                    else
+                    {
+                        marsMetTex.SetPixel(x, y, marsMetColor);
+                    }
+                }
+                else
+                {
+                    marsMetTex.SetPixel(x, y, clear);
+                }
+            }
+        }
+        marsMetTex.Apply();
+        marsMeteorSprite = Sprite.Create(marsMetTex, new Rect(0, 0, 64, 64), new Vector2(0.5f, 0.5f), 100f);
+
+        // 9. Mars Satellite Sprite (blue panels, grey core body, antenna)
+        Texture2D satTex = new Texture2D(64, 64, TextureFormat.RGBA32, false);
+        for (int y = 0; y < 64; y++)
+        {
+            for (int x = 0; x < 64; x++)
+            {
+                Color col = clear;
+                // central body (circle)
+                if (Vector2.Distance(new Vector2(x, y), new Vector2(32, 32)) <= 8f)
+                {
+                    col = new Color(0.70f, 0.70f, 0.75f); // light grey metal
+                }
+                // solar panels (horizontal bars on left/right)
+                else if (y >= 26 && y <= 38 && ((x >= 8 && x <= 22) || (x >= 42 && x <= 56)))
+                {
+                    col = new Color(0.12f, 0.38f, 0.82f); // solar panel blue
+                    // grid lines
+                    if (x % 5 == 0 || y % 6 == 0) col = Color.white;
+                }
+                // antenna stick
+                else if (x >= 31 && x <= 33 && y >= 40 && y <= 50)
+                {
+                    col = new Color(0.50f, 0.50f, 0.55f);
+                }
+                satTex.SetPixel(x, y, col);
+            }
+        }
+        satTex.Apply();
+        marsSatelliteSprite = Sprite.Create(satTex, new Rect(0, 0, 64, 64), new Vector2(0.5f, 0.5f), 100f);
     }
 }
 

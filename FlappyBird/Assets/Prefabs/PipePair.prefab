@@ -149,7 +149,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3013721303658322993}
   - component: {fileID: 963396781381623476}
-  - component: {fileID: 3077299080044473716}
+  - component: {fileID: 7969757704662485009}
   m_Layer: 0
   m_Name: PipePair
   m_TagString: Untagged
@@ -191,7 +191,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PipeMover
   speed: 3
   destroyXPosition: -12
---- !u!114 &3077299080044473716
+--- !u!114 &7969757704662485009
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
