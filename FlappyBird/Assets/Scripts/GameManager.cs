@@ -1231,7 +1231,7 @@ public class GameManager : MonoBehaviour
             RectTransform iconRt = iconTrans.GetComponent<RectTransform>();
             if (iconRt != null)
             {
-                iconRt.sizeDelta = active ? new Vector2(76, 76) : new Vector2(62, 62);
+                iconRt.sizeDelta = active ? new Vector2(96, 96) : new Vector2(58, 58);
             }
 
             UnityEngine.UI.Image img = iconTrans.GetComponent<UnityEngine.UI.Image>();

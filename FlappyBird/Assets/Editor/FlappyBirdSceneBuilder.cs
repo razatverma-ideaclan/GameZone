@@ -2432,16 +2432,27 @@ public static class FlappyBirdSceneBuilder
         GameObject upgradeGO = new GameObject("UpgradeButton");
         upgradeGO.transform.SetParent(card.transform, false);
         Image upgradeImg = upgradeGO.AddComponent<Image>();
-        ApplyButtonLook(upgradeImg, buttonSprite, new Color(0.95f, 0.72f, 0.15f));
+        upgradeImg.sprite = buttonSprite;
+        upgradeImg.type = Image.Type.Simple;
+        upgradeImg.color = new Color(0.98f, 0.6f, 0.12f); // vibrant orange, explicit tint for a bolder pop
         RectTransform upgradeRt = upgradeGO.GetComponent<RectTransform>();
         upgradeRt.sizeDelta = new Vector2(200, 70);
         upgradeRt.anchoredPosition = new Vector2(330, 25);
+        Outline upgradeOutline = upgradeGO.AddComponent<Outline>();
+        upgradeOutline.effectColor = new Color(0.55f, 0.28f, 0.02f);
+        upgradeOutline.effectDistance = new Vector2(3f, -3f);
+        Shadow upgradeShadow = upgradeGO.AddComponent<Shadow>();
+        upgradeShadow.effectColor = new Color(0f, 0f, 0f, 0.45f);
+        upgradeShadow.effectDistance = new Vector2(0f, -6f);
         upgradeButton = upgradeGO.AddComponent<Button>();
         upgradeButton.transition = Selectable.Transition.None;
 
         GameObject upgradeLabelGO = CreateLabel("Text", upgradeGO.transform, "UPGRADE", 22);
-        upgradeLabelGO.GetComponent<Text>().color = new Color(0.15f, 0.1f, 0.02f);
-        upgradeLabelGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+        Text upgradeLabelText = upgradeLabelGO.GetComponent<Text>();
+        upgradeLabelText.color = Color.white;
+        upgradeLabelText.fontStyle = FontStyle.Bold;
+        Outline upgradeLabelOutline = upgradeLabelGO.GetComponent<Outline>();
+        if (upgradeLabelOutline != null) upgradeLabelOutline.effectColor = new Color(0.4f, 0.2f, 0.02f, 1f);
 
         GameObject costGO = CreateLabel("Cost", card.transform, "100 COINS", 20, new Vector2(330, -35));
         costText = costGO.GetComponent<Text>();
@@ -2568,16 +2579,27 @@ public static class FlappyBirdSceneBuilder
         GameObject buyGO = new GameObject("BuyButton");
         buyGO.transform.SetParent(card.transform, false);
         Image buyImg = buyGO.AddComponent<Image>();
-        ApplyButtonLook(buyImg, buttonSprite, new Color(0.2f, 0.75f, 0.35f));
+        buyImg.sprite = buttonSprite;
+        buyImg.type = Image.Type.Simple;
+        buyImg.color = new Color(0.22f, 0.78f, 0.38f); // vibrant green, explicit tint for a bolder pop
         RectTransform buyRt = buyGO.GetComponent<RectTransform>();
         buyRt.sizeDelta = new Vector2(220, 80);
         buyRt.anchoredPosition = new Vector2(330, 0);
+        Outline buyOutline = buyGO.AddComponent<Outline>();
+        buyOutline.effectColor = new Color(0.05f, 0.4f, 0.15f);
+        buyOutline.effectDistance = new Vector2(3f, -3f);
+        Shadow buyShadow = buyGO.AddComponent<Shadow>();
+        buyShadow.effectColor = new Color(0f, 0f, 0f, 0.45f);
+        buyShadow.effectDistance = new Vector2(0f, -6f);
         buyButton = buyGO.AddComponent<Button>();
         buyButton.transition = Selectable.Transition.None;
 
         GameObject buyLabelGO = CreateLabel("Text", buyGO.transform, "BUY (" + GameManager.StarterPurchaseCost + ")", 22);
-        buyLabelGO.GetComponent<Text>().color = Color.white;
-        buyLabelGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+        Text buyLabelText = buyLabelGO.GetComponent<Text>();
+        buyLabelText.color = Color.white;
+        buyLabelText.fontStyle = FontStyle.Bold;
+        Outline buyLabelOutline = buyLabelGO.GetComponent<Outline>();
+        if (buyLabelOutline != null) buyLabelOutline.effectColor = new Color(0.05f, 0.3f, 0.1f, 1f);
     }
 
     private static GameObject BuildGameOverPanel(Transform canvasTransform, Sprite buttonSprite, Sprite resultCardSprite, Sprite coinIcon, out Button menuButton, out Button retryButton, out GameObject scoreValueText, out GameObject bestValueText, out GameObject coinsValueText, out UnityEngine.UI.Image medalImage, out GameObject newBestBadge, out RectTransform resultCardTransform)
