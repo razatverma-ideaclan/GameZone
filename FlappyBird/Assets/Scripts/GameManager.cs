@@ -78,10 +78,11 @@ public class GameManager : MonoBehaviour
     private const float BoostSpeedMultiplier = 2.2f;
 
     // --- Starter Powers: buy charges in the Shop, arm one on the Lobby to auto-apply at the start of your next run ---
-    public enum StarterPower { None, Magnet, Boost, Double }
+    public enum StarterPower { None, Magnet, Boost, Double, Hammer }
     private const string StarterMagnetCountKey = "FlappyBird_StarterMagnetCount";
     private const string StarterBoostCountKey = "FlappyBird_StarterBoostCount";
     private const string StarterDoubleCountKey = "FlappyBird_StarterDoubleCount";
+    private const string StarterHammerCountKey = "FlappyBird_StarterHammerCount";
     private const string StarterPowersGrantedKey = "FlappyBird_StarterPowersGranted";
     public const int StarterPurchaseCost = 20;
     private const int StarterFreeGrantAmount = 3;
@@ -89,6 +90,7 @@ public class GameManager : MonoBehaviour
     public int StarterMagnetCount { get; private set; }
     public int StarterBoostCount { get; private set; }
     public int StarterDoubleCount { get; private set; }
+    public int StarterHammerCount { get; private set; }
     public StarterPower ArmedStarter { get; private set; } = StarterPower.None;
 
     [Header("Coins & Power-ups HUD")]
@@ -96,11 +98,13 @@ public class GameManager : MonoBehaviour
     public GameObject magnetTimerText;
     public GameObject boostTimerText;
     public GameObject doubleTimerText;
+    public GameObject hammerChargesWidget;
 
     [Header("Starter Power Widgets (Lobby icon + count)")]
     public GameObject starterMagnetWidget;
     public GameObject starterBoostWidget;
     public GameObject starterDoubleWidget;
+    public GameObject starterHammerWidget;
 
     public int TotalCoins { get; private set; }
     public int MagnetLevel { get; private set; } = 1;
@@ -111,10 +115,12 @@ public class GameManager : MonoBehaviour
     private float magnetTimer = 0f;
     private float boostTimer = 0f;
     private float doubleTimer = 0f;
+    private int hammerCharges = 0;
 
     public bool IsBoostActive => boostTimer > 0f;
     public bool IsDoubleActive => doubleTimer > 0f;
     public bool IsInvulnerable() => IsBoostActive;
+    public int HammerCharges => hammerCharges;
 
     public float GetMagnetRadius()
     {
@@ -170,12 +176,14 @@ public class GameManager : MonoBehaviour
             PlayerPrefs.SetInt(StarterMagnetCountKey, StarterFreeGrantAmount);
             PlayerPrefs.SetInt(StarterBoostCountKey, StarterFreeGrantAmount);
             PlayerPrefs.SetInt(StarterDoubleCountKey, StarterFreeGrantAmount);
+            PlayerPrefs.SetInt(StarterHammerCountKey, StarterFreeGrantAmount);
             PlayerPrefs.SetInt(StarterPowersGrantedKey, 1);
             PlayerPrefs.Save();
         }
         StarterMagnetCount = PlayerPrefs.GetInt(StarterMagnetCountKey, 0);
         StarterBoostCount = PlayerPrefs.GetInt(StarterBoostCountKey, 0);
         StarterDoubleCount = PlayerPrefs.GetInt(StarterDoubleCountKey, 0);
+        StarterHammerCount = PlayerPrefs.GetInt(StarterHammerCountKey, 0);
     }
 
     void Start()
@@ -231,10 +239,12 @@ public class GameManager : MonoBehaviour
         magnetTimer = 0f;
         boostTimer = 0f;
         doubleTimer = 0f;
+        hammerCharges = 0;
         SetBoostTrail(false);
         if (magnetTimerText != null) magnetTimerText.SetActive(false);
         if (boostTimerText != null) boostTimerText.SetActive(false);
         if (doubleTimerText != null) doubleTimerText.SetActive(false);
+        if (hammerChargesWidget != null) hammerChargesWidget.SetActive(false);
         UpdateCoinsUI();
         RefreshStarterWidgets();
 
@@ -414,6 +424,7 @@ public class GameManager : MonoBehaviour
                 case StarterPower.Magnet: ActivateMagnet(); break;
                 case StarterPower.Boost: ActivateBoostForDuration(GetPowerupDuration(BoostLevel)); break;
                 case StarterPower.Double: ActivateDouble(); break;
+                case StarterPower.Hammer: ActivateHammer(); break;
             }
             ArmedStarter = StarterPower.None;
             RefreshStarterWidgets();
@@ -492,6 +503,34 @@ public class GameManager : MonoBehaviour
     {
         doubleTimer = GetPowerupDuration(DoubleLevel);
         UpdateTimerUI(doubleTimerText, doubleTimer);
+    }
+
+    /// <summary>Hammer is charge-based, not a timer — one charge destroys the next pipe touched.</summary>
+    public void ActivateHammer()
+    {
+        hammerCharges++;
+        UpdateHammerUI();
+    }
+
+    /// <summary>Called from BirdController when the bird touches a pipe — consumes one charge if available.</summary>
+    public bool TryConsumeHammerCharge()
+    {
+        if (hammerCharges <= 0) return false;
+        hammerCharges--;
+        UpdateHammerUI();
+        return true;
+    }
+
+    private void UpdateHammerUI()
+    {
+        if (hammerChargesWidget == null) return;
+        hammerChargesWidget.SetActive(hammerCharges > 0);
+        if (hammerCharges <= 0) return;
+
+        Transform numberTrans = hammerChargesWidget.transform.Find("Number");
+        if (numberTrans == null) return;
+        UnityEngine.UI.Text numberText = numberTrans.GetComponent<UnityEngine.UI.Text>();
+        if (numberText != null) numberText.text = hammerCharges.ToString();
     }
 
     private void SetBoostTrail(bool active)
@@ -659,6 +698,7 @@ public class GameManager : MonoBehaviour
             case StarterPower.Magnet: return StarterMagnetCount;
             case StarterPower.Boost: return StarterBoostCount;
             case StarterPower.Double: return StarterDoubleCount;
+            case StarterPower.Hammer: return StarterHammerCount;
             default: return 0;
         }
     }
@@ -670,6 +710,7 @@ public class GameManager : MonoBehaviour
             case StarterPower.Magnet: StarterMagnetCount += delta; PlayerPrefs.SetInt(StarterMagnetCountKey, StarterMagnetCount); break;
             case StarterPower.Boost: StarterBoostCount += delta; PlayerPrefs.SetInt(StarterBoostCountKey, StarterBoostCount); break;
             case StarterPower.Double: StarterDoubleCount += delta; PlayerPrefs.SetInt(StarterDoubleCountKey, StarterDoubleCount); break;
+            case StarterPower.Hammer: StarterHammerCount += delta; PlayerPrefs.SetInt(StarterHammerCountKey, StarterHammerCount); break;
         }
     }
 
@@ -679,6 +720,7 @@ public class GameManager : MonoBehaviour
         UpdateStarterWidget(starterMagnetWidget, StarterMagnetCount, ArmedStarter == StarterPower.Magnet);
         UpdateStarterWidget(starterBoostWidget, StarterBoostCount, ArmedStarter == StarterPower.Boost);
         UpdateStarterWidget(starterDoubleWidget, StarterDoubleCount, ArmedStarter == StarterPower.Double);
+        UpdateStarterWidget(starterHammerWidget, StarterHammerCount, ArmedStarter == StarterPower.Hammer);
     }
 
     private void UpdateStarterWidget(GameObject widget, int count, bool armed)

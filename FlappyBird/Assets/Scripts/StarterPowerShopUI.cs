@@ -15,12 +15,14 @@ public class StarterPowerShopUI : MonoBehaviour
     public BuyRow magnetRow;
     public BuyRow boostRow;
     public BuyRow doubleRow;
+    public BuyRow hammerRow;
 
     private void Awake()
     {
         BindRow(magnetRow, GameManager.StarterPower.Magnet);
         BindRow(boostRow, GameManager.StarterPower.Boost);
         BindRow(doubleRow, GameManager.StarterPower.Double);
+        BindRow(hammerRow, GameManager.StarterPower.Hammer);
     }
 
     private void BindRow(BuyRow row, GameManager.StarterPower type)
@@ -42,6 +44,7 @@ public class StarterPowerShopUI : MonoBehaviour
         RefreshRow(magnetRow, GameManager.Instance.StarterMagnetCount);
         RefreshRow(boostRow, GameManager.Instance.StarterBoostCount);
         RefreshRow(doubleRow, GameManager.Instance.StarterDoubleCount);
+        RefreshRow(hammerRow, GameManager.Instance.StarterHammerCount);
     }
 
     private void RefreshRow(BuyRow row, int count)

@@ -24,6 +24,7 @@ public class ItemSpawner : MonoBehaviour
     public Sprite magnetSprite;
     public Sprite boostSprite;
     public Sprite doubleSprite;
+    public Sprite hammerSprite;
 
     private Coroutine spawnRoutine;
 
@@ -67,12 +68,13 @@ public class ItemSpawner : MonoBehaviour
 
     private void SpawnRandomPowerup()
     {
-        int pick = Random.Range(0, 3);
+        int pick = Random.Range(0, 4);
         switch (pick)
         {
             case 0: Spawn(CollectableItem.ItemType.Magnet, magnetSprite); break;
             case 1: Spawn(CollectableItem.ItemType.Boost, boostSprite); break;
-            default: Spawn(CollectableItem.ItemType.Double, doubleSprite); break;
+            case 2: Spawn(CollectableItem.ItemType.Double, doubleSprite); break;
+            default: Spawn(CollectableItem.ItemType.Hammer, hammerSprite); break;
         }
     }
 

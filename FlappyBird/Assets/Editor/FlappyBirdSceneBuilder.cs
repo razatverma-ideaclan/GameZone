@@ -113,6 +113,7 @@ public static class FlappyBirdSceneBuilder
         Sprite magnetSprite = GetOrCreateSprite("Powerup_Magnet", 128, 128, (w, h) => GenerateMagnetTexture(w, h), 128);
         Sprite boostSprite = GetOrCreateSprite("Powerup_Boost", 128, 128, (w, h) => GenerateBoostTexture(w, h), 128);
         Sprite doubleSprite = GetOrCreateSprite("Powerup_Double", 128, 128, (w, h) => GenerateDoubleTexture(w, h), 128);
+        Sprite hammerSprite = GetOrCreateSprite("Powerup_Hammer", 128, 128, (w, h) => GenerateHammerTexture(w, h), 128);
 
         Sprite pipeBodySprite = GetOrCreateSprite("PipeBody", 256, 256, (w, h) => GeneratePipeBodyTexture(w, h), 256, FilterMode.Point);
         Sprite pipeCapSprite = GetOrCreateSprite("PipeCap", 256, 256, (w, h) => GeneratePipeCapTexture(w, h), 256, FilterMode.Point);
@@ -144,13 +145,13 @@ public static class FlappyBirdSceneBuilder
         GameObject bird = BuildBird(birdMidSprites, birdUpSprites, birdDownSprites, flapClip, hitClip, landClip);
         GameObject pipePairPrefab = BuildPipePairPrefab(pipeBodySprite, pipeCapSprite);
         GameObject pipeSpawnerGO = BuildPipeSpawner(pipePairPrefab);
-        GameObject itemSpawnerGO = BuildItemSpawner(coinSprite, magnetSprite, boostSprite, doubleSprite);
+        GameObject itemSpawnerGO = BuildItemSpawner(coinSprite, magnetSprite, boostSprite, doubleSprite, hammerSprite);
         BuildEventSystem();
         Canvas canvas = BuildCanvas();
         GameObject scoreTextGO = BuildScoreText(canvas.transform);
 
-        GameObject coinsTextGO, magnetTimerGO, boostTimerGO, doubleTimerGO;
-        BuildPowerupHUD(canvas.transform, coinSprite, magnetSprite, boostSprite, doubleSprite, out coinsTextGO, out magnetTimerGO, out boostTimerGO, out doubleTimerGO);
+        GameObject coinsTextGO, magnetTimerGO, boostTimerGO, doubleTimerGO, hammerChargesGO;
+        BuildPowerupHUD(canvas.transform, coinSprite, magnetSprite, boostSprite, doubleSprite, hammerSprite, out coinsTextGO, out magnetTimerGO, out boostTimerGO, out doubleTimerGO, out hammerChargesGO);
 
         GameObject startHighScoreText;
         Button startButton, shopButton, heroesButton, missionsButton, themesButton, navPlayBtn;
@@ -159,9 +160,9 @@ public static class FlappyBirdSceneBuilder
         UnityEngine.UI.Image playIconImageRef;
         Text activeThemeLabelText;
         GameObject shopPanel, questsPanel, leaderboardPanel, screenBackdrop;
-        GameObject starterMagnetWidget, starterBoostWidget, starterDoubleWidget;
+        GameObject starterMagnetWidget, starterBoostWidget, starterDoubleWidget, starterHammerWidget;
         Button bestScoreButton;
-        GameObject startPanel = BuildStartPanel(canvas.transform, pillButtonSprite, resultCardSprite, goldMedalSprite, out startButton, out startHighScoreText, birdMidSprites, themeAssets, shopIcon, heroesIcon, missionsIcon, themesIcon, playIcon, homeIcon, out shopButton, out heroesButton, out missionsButton, out themesButton, out toastPanel, out themeSelectorPanelRef, out lobbyPanel, out heroesPanel, out playIconImageRef, out navPlayBtn, out activeThemeLabelText, out shopPanel, out questsPanel, out leaderboardPanel, out bestScoreButton, out screenBackdrop, out starterMagnetWidget, out starterBoostWidget, out starterDoubleWidget, coinSprite, magnetSprite, boostSprite, doubleSprite);
+        GameObject startPanel = BuildStartPanel(canvas.transform, pillButtonSprite, resultCardSprite, goldMedalSprite, out startButton, out startHighScoreText, birdMidSprites, themeAssets, shopIcon, heroesIcon, missionsIcon, themesIcon, playIcon, homeIcon, out shopButton, out heroesButton, out missionsButton, out themesButton, out toastPanel, out themeSelectorPanelRef, out lobbyPanel, out heroesPanel, out playIconImageRef, out navPlayBtn, out activeThemeLabelText, out shopPanel, out questsPanel, out leaderboardPanel, out bestScoreButton, out screenBackdrop, out starterMagnetWidget, out starterBoostWidget, out starterDoubleWidget, out starterHammerWidget, coinSprite, magnetSprite, boostSprite, doubleSprite, hammerSprite);
         
         UnityEngine.UI.Image medalImage;
         GameObject newBestBadge;
@@ -184,10 +185,12 @@ public static class FlappyBirdSceneBuilder
         gm.starterMagnetWidget = starterMagnetWidget;
         gm.starterBoostWidget = starterBoostWidget;
         gm.starterDoubleWidget = starterDoubleWidget;
+        gm.starterHammerWidget = starterHammerWidget;
         gm.coinsText = coinsTextGO;
         gm.magnetTimerText = magnetTimerGO;
         gm.boostTimerText = boostTimerGO;
         gm.doubleTimerText = doubleTimerGO;
+        gm.hammerChargesWidget = hammerChargesGO;
         gm.playIconImage = playIconImageRef;
         gm.playSprite = playIcon;
         gm.homeSprite = homeIcon;
@@ -239,6 +242,7 @@ public static class FlappyBirdSceneBuilder
         UnityEventTools.AddIntPersistentListener(starterMagnetWidget.GetComponent<Button>().onClick, gm.ToggleArmedStarter, (int)GameManager.StarterPower.Magnet);
         UnityEventTools.AddIntPersistentListener(starterBoostWidget.GetComponent<Button>().onClick, gm.ToggleArmedStarter, (int)GameManager.StarterPower.Boost);
         UnityEventTools.AddIntPersistentListener(starterDoubleWidget.GetComponent<Button>().onClick, gm.ToggleArmedStarter, (int)GameManager.StarterPower.Double);
+        UnityEventTools.AddIntPersistentListener(starterHammerWidget.GetComponent<Button>().onClick, gm.ToggleArmedStarter, (int)GameManager.StarterPower.Hammer);
 
         UnityEventTools.AddPersistentListener(menuButton.onClick, gm.RestartGame);
         UnityEventTools.AddPersistentListener(retryButton.onClick, gm.RetryGame);
@@ -1116,6 +1120,81 @@ public static class FlappyBirdSceneBuilder
         psRenderer.sortingOrder = 29; // just behind bird
         psRenderer.material = AssetDatabase.GetBuiltinExtraResource<Material>("Default-Particle.mat");
 
+        // Boost Storm — swirling energy ring around the bird, only active during Fast Boost.
+        GameObject storm = new GameObject("BoostStorm");
+        storm.transform.SetParent(bird.transform, false);
+        ParticleSystem stormPs = storm.AddComponent<ParticleSystem>();
+
+        var stormMain = stormPs.main;
+        stormMain.duration = 1f;
+        stormMain.loop = true;
+        stormMain.startLifetime = 0.6f;
+        stormMain.startSpeed = 0f; // orbital velocity module drives all movement
+        stormMain.startSize = 0.1f;
+        stormMain.gravityModifier = 0f;
+        stormMain.simulationSpace = ParticleSystemSimulationSpace.Local;
+        stormMain.startColor = new Color(0.6f, 0.85f, 1f, 0.8f);
+
+        var stormEmission = stormPs.emission;
+        stormEmission.rateOverTime = 20f;
+
+        var stormShape = stormPs.shape;
+        stormShape.shapeType = ParticleSystemShapeType.Circle;
+        stormShape.radius = 0.5f;
+
+        var stormVelocity = stormPs.velocityOverLifetime;
+        stormVelocity.enabled = true;
+        stormVelocity.orbitalZ = 6f; // spins particles around the bird in the 2D view plane
+
+        var stormRenderer = storm.GetComponent<ParticleSystemRenderer>();
+        stormRenderer.sortingOrder = 31; // in front of the bird for a wraparound look
+        stormRenderer.material = AssetDatabase.GetBuiltinExtraResource<Material>("Default-Particle.mat");
+
+        storm.SetActive(false); // toggled on/off by BirdController.SetBoostTrailActive
+
+        // Boost Comet — sharp stretched streaks trailing behind, only active during Fast Boost.
+        GameObject comet = new GameObject("BoostComet");
+        comet.transform.SetParent(bird.transform, false);
+        comet.transform.localPosition = new Vector3(-0.3f, 0f, 0f);
+        ParticleSystem cometPs = comet.AddComponent<ParticleSystem>();
+
+        var cometMain = cometPs.main;
+        cometMain.duration = 1f;
+        cometMain.loop = true;
+        cometMain.startLifetime = 0.25f;
+        cometMain.startSpeed = 3f;
+        cometMain.startSize = 0.18f;
+        cometMain.gravityModifier = 0f;
+        cometMain.simulationSpace = ParticleSystemSimulationSpace.World;
+        cometMain.startColor = new Color(1f, 0.95f, 0.6f);
+
+        var cometEmission = cometPs.emission;
+        cometEmission.rateOverTime = 8f;
+
+        var cometShape = cometPs.shape;
+        cometShape.shapeType = ParticleSystemShapeType.Cone;
+        cometShape.angle = 3f;
+        cometShape.radius = 0.05f;
+        cometShape.rotation = new Vector3(0f, -90f, 0f); // points emission along -X, trailing behind the bird
+
+        var cometColorOverLifetime = cometPs.colorOverLifetime;
+        cometColorOverLifetime.enabled = true;
+        Gradient cometGrad = new Gradient();
+        cometGrad.SetKeys(
+            new GradientColorKey[] { new GradientColorKey(new Color(1f, 0.95f, 0.6f), 0f), new GradientColorKey(new Color(1f, 0.6f, 0.1f), 1f) },
+            new GradientAlphaKey[] { new GradientAlphaKey(0.9f, 0f), new GradientAlphaKey(0f, 1f) }
+        );
+        cometColorOverLifetime.color = new ParticleSystem.MinMaxGradient(cometGrad);
+
+        var cometRenderer = comet.GetComponent<ParticleSystemRenderer>();
+        cometRenderer.renderMode = ParticleSystemRenderMode.Stretch;
+        cometRenderer.lengthScale = 4f;
+        cometRenderer.velocityScale = 0.3f;
+        cometRenderer.sortingOrder = 28; // behind the spark trail
+        cometRenderer.material = AssetDatabase.GetBuiltinExtraResource<Material>("Default-Particle.mat");
+
+        comet.SetActive(false); // toggled on/off by BirdController.SetBoostTrailActive
+
         return bird;
     }
 
@@ -1203,7 +1282,7 @@ public static class FlappyBirdSceneBuilder
         return spawnerGO;
     }
 
-    private static GameObject BuildItemSpawner(Sprite coinSprite, Sprite magnetSprite, Sprite boostSprite, Sprite doubleSprite)
+    private static GameObject BuildItemSpawner(Sprite coinSprite, Sprite magnetSprite, Sprite boostSprite, Sprite doubleSprite, Sprite hammerSprite)
     {
         GameObject spawnerGO = new GameObject("ItemSpawner");
         ItemSpawner spawner = spawnerGO.AddComponent<ItemSpawner>();
@@ -1216,6 +1295,7 @@ public static class FlappyBirdSceneBuilder
         spawner.magnetSprite = magnetSprite;
         spawner.boostSprite = boostSprite;
         spawner.doubleSprite = doubleSprite;
+        spawner.hammerSprite = hammerSprite;
         return spawnerGO;
     }
 
@@ -1270,7 +1350,7 @@ public static class FlappyBirdSceneBuilder
     }
 
     /// <summary>Top-left coin counter (mirrors the top-right score display) plus three stacked, initially-hidden active power-up timer labels below it.</summary>
-    private static void BuildPowerupHUD(Transform canvasTransform, Sprite coinIcon, Sprite magnetIcon, Sprite boostIcon, Sprite doubleIcon, out GameObject coinsTextGO, out GameObject magnetTimerGO, out GameObject boostTimerGO, out GameObject doubleTimerGO)
+    private static void BuildPowerupHUD(Transform canvasTransform, Sprite coinIcon, Sprite magnetIcon, Sprite boostIcon, Sprite doubleIcon, Sprite hammerIcon, out GameObject coinsTextGO, out GameObject magnetTimerGO, out GameObject boostTimerGO, out GameObject doubleTimerGO, out GameObject hammerChargesGO)
     {
         GameObject coinBadge = new GameObject("CoinsBadge");
         coinBadge.transform.SetParent(canvasTransform, false);
@@ -1314,6 +1394,7 @@ public static class FlappyBirdSceneBuilder
         magnetTimerGO = BuildTimerIndicator(canvasTransform, "MagnetTimer", magnetIcon, -170);
         boostTimerGO = BuildTimerIndicator(canvasTransform, "BoostTimer", boostIcon, -220);
         doubleTimerGO = BuildTimerIndicator(canvasTransform, "DoubleTimer", doubleIcon, -270);
+        hammerChargesGO = BuildTimerIndicator(canvasTransform, "HammerCharges", hammerIcon, -320);
     }
 
     /// <summary>Icon + countdown number (no text label) for an active power-up, shown only while it's running.</summary>
@@ -1367,7 +1448,7 @@ public static class FlappyBirdSceneBuilder
         Image bg = go.AddComponent<Image>();
         bg.color = new Color(0.15f, 0.15f, 0.18f, 0.85f);
         RectTransform rt = go.GetComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(76, 76);
+        rt.sizeDelta = new Vector2(70, 70);
         rt.anchoredPosition = position;
 
         Outline outline = go.AddComponent<Outline>();
@@ -1409,7 +1490,7 @@ public static class FlappyBirdSceneBuilder
         new Color(0.15f, 0.15f, 0.18f) // Premium dark charcoal color
     };
 
-    private static GameObject BuildStartPanel(Transform canvasTransform, Sprite buttonSprite, Sprite resultCardSprite, Sprite goldMedalSprite, out Button startButton, out GameObject startHighScoreText, Sprite[] birdMidSprites, ThemeData[] themeAssets, Sprite shopIcon, Sprite heroesIcon, Sprite missionsIcon, Sprite themesIcon, Sprite playIcon, Sprite homeIcon, out Button shopButton, out Button heroesButton, out Button missionsButton, out Button themesButton, out GameObject toastPanel, out GameObject themeSelectorPanelRef, out GameObject lobbyPanel, out GameObject heroesPanel, out UnityEngine.UI.Image playIconImageRef, out Button navPlayBtn, out Text activeThemeLabelText, out GameObject shopPanel, out GameObject questsPanel, out GameObject leaderboardPanel, out Button bestScoreButton, out GameObject screenBackdrop, out GameObject starterMagnetWidget, out GameObject starterBoostWidget, out GameObject starterDoubleWidget, Sprite coinSprite, Sprite magnetSprite, Sprite boostSprite, Sprite doubleSprite)
+    private static GameObject BuildStartPanel(Transform canvasTransform, Sprite buttonSprite, Sprite resultCardSprite, Sprite goldMedalSprite, out Button startButton, out GameObject startHighScoreText, Sprite[] birdMidSprites, ThemeData[] themeAssets, Sprite shopIcon, Sprite heroesIcon, Sprite missionsIcon, Sprite themesIcon, Sprite playIcon, Sprite homeIcon, out Button shopButton, out Button heroesButton, out Button missionsButton, out Button themesButton, out GameObject toastPanel, out GameObject themeSelectorPanelRef, out GameObject lobbyPanel, out GameObject heroesPanel, out UnityEngine.UI.Image playIconImageRef, out Button navPlayBtn, out Text activeThemeLabelText, out GameObject shopPanel, out GameObject questsPanel, out GameObject leaderboardPanel, out Button bestScoreButton, out GameObject screenBackdrop, out GameObject starterMagnetWidget, out GameObject starterBoostWidget, out GameObject starterDoubleWidget, out GameObject starterHammerWidget, Sprite coinSprite, Sprite magnetSprite, Sprite boostSprite, Sprite doubleSprite, Sprite hammerSprite)
     {
         GameObject panel = CreatePanel("StartPanel", canvasTransform, new Color(0, 0, 0, 0.0f));
 
@@ -1470,7 +1551,7 @@ public static class FlappyBirdSceneBuilder
 
         RectTransform badgeRt = scoreBadge.GetComponent<RectTransform>();
         badgeRt.sizeDelta = new Vector2(280, 68);
-        badgeRt.anchoredPosition = new Vector2(0, -180); // moved up slightly to make room for the HEAD START button below it
+        badgeRt.anchoredPosition = new Vector2(0, -140); // moved up to clear the starter-power widget row below it
 
         // Small Gold Medal icon inside badge
         GameObject medalIcon = new GameObject("MedalIcon");
@@ -1494,9 +1575,10 @@ public static class FlappyBirdSceneBuilder
 
         // Starter Power widgets — small icon+count buttons. Tapping one arms it (consumes a charge)
         // to auto-apply at the start of the next run; tapping the same one again un-arms/refunds it.
-        starterMagnetWidget = BuildStarterWidget(lobbyPanel.transform, magnetSprite, new Vector2(-90, -250));
-        starterBoostWidget = BuildStarterWidget(lobbyPanel.transform, boostSprite, new Vector2(0, -250));
-        starterDoubleWidget = BuildStarterWidget(lobbyPanel.transform, doubleSprite, new Vector2(90, -250));
+        starterMagnetWidget = BuildStarterWidget(lobbyPanel.transform, magnetSprite, new Vector2(-130, -250));
+        starterBoostWidget = BuildStarterWidget(lobbyPanel.transform, boostSprite, new Vector2(-43, -250));
+        starterDoubleWidget = BuildStarterWidget(lobbyPanel.transform, doubleSprite, new Vector2(43, -250));
+        starterHammerWidget = BuildStarterWidget(lobbyPanel.transform, hammerSprite, new Vector2(130, -250));
 
         // Pulsing "TAP TO START" hint text on start screen
         GameObject tapStartGO = CreateLabel("TapToStartText", lobbyPanel.transform, "TAP TO START", 52, new Vector2(0, -300));
@@ -1824,7 +1906,7 @@ public static class FlappyBirdSceneBuilder
         worldsPanel.SetActive(false);
 
         // --- Shop / Quests placeholder screens ---
-        shopPanel = BuildStarterPowerShopPanel(panel.transform, resultCardSprite, buttonSprite, coinSprite, magnetSprite, boostSprite, doubleSprite);
+        shopPanel = BuildStarterPowerShopPanel(panel.transform, resultCardSprite, buttonSprite, coinSprite, magnetSprite, boostSprite, doubleSprite, hammerSprite);
         questsPanel = BuildUpgradeShopPanel(panel.transform, resultCardSprite, buttonSprite, coinSprite, magnetSprite, boostSprite, doubleSprite);
 
         leaderboardPanel = BuildLeaderboardPanel(panel.transform, resultCardSprite, buttonSprite);
@@ -2368,7 +2450,7 @@ public static class FlappyBirdSceneBuilder
         costRt.sizeDelta = new Vector2(220, 40);
     }
 
-    private static GameObject BuildStarterPowerShopPanel(Transform parent, Sprite resultCardSprite, Sprite buttonSprite, Sprite coinSprite, Sprite magnetSprite, Sprite boostSprite, Sprite doubleSprite)
+    private static GameObject BuildStarterPowerShopPanel(Transform parent, Sprite resultCardSprite, Sprite buttonSprite, Sprite coinSprite, Sprite magnetSprite, Sprite boostSprite, Sprite doubleSprite, Sprite hammerSprite)
     {
         GameObject shopPanel = new GameObject("StarterPowerShopPanel");
         shopPanel.transform.SetParent(parent, false);
@@ -2428,18 +2510,20 @@ public static class FlappyBirdSceneBuilder
         coinsValueText.color = new Color(0.98f, 0.82f, 0.15f);
         coinsValueText.fontStyle = FontStyle.Bold;
 
-        // Three buy rows — 20 coins each, one charge per purchase
-        Button magnetBtn, boostBtn, doubleBtn;
-        Text magnetCount, boostCount, doubleCount;
+        // Four buy rows — 20 coins each, one charge per purchase
+        Button magnetBtn, boostBtn, doubleBtn, hammerBtn;
+        Text magnetCount, boostCount, doubleCount, hammerCount;
 
-        BuildStarterShopRow(shopPanel.transform, resultCardSprite, buttonSprite, magnetSprite, "MAGNET", 320, out magnetBtn, out magnetCount);
-        BuildStarterShopRow(shopPanel.transform, resultCardSprite, buttonSprite, boostSprite, "GO FAST", 80, out boostBtn, out boostCount);
-        BuildStarterShopRow(shopPanel.transform, resultCardSprite, buttonSprite, doubleSprite, "DOUBLE COINS", -160, out doubleBtn, out doubleCount);
+        BuildStarterShopRow(shopPanel.transform, resultCardSprite, buttonSprite, magnetSprite, "MAGNET", 340, out magnetBtn, out magnetCount);
+        BuildStarterShopRow(shopPanel.transform, resultCardSprite, buttonSprite, boostSprite, "GO FAST", 150, out boostBtn, out boostCount);
+        BuildStarterShopRow(shopPanel.transform, resultCardSprite, buttonSprite, doubleSprite, "DOUBLE COINS", -40, out doubleBtn, out doubleCount);
+        BuildStarterShopRow(shopPanel.transform, resultCardSprite, buttonSprite, hammerSprite, "HAMMER", -230, out hammerBtn, out hammerCount);
 
         shop.totalCoinsText = coinsValueText;
         shop.magnetRow = new StarterPowerShopUI.BuyRow { countText = magnetCount, buyButton = magnetBtn };
         shop.boostRow = new StarterPowerShopUI.BuyRow { countText = boostCount, buyButton = boostBtn };
         shop.doubleRow = new StarterPowerShopUI.BuyRow { countText = doubleCount, buyButton = doubleBtn };
+        shop.hammerRow = new StarterPowerShopUI.BuyRow { countText = hammerCount, buyButton = hammerBtn };
 
         shopPanel.SetActive(false);
         return shopPanel;
@@ -2457,7 +2541,7 @@ public static class FlappyBirdSceneBuilder
         cardOutline.effectColor = new Color(0.35f, 0.35f, 0.4f);
         cardOutline.effectDistance = new Vector2(2f, -2f);
         RectTransform cardRt = card.GetComponent<RectTransform>();
-        cardRt.sizeDelta = new Vector2(900, 200);
+        cardRt.sizeDelta = new Vector2(900, 170);
         cardRt.anchoredPosition = new Vector2(0, yPos);
 
         GameObject iconGO = new GameObject("Icon");
@@ -2465,7 +2549,7 @@ public static class FlappyBirdSceneBuilder
         Image iconImg = iconGO.AddComponent<Image>();
         iconImg.sprite = icon;
         RectTransform iconRt = iconGO.GetComponent<RectTransform>();
-        iconRt.sizeDelta = new Vector2(100, 100);
+        iconRt.sizeDelta = new Vector2(90, 90);
         iconRt.anchoredPosition = new Vector2(-370, 20);
 
         GameObject nameGO = CreateLabel("Name", card.transform, name, 26, new Vector2(-160, 40));
@@ -2520,7 +2604,7 @@ public static class FlappyBirdSceneBuilder
         cardImg.sprite = resultCardSprite;
         cardImg.type = Image.Type.Simple;
         resultCardTransform = resultCard.GetComponent<RectTransform>();
-        resultCardTransform.sizeDelta = new Vector2(650, 380);
+        resultCardTransform.sizeDelta = new Vector2(650, 460);
         resultCardTransform.anchoredPosition = new Vector2(0, 50);
 
         Shadow cardShadow = resultCard.AddComponent<Shadow>();
@@ -2569,9 +2653,9 @@ public static class FlappyBirdSceneBuilder
         coinsIconImg.sprite = coinIcon;
         RectTransform coinsIconRt = coinsIconGO.GetComponent<RectTransform>();
         coinsIconRt.sizeDelta = new Vector2(36, 36);
-        coinsIconRt.anchoredPosition = new Vector2(-185, -140);
+        coinsIconRt.anchoredPosition = new Vector2(-185, -170);
 
-        GameObject coinsVal = CreateLabel("CoinsValue", resultCard.transform, "0", 32, new Vector2(-135, -140));
+        GameObject coinsVal = CreateLabel("CoinsValue", resultCard.transform, "0", 32, new Vector2(-135, -170));
         coinsValueText = coinsVal;
         Text cvText = coinsVal.GetComponent<Text>();
         cvText.color = new Color(0.98f, 0.82f, 0.15f);
@@ -2605,7 +2689,7 @@ public static class FlappyBirdSceneBuilder
         ApplyButtonLook(menuImg, buttonSprite, new Color(0.55f, 0.6f, 0.65f));
         RectTransform menuRt = menuGO.GetComponent<RectTransform>();
         menuRt.sizeDelta = new Vector2(260, 100);
-        menuRt.anchoredPosition = new Vector2(-150, -220); // lowered slightly to clear the taller Results card
+        menuRt.anchoredPosition = new Vector2(-150, -260); // lowered to clear the taller Results card (grew to fit the COINS row)
         menuButton = menuGO.AddComponent<Button>();
         GameObject menuLabel = CreateLabel("Text", menuGO.transform, "MENU", 38);
         Text menuLabelText = menuLabel.GetComponent<Text>();
@@ -2621,7 +2705,7 @@ public static class FlappyBirdSceneBuilder
         ApplyButtonLook(retryImg, buttonSprite, new Color(0.4f, 0.82f, 0.4f));
         RectTransform retryRt = retryGO.GetComponent<RectTransform>();
         retryRt.sizeDelta = new Vector2(260, 100);
-        retryRt.anchoredPosition = new Vector2(150, -220);
+        retryRt.anchoredPosition = new Vector2(150, -260);
         retryButton = retryGO.AddComponent<Button>();
         GameObject retryLabel = CreateLabel("Text", retryGO.transform, "RETRY", 38);
         Text retryLabelText = retryLabel.GetComponent<Text>();
@@ -3125,6 +3209,43 @@ public static class FlappyBirdSceneBuilder
                 if ((inLeftPole || inRightPole) && y <= center.y - outerRadius * 0.85f)
                 {
                     pixel = silver;
+                }
+
+                tex.SetPixel(x, y, pixel);
+            }
+        }
+        tex.Apply();
+        return tex;
+    }
+
+    private static Texture2D GenerateHammerTexture(int width, int height)
+    {
+        Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        Color clear = new Color(0, 0, 0, 0);
+        Color steel = new Color(0.55f, 0.58f, 0.62f);
+        Color steelDark = new Color(0.35f, 0.38f, 0.42f);
+        Color wood = new Color(0.55f, 0.35f, 0.15f);
+        Color woodDark = new Color(0.35f, 0.2f, 0.08f);
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                Color pixel = clear;
+
+                // Handle: diagonal wooden shaft
+                float handleWidth = width * 0.12f;
+                float t = (float)y / height;
+                float handleCenterX = width * 0.55f - t * width * 0.15f;
+                if (Mathf.Abs(x - handleCenterX) < handleWidth * 0.5f && y < height * 0.72f)
+                {
+                    pixel = (x < handleCenterX) ? woodDark : wood;
+                }
+
+                // Head: rectangular steel block near the top
+                if (y >= height * 0.58f && y <= height * 0.85f && x >= width * 0.18f && x <= width * 0.78f)
+                {
+                    pixel = (y > height * 0.75f) ? steelDark : steel;
                 }
 
                 tex.SetPixel(x, y, pixel);

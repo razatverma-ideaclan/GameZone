@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class CollectableItem : MonoBehaviour
 {
-    public enum ItemType { Coin, Magnet, Boost, Double }
+    public enum ItemType { Coin, Magnet, Boost, Double, Hammer }
 
     public ItemType itemType = ItemType.Coin;
     public int coinValue = 1;
@@ -74,6 +74,9 @@ public class CollectableItem : MonoBehaviour
                 break;
             case ItemType.Double:
                 GameManager.Instance.ActivateDouble();
+                break;
+            case ItemType.Hammer:
+                GameManager.Instance.ActivateHammer();
                 break;
         }
 
