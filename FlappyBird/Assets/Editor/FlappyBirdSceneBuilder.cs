@@ -2651,29 +2651,31 @@ public static class FlappyBirdSceneBuilder
         medalGO.SetActive(true); // Always active so placeholder shows immediately
 
         // 3. SCORE section on the right
-        GameObject scoreLabel = CreateLabel("ScoreLabel", resultCard.transform, "SCORE", 28, new Vector2(160, 95));
+        GameObject scoreLabel = CreateLabel("ScoreLabel", resultCard.transform, "SCORE", 32, new Vector2(160, 95));
         Text slText = scoreLabel.GetComponent<Text>();
-        slText.color = new Color(0.4f, 0.25f, 0.15f);
+        slText.color = new Color(0.18f, 0.1f, 0.04f); // near-black brown for strong contrast against the tan card
+        slText.fontStyle = FontStyle.Bold;
         Outline slOutline = scoreLabel.GetComponent<Outline>();
         if (slOutline != null) Object.DestroyImmediate(slOutline);
 
-        GameObject scoreVal = CreateLabel("ScoreValue", resultCard.transform, "0", 56, new Vector2(160, 35));
+        GameObject scoreVal = CreateLabel("ScoreValue", resultCard.transform, "0", 62, new Vector2(160, 35));
         scoreValueText = scoreVal;
         Text svText = scoreVal.GetComponent<Text>();
         svText.color = Color.white;
         svText.fontStyle = FontStyle.Bold;
 
         // 4. BEST section on the right
-        GameObject bestLabel = CreateLabel("BestLabel", resultCard.transform, "BEST", 28, new Vector2(160, -45));
+        GameObject bestLabel = CreateLabel("BestLabel", resultCard.transform, "BEST", 32, new Vector2(160, -45));
         Text blText = bestLabel.GetComponent<Text>();
-        blText.color = new Color(0.4f, 0.25f, 0.15f);
+        blText.color = new Color(0.18f, 0.1f, 0.04f); // near-black brown for strong contrast against the tan card
+        blText.fontStyle = FontStyle.Bold;
         Outline blOutline = bestLabel.GetComponent<Outline>();
         if (blOutline != null) Object.DestroyImmediate(blOutline);
 
-        GameObject bestVal = CreateLabel("BestValue", resultCard.transform, "0", 56, new Vector2(160, -105));
+        GameObject bestVal = CreateLabel("BestValue", resultCard.transform, "0", 62, new Vector2(160, -105));
         bestValueText = bestVal;
         Text bvText = bestVal.GetComponent<Text>();
-        bvText.color = Color.white;
+        bvText.color = new Color(0.95f, 0.72f, 0.15f); // gold, so BEST reads distinctly from the current SCORE
         bvText.fontStyle = FontStyle.Bold;
 
         // 4b. COINS earned this run, tucked under the medal
@@ -2682,17 +2684,17 @@ public static class FlappyBirdSceneBuilder
         Image coinsIconImg = coinsIconGO.AddComponent<Image>();
         coinsIconImg.sprite = coinIcon;
         RectTransform coinsIconRt = coinsIconGO.GetComponent<RectTransform>();
-        coinsIconRt.sizeDelta = new Vector2(36, 36);
-        coinsIconRt.anchoredPosition = new Vector2(-185, -195);
+        coinsIconRt.sizeDelta = new Vector2(40, 40);
+        coinsIconRt.anchoredPosition = new Vector2(-280, -195); // tucked in the card's left corner
 
-        GameObject coinsVal = CreateLabel("CoinsValue", resultCard.transform, "0", 32, new Vector2(-135, -195));
+        GameObject coinsVal = CreateLabel("CoinsValue", resultCard.transform, "0", 32, new Vector2(-212, -195));
         coinsValueText = coinsVal;
         Text cvText = coinsVal.GetComponent<Text>();
         cvText.color = new Color(0.98f, 0.82f, 0.15f);
         cvText.fontStyle = FontStyle.Bold;
         cvText.alignment = TextAnchor.MiddleLeft;
         RectTransform coinsValRt = coinsVal.GetComponent<RectTransform>();
-        coinsValRt.sizeDelta = new Vector2(100, 50);
+        coinsValRt.sizeDelta = new Vector2(80, 50); // tight to the icon, just a small readable gap
 
         // 5. NEW Best badge next to the BEST score value
         GameObject newBadge = new GameObject("NewBestBadge");
