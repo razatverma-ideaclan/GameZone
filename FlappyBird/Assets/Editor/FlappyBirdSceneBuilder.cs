@@ -1922,8 +1922,8 @@ public static class FlappyBirdSceneBuilder
         barRt.anchorMin = new Vector2(0.5f, 0f);
         barRt.anchorMax = new Vector2(0.5f, 0f);
         barRt.pivot = new Vector2(0.5f, 0.5f);
-        barRt.sizeDelta = new Vector2(900, 120);
-        barRt.anchoredPosition = new Vector2(0, 80); // float elegantly closer to the bottom
+        barRt.sizeDelta = new Vector2(900, 160);
+        barRt.anchoredPosition = new Vector2(0, 100); // float elegantly closer to the bottom
         
         Shadow barShadow = bottomBar.AddComponent<Shadow>();
         barShadow.effectColor = new Color(0f, 0f, 0f, 0.35f);
