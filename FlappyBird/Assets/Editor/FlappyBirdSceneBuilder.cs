@@ -398,6 +398,25 @@ public static class FlappyBirdSceneBuilder
     {
         string path = $"{SpriteFolder}/{name}.png";
 
+        if (File.Exists(path))
+        {
+            AssetDatabase.ImportAsset(path);
+            TextureImporter existImporter = (TextureImporter)AssetImporter.GetAtPath(path);
+            if (existImporter != null)
+            {
+                bool changed = false;
+                if (existImporter.textureType != TextureImporterType.Sprite) { existImporter.textureType = TextureImporterType.Sprite; changed = true; }
+                if (existImporter.spriteImportMode != SpriteImportMode.Single) { existImporter.spriteImportMode = SpriteImportMode.Single; changed = true; }
+                if (existImporter.spritePixelsPerUnit != pixelsPerUnit) { existImporter.spritePixelsPerUnit = pixelsPerUnit; changed = true; }
+                if (existImporter.filterMode != filterMode) { existImporter.filterMode = filterMode; changed = true; }
+                if (existImporter.wrapMode != wrapMode) { existImporter.wrapMode = wrapMode; changed = true; }
+                if (existImporter.spriteBorder != border) { existImporter.spriteBorder = border; changed = true; }
+                if (changed) existImporter.SaveAndReimport();
+            }
+            Sprite existingSprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (existingSprite != null) return existingSprite;
+        }
+
         Texture2D tex = generator(width, height);
         File.WriteAllBytes(path, tex.EncodeToPNG());
         Object.DestroyImmediate(tex);
@@ -572,6 +591,85 @@ public static class FlappyBirdSceneBuilder
                 tex.SetPixel(x, y, pixel);
             }
         }
+        tex.Apply();
+        return tex;
+    }
+
+    /// <summary>
+    /// Interlocking stair-step brick look (per the user's reference image): tall rectangular
+    /// orange blocks separated by cream mortar, where the seam between neighboring bricks
+    /// zig-zags in a staircase shape (rather than a straight line) as it descends, with a
+    /// black outline everywhere the orange meets the cream.
+    /// </summary>
+    private static Texture2D GenerateMarioClassicBrickTexture(int width, int height)
+    {
+        Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        Color cream = new Color(0.93f, 0.78f, 0.55f);
+        Color orange = new Color(0.82f, 0.35f, 0.12f);
+        Color orangeDark = new Color(0.7f, 0.28f, 0.09f);
+        Color black = new Color(0.08f, 0.04f, 0.02f);
+
+        int cellW = Mathf.Max(16, width / 4);
+        int cellH = Mathf.Max(16, height / 2);
+        bool[,] isBrick = new bool[width, height];
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int cx = x % cellW;
+                int cy = y % cellH;
+                int margin = Mathf.Max(3, cellW / 14);
+
+                bool insideBox = cx > margin && cx < cellW - margin && cy > margin && cy < cellH - margin;
+
+                // Staircase notch eating into the bottom-right corner: as y descends through the
+                // corner region, progressively more of the right edge gets cut away, producing a
+                // 3-step zig-zag seam instead of a straight border.
+                bool cutStair = false;
+                float cornerStartX = cellW * 0.28f;
+                float cornerStartY = cellH * 0.58f;
+                if (cx > cornerStartX && cy > cornerStartY)
+                {
+                    float lx = cx - cornerStartX;
+                    float ly = cy - cornerStartY;
+                    float boxW = (cellW - margin) - cornerStartX;
+                    float boxH = (cellH - margin) - cornerStartY;
+                    int steps = 3;
+                    int stepIndex = Mathf.Clamp((int)(ly / (boxH / steps)), 0, steps - 1);
+                    float cutoff = boxW - stepIndex * (boxW / steps);
+                    if (lx > cutoff) cutStair = true;
+                }
+
+                isBrick[x, y] = insideBox && !cutStair;
+            }
+        }
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                Color px = isBrick[x, y] ? (((x * 13 + y * 7) % 23 == 0) ? orangeDark : orange) : cream;
+
+                // Black outline wherever this pixel borders a differently-classified neighbor
+                // (wraps around tile edges so the texture still tiles seamlessly).
+                bool edge = false;
+                for (int dy = -1; dy <= 1 && !edge; dy++)
+                {
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        if (dx == 0 && dy == 0) continue;
+                        int nx = ((x + dx) % width + width) % width;
+                        int ny = ((y + dy) % height + height) % height;
+                        if (isBrick[nx, ny] != isBrick[x, y]) { edge = true; break; }
+                    }
+                }
+                if (edge) px = black;
+
+                tex.SetPixel(x, y, px);
+            }
+        }
+
         tex.Apply();
         return tex;
     }
@@ -1034,6 +1132,10 @@ public static class FlappyBirdSceneBuilder
         // width (so more of the skyline/buildings show) on tall phone aspect
         // ratios, without going back to the "zoomed out" look on very tall screens.
         fitWidth.maxOrthographicSize = 8f;
+        // Prevents wide/landscape aspects (desktop browsers, WebGL windows) from zooming the
+        // vertical view in so far that the ground (fixed at y=-5.6) falls outside the camera
+        // entirely and disappears — was uncapped on the low end before.
+        fitWidth.minOrthographicSize = 6.5f;
     }
 
     private static GameObject BuildGround(Sprite dirtSprite, Sprite grassSprite)
@@ -4066,45 +4168,12 @@ public static class FlappyBirdSceneBuilder
                 hatch = new Color(0.28f, 0.25f, 0.22f);
                 lineColor = new Color(0.12f, 0.1f, 0.08f);
             }
-            else if (index == 7) // Mario — same clean staggered brick pattern used on the Mario pipes
-                                  // (offset rows of solid blocks with a dark border + top-left highlight),
-                                  // instead of the busier diagonal cross-hatch bricks used previously.
+            else if (index == 7) // Mario — classic rounded-arch brick with a stepped notch,
+                                  // matching the reference SMB underground-brick look (cream
+                                  // mortar, orange arch-shaped block, black outline, small
+                                  // bottom-left notch), instead of a plain rectangular brick.
             {
-                Color brickCol = new Color(0.85f, 0.35f, 0.12f);
-                Color brickShadow = new Color(0.5f, 0.15f, 0.05f);
-                Color brickHighlight = new Color(0.98f, 0.6f, 0.45f);
-
-                for (int y = 0; y < height; y++)
-                {
-                    for (int x = 0; x < width; x++)
-                    {
-                        int rowHeight = height / 4;
-                        int row = y / rowHeight;
-                        int colWidth = width / 2;
-                        int colOffset = (row % 2 == 0) ? 0 : colWidth / 2;
-
-                        int localY = y % rowHeight;
-                        int localX = (x + colOffset) % colWidth;
-
-                        Color px;
-                        if (localY == 0 || localY == rowHeight - 1 || localX == 0 || localX == colWidth - 1)
-                        {
-                            px = brickShadow;
-                        }
-                        else if (localY == 1 || localX == 1)
-                        {
-                            px = brickHighlight;
-                        }
-                        else
-                        {
-                            px = brickCol;
-                        }
-
-                        tex.SetPixel(x, y, px);
-                    }
-                }
-                tex.Apply();
-                return tex;
+                return GenerateMarioClassicBrickTexture(width, height);
             }
 
             for (int y = 0; y < height; y++)

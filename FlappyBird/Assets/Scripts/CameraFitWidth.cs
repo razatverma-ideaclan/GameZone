@@ -17,6 +17,13 @@ public class CameraFitWidth : MonoBehaviour
              "at the left/right edges instead of shrinking everything.")]
     public float maxOrthographicSize = 7f;
 
+    [Tooltip("Floors how far the camera can zoom IN on wide/landscape screens (desktop " +
+             "browsers, WebGL windows, tablets). Without this, targetHalfWidth / aspect can " +
+             "shrink the vertical view enough that the ground (which sits at a fixed Y below " +
+             "the camera) falls completely outside the frustum and disappears. Once hit, extra " +
+             "height beyond what's needed just reveals more sky/side margin instead.")]
+    public float minOrthographicSize = 6.5f;
+
     private Camera cam;
 
     void Awake()
@@ -39,7 +46,7 @@ public class CameraFitWidth : MonoBehaviour
         if (cam != null && cam.orthographic && cam.aspect > 0f)
         {
             float desiredSize = targetHalfWidth / cam.aspect;
-            cam.orthographicSize = Mathf.Min(desiredSize, maxOrthographicSize);
+            cam.orthographicSize = Mathf.Clamp(desiredSize, minOrthographicSize, maxOrthographicSize);
         }
     }
 }

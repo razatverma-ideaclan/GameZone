@@ -166,7 +166,8 @@ public class ThemeApplier : MonoBehaviour
         // the menu reflects whichever world is currently selected.
         foreach (var sr in FindObjectsOfType<SpriteRenderer>())
         {
-            if (sr.gameObject.name.StartsWith("Background"))
+            string name = sr.gameObject.name;
+            if (name == "Background" || name == "Background2")
             {
                 sr.sprite = theme.backgroundSprite != null ? theme.backgroundSprite : originalBackgroundSprite;
             }
