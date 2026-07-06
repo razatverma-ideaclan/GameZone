@@ -33,7 +33,8 @@ public class ThemeManager : MonoBehaviour
     /// </summary>
     public void LoadThemeSelection()
     {
-        selectedThemeIndex = PlayerPrefs.GetInt(ThemePrefsKey, 0);
+        // Default to Space (index 1) for first-time players who haven't picked a world yet.
+        selectedThemeIndex = PlayerPrefs.GetInt(ThemePrefsKey, 1);
         if (themes != null && (selectedThemeIndex < 0 || selectedThemeIndex >= themes.Length))
         {
             selectedThemeIndex = 0;

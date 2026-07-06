@@ -3478,11 +3478,11 @@ public static class FlappyBirdSceneBuilder
             data.obstacleTopCapSprite = null;
             data.obstacleBottomCapSprite = null;
         }
-        else if (index == 7) // Mario: Bricks on top, Green Warp Pipe on bottom
+        else if (index == 7) // Mario: same green Warp Pipe on both top and bottom
         {
-            data.obstacleTopSprite = GetOrCreateSprite($"{name}/ObstacleTopBricks", 256, 256, (w, h) => GenerateThemeTexture("MarioBricks", index, w, h), 256, FilterMode.Point);
+            data.obstacleTopSprite = GetOrCreateSprite($"{name}/ObstacleTopPipe", 256, 256, (w, h) => GenerateThemeTexture("MarioPipeBody", index, w, h), 256, FilterMode.Point);
             data.obstacleBottomSprite = GetOrCreateSprite($"{name}/ObstacleBottomPipe", 256, 256, (w, h) => GenerateThemeTexture("MarioPipeBody", index, w, h), 256, FilterMode.Point);
-            data.obstacleTopCapSprite = null; // Bricks don't need caps
+            data.obstacleTopCapSprite = GetOrCreateSprite($"{name}/ObstacleTopCap", 256, 256, (w, h) => GenerateThemeTexture("MarioPipeCap", index, w, h), 256, FilterMode.Point);
             data.obstacleBottomCapSprite = GetOrCreateSprite($"{name}/ObstacleBottomCap", 256, 256, (w, h) => GenerateThemeTexture("MarioPipeCap", index, w, h), 256, FilterMode.Point);
         }
         else if (index == 8) // Mars: Dark rocky spire columns
@@ -3891,14 +3891,15 @@ public static class FlappyBirdSceneBuilder
                                         isOutline = true;
                                     }
                                     
-                                    // Eye calculations near the peak of the hill
+                                    // Eye calculations near the peak of the hill — small round dots,
+                                    // not tall bars (was checking x/y independently, which drew two
+                                    // solid vertical rectangles that looked like a pause icon).
                                     float eyeYCenter = hh * 0.75f;
-                                    if (Mathf.Abs(y - eyeYCenter) < 12f)
+                                    float eyeRadius = 5f;
+                                    if (Vector2.Distance(new Vector2(dx, y), new Vector2(8f, eyeYCenter)) < eyeRadius ||
+                                        Vector2.Distance(new Vector2(dx, y), new Vector2(-8f, eyeYCenter)) < eyeRadius)
                                     {
-                                        if (Mathf.Abs(dx - 8f) < 3f || Mathf.Abs(dx + 8f) < 3f)
-                                        {
-                                            isEye = true;
-                                        }
+                                        isEye = true;
                                     }
                                 }
                             }

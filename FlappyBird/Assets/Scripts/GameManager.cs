@@ -1030,7 +1030,8 @@ public class GameManager : MonoBehaviour
     {
         if (heroesPanel == null) return;
 
-        int currentGlobal = PlayerPrefs.GetInt(SelectedHeroKey, 0);
+        // Default to Space world (1) / Cosmic UFO skin (1) => global index 4, for first-time players.
+        int currentGlobal = PlayerPrefs.GetInt(SelectedHeroKey, 4);
         int currentWorld = currentGlobal / 3;
         int currentSkin = currentGlobal % 3;
 

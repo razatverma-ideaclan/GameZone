@@ -30,6 +30,16 @@ public class GroundScroller : MonoBehaviour
             {
                 currentSpeed *= GameManager.Instance.GetCurrentSpeedMultiplier();
             }
+
+            // Mario theme's floor tiles are a detailed brick pattern that's hard to read when
+            // scrolling fast, so slow ONLY the ground for this theme. Pipes/items are untouched
+            // since they read GetCurrentSpeedMultiplier() directly, not this extra factor.
+            if (ThemeManager.Instance != null && ThemeManager.Instance.GetCurrentTheme() != null &&
+                ThemeManager.Instance.GetCurrentTheme().themeName.ToLower() == "mario")
+            {
+                currentSpeed *= 0.5f;
+            }
+
             scrollOffset += currentSpeed * Time.deltaTime;
             scrollOffset %= tileWidth;
         }

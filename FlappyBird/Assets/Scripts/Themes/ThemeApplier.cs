@@ -335,7 +335,8 @@ public class ThemeApplier : MonoBehaviour
     public void ApplySelectedHero()
     {
         InitializeFallbacks();
-        int globalIndex = PlayerPrefs.GetInt(SelectedHeroKey, 0);
+        // Default to Space world (1) / Cosmic UFO skin (1) => global index 4, for first-time players.
+        int globalIndex = PlayerPrefs.GetInt(SelectedHeroKey, 4);
         ApplyHeroSprite(globalIndex);
     }
 

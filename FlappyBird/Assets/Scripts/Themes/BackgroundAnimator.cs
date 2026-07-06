@@ -263,13 +263,16 @@ public class BackgroundAnimator : MonoBehaviour
 
                 goomba.transform.localScale = new Vector3(1f, 1f, 1f);
                 float startX = (i == 0) ? Random.Range(minX, 0f) : Random.Range(0f, maxX);
-                goomba.transform.position = new Vector3(startX, -5.3f, 1.2f);
+                // Raised so the Goomba's feet land ON TOP of the brick floor (dirtTopY = -5.6)
+                // instead of sinking into it — was previously placed too low, burying the legs/body.
+                const float goombaGroundY = -4.8f;
+                goomba.transform.position = new Vector3(startX, goombaGroundY, 1.2f);
 
                 DriftData gDrift = goomba.AddComponent<DriftData>();
                 gDrift.speed = 0.6f + i * 0.4f; // walk slowly along the floor
                 gDrift.rotSpeed = 0f;
-                gDrift.minY = -5.3f;
-                gDrift.maxY = -5.3f;
+                gDrift.minY = goombaGroundY;
+                gDrift.maxY = goombaGroundY;
 
                 animatedElements.Add(goomba);
             }

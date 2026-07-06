@@ -78,9 +78,25 @@ public class ItemSpawner : MonoBehaviour
         }
     }
 
+    [Header("Safety")]
+    [Tooltip("Minimum distance an item must keep from any active pipe's X position, so timing drift (both spawners' intervals are independently rescaled by the same speed multiplier, which can desync slightly over a run) never lets a coin land inside a pipe's solid body.")]
+    public float minPipeClearance = 3f;
+
+    private bool IsNearAnyPipe(float x)
+    {
+        PipeMover[] pipes = FindObjectsOfType<PipeMover>();
+        foreach (PipeMover pipe in pipes)
+        {
+            if (pipe == null) continue;
+            if (Mathf.Abs(pipe.transform.position.x - x) < minPipeClearance) return true;
+        }
+        return false;
+    }
+
     private void Spawn(CollectableItem.ItemType type, Sprite sprite)
     {
         if (sprite == null) return;
+        if (IsNearAnyPipe(spawnXPosition)) return; // skip this cycle rather than risk overlapping a pipe
 
         GameObject item = new GameObject(type.ToString() + "Item");
         float y = Random.Range(minY, maxY);
