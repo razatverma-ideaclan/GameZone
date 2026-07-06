@@ -1078,8 +1078,15 @@ public static class FlappyBirdSceneBuilder
         sr.color = Color.white;
         sr.sortingOrder = 10; // Ground renders in front of pipes (5)
 
+        // Grass strip height/placement (below) — the collider's top edge is offset up by
+        // half of this so the physical landing surface matches the TOP of the grass cap,
+        // not the top of the dirt sprite underneath it. Previously the collider stopped the
+        // bird at the dirt's top edge while the grass visually sat another 0.25 units above
+        // that, so every landing buried the bird's legs/body into the ground by that amount.
+        const float grassCapHeight = 0.5f;
         BoxCollider2D col = ground.AddComponent<BoxCollider2D>();
         col.size = new Vector2(tileWidth, dirtHeight);
+        col.offset = new Vector2(0, grassCapHeight / 2f);
 
         // Cosmetic grass strip with a jagged blade edge, sitting right on the dirt's top edge.
         GameObject grass = new GameObject("Grass");
@@ -1087,7 +1094,7 @@ public static class FlappyBirdSceneBuilder
         SpriteRenderer grassSr = grass.AddComponent<SpriteRenderer>();
         grassSr.sprite = grassSprite;
         grassSr.drawMode = SpriteDrawMode.Tiled;
-            grassSr.size = new Vector2(tileWidth, 0.5f);
+            grassSr.size = new Vector2(tileWidth, grassCapHeight);
         grassSr.color = Color.white;
         grassSr.sortingOrder = 11; // Grass renders in front of pipes (5)
         grass.transform.localPosition = new Vector3(0, dirtHeight / 2f, 0); // sits at the dirt's top edge
@@ -4235,9 +4242,8 @@ public static class FlappyBirdSceneBuilder
                 tex.Apply();
                 return tex;
             }
-            else if (index == 7) // Mario: real green grass cap sitting on top of the brick floor
-                                  // (matches other themes' look — was previously a busy diagonal
-                                  // brick pattern here too, so the "grass" never looked like grass).
+            else if (index == 7) // Mario: same jagged-blade grass shape/style as Classic (falls
+                                  // through to the shared renderer below), just green-tinted.
             {
                 grass = new Color(0.0f, 0.72f, 0.0f);          // classic Mario green
                 grassHighlight = new Color(0.35f, 0.9f, 0.25f);

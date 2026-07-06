@@ -263,9 +263,11 @@ public class BackgroundAnimator : MonoBehaviour
 
                 goomba.transform.localScale = new Vector3(1f, 1f, 1f);
                 float startX = (i == 0) ? Random.Range(minX, 0f) : Random.Range(0f, maxX);
-                // Raised so the Goomba's feet land ON TOP of the brick floor (dirtTopY = -5.6)
-                // instead of sinking into it — was previously placed too low, burying the legs/body.
-                const float goombaGroundY = -4.8f;
+                // Aligned to the REAL foreground floor's grass top (dirtTopY -5.6 + grass cap 0.5
+                // = -5.35 visual surface), not the distant painted background hill — the hill
+                // artwork only reaches that height in three spots, so tying the Goomba to it made
+                // it look grounded near a hill but buried in the brick everywhere else.
+                const float goombaGroundY = -5.05f;
                 goomba.transform.position = new Vector3(startX, goombaGroundY, 1.2f);
 
                 DriftData gDrift = goomba.AddComponent<DriftData>();
