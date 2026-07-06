@@ -1160,7 +1160,7 @@ public class GameManager : MonoBehaviour
 
                 RectTransform targetRt = targetBtn.GetComponent<RectTransform>();
                 Vector2 targetPos = targetRt.anchoredPosition;
-                Vector2 targetSize = new Vector2(100, 90);
+                Vector2 targetSize = new Vector2(116, 106);
 
                 if (navIndicator.anchoredPosition == Vector2.zero) // Snap on first layout
                 {
@@ -1212,7 +1212,7 @@ public class GameManager : MonoBehaviour
         if (rt != null)
         {
             // Keep button size uniform and flat at Y: 0 (Liquid Glass style)
-            rt.sizeDelta = new Vector2(80, 80);
+            rt.sizeDelta = new Vector2(100, 100);
             rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, 0f);
         }
 
@@ -1231,7 +1231,7 @@ public class GameManager : MonoBehaviour
             RectTransform iconRt = iconTrans.GetComponent<RectTransform>();
             if (iconRt != null)
             {
-                iconRt.sizeDelta = active ? new Vector2(96, 96) : new Vector2(58, 58);
+                iconRt.sizeDelta = active ? new Vector2(100, 100) : new Vector2(82, 82);
             }
 
             UnityEngine.UI.Image img = iconTrans.GetComponent<UnityEngine.UI.Image>();
