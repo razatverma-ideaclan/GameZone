@@ -33,6 +33,7 @@ public static class FlappyBirdSceneBuilder
 
         EnsureFolders();
         EnsureTags();
+        EnsureLayers();
         LockPortraitOrientation();
 
         // 1. Synthesize retro 8-bit WAV sound effects
@@ -91,6 +92,11 @@ public static class FlappyBirdSceneBuilder
         
         // Classic tan Flappy Bird results scoreboard card
         Sprite resultCardSprite = GetOrCreateSprite("ResultCard", 620, 350, (w, h) => GenerateRoundedRectTexture(w, h, 24, new Color(0.88f, 0.85f, 0.72f), new Color(0.48f, 0.45f, 0.35f), 8), 620);
+
+        // Dedicated 9-sliced pill for the bottom nav bar — white fill so it can be tinted via Image.color,
+        // with a border baked in so the rounded corners stay crisp at ANY bar width/height (no stretch distortion).
+        Sprite navBarSprite = GetOrCreateSprite("NavBarPill", 240, 160, (w, h) => GenerateRoundedRectTexture(w, h, 36, Color.white, new Color(1f, 1f, 1f, 0.5f), 3), 240, FilterMode.Bilinear, TextureWrapMode.Clamp, new Vector4(40, 40, 40, 40));
+        Sprite navIndicatorSprite = GetOrCreateSprite("NavIndicatorPill", 160, 160, (w, h) => GenerateRoundedRectTexture(w, h, 44, Color.white, new Color(1f, 1f, 1f, 0.5f), 0), 160, FilterMode.Bilinear, TextureWrapMode.Clamp, new Vector4(44, 44, 44, 44));
         
         // Shiny metallic medals with gradient, shadow, and embossing
         Sprite bronzeMedalSprite = GetOrCreateSprite("BronzeMedal", 128, 128, (w, h) => GenerateMedalTexture(w, h, new Color(0.7f, 0.4f, 0.2f), new Color(0.9f, 0.6f, 0.4f)), 128);
@@ -106,6 +112,13 @@ public static class FlappyBirdSceneBuilder
         Sprite themesIcon = GetOrCreateSprite("ThemesIcon", 128, 128, (w, h) => GenerateIconTexture("Themes", w, h), 128);
         Sprite playIcon = GetOrCreateSprite("PlayIcon", 128, 128, (w, h) => GenerateIconTexture("Play", w, h), 128);
         Sprite homeIcon = GetOrCreateSprite("HomeIcon", 128, 128, (w, h) => GenerateIconTexture("Home", w, h), 128);
+
+        // Coins & power-ups
+        Sprite coinSprite = GetOrCreateSprite("Coin", 128, 128, (w, h) => GenerateCoinTexture(w, h), 128);
+        Sprite magnetSprite = GetOrCreateSprite("Powerup_Magnet", 128, 128, (w, h) => GenerateMagnetTexture(w, h), 128);
+        Sprite boostSprite = GetOrCreateSprite("Powerup_Boost", 128, 128, (w, h) => GenerateBoostTexture(w, h), 128);
+        Sprite doubleSprite = GetOrCreateSprite("Powerup_Double", 128, 128, (w, h) => GenerateDoubleTexture(w, h), 128);
+        Sprite hammerSprite = GetOrCreateSprite("Powerup_Hammer", 128, 128, (w, h) => GenerateHammerTexture(w, h), 128);
 
         Sprite pipeBodySprite = GetOrCreateSprite("PipeBody", 256, 256, (w, h) => GeneratePipeBodyTexture(w, h), 256, FilterMode.Point);
         Sprite pipeCapSprite = GetOrCreateSprite("PipeCap", 256, 256, (w, h) => GeneratePipeCapTexture(w, h), 256, FilterMode.Point);
@@ -137,27 +150,32 @@ public static class FlappyBirdSceneBuilder
         GameObject bird = BuildBird(birdMidSprites, birdUpSprites, birdDownSprites, flapClip, hitClip, landClip);
         GameObject pipePairPrefab = BuildPipePairPrefab(pipeBodySprite, pipeCapSprite);
         GameObject pipeSpawnerGO = BuildPipeSpawner(pipePairPrefab);
+        GameObject itemSpawnerGO = BuildItemSpawner(coinSprite, magnetSprite, boostSprite, doubleSprite, hammerSprite);
         BuildEventSystem();
         Canvas canvas = BuildCanvas();
         GameObject scoreTextGO = BuildScoreText(canvas.transform);
-        
+
+        GameObject coinsTextGO, magnetTimerGO, boostTimerGO, doubleTimerGO, hammerChargesGO;
+        BuildPowerupHUD(canvas.transform, coinSprite, magnetSprite, boostSprite, doubleSprite, hammerSprite, out coinsTextGO, out magnetTimerGO, out boostTimerGO, out doubleTimerGO, out hammerChargesGO);
+
         GameObject startHighScoreText;
         Button startButton, shopButton, heroesButton, missionsButton, themesButton, navPlayBtn;
         GameObject toastPanel, themeSelectorPanelRef;
         GameObject lobbyPanel, heroesPanel;
         UnityEngine.UI.Image playIconImageRef;
         Text activeThemeLabelText;
-        GameObject shopPanel, questsPanel, leaderboardPanel;
+        GameObject shopPanel, questsPanel, leaderboardPanel, screenBackdrop;
+        GameObject starterMagnetWidget, starterBoostWidget, starterDoubleWidget, starterHammerWidget;
         Button bestScoreButton;
-        GameObject startPanel = BuildStartPanel(canvas.transform, pillButtonSprite, resultCardSprite, goldMedalSprite, out startButton, out startHighScoreText, birdMidSprites, themeAssets, shopIcon, heroesIcon, missionsIcon, themesIcon, playIcon, homeIcon, out shopButton, out heroesButton, out missionsButton, out themesButton, out toastPanel, out themeSelectorPanelRef, out lobbyPanel, out heroesPanel, out playIconImageRef, out navPlayBtn, out activeThemeLabelText, out shopPanel, out questsPanel, out leaderboardPanel, out bestScoreButton);
+        GameObject startPanel = BuildStartPanel(canvas.transform, pillButtonSprite, resultCardSprite, goldMedalSprite, out startButton, out startHighScoreText, birdMidSprites, themeAssets, shopIcon, heroesIcon, missionsIcon, themesIcon, playIcon, homeIcon, out shopButton, out heroesButton, out missionsButton, out themesButton, out toastPanel, out themeSelectorPanelRef, out lobbyPanel, out heroesPanel, out playIconImageRef, out navPlayBtn, out activeThemeLabelText, out shopPanel, out questsPanel, out leaderboardPanel, out bestScoreButton, out screenBackdrop, out starterMagnetWidget, out starterBoostWidget, out starterDoubleWidget, out starterHammerWidget, coinSprite, magnetSprite, boostSprite, doubleSprite, hammerSprite, navBarSprite, navIndicatorSprite);
         
         UnityEngine.UI.Image medalImage;
         GameObject newBestBadge;
         RectTransform resultCardTransform;
-        GameObject gameOverScoreText, gameOverBestText;
-        GameObject gameOverPanel = BuildGameOverPanel(canvas.transform, pillButtonSprite, resultCardSprite, out Button menuButton, out Button retryButton, out gameOverScoreText, out gameOverBestText, out medalImage, out newBestBadge, out resultCardTransform);
+        GameObject gameOverScoreText, gameOverBestText, gameOverCoinsText;
+        GameObject gameOverPanel = BuildGameOverPanel(canvas.transform, pillButtonSprite, resultCardSprite, coinSprite, out Button menuButton, out Button retryButton, out gameOverScoreText, out gameOverBestText, out gameOverCoinsText, out medalImage, out newBestBadge, out resultCardTransform);
         
-        GameObject gameManagerGO = BuildGameManager(bird, pipeSpawnerGO, scoreTextGO, startPanel, gameOverPanel, clickClip, scoreClip, gameOverScoreText, gameOverBestText, startHighScoreText, medalImage, bronzeMedalSprite, silverMedalSprite, goldMedalSprite, platinumMedalSprite, medalPlaceholderSprite, newBestBadge, resultCardTransform);
+        GameObject gameManagerGO = BuildGameManager(bird, pipeSpawnerGO, itemSpawnerGO, scoreTextGO, startPanel, gameOverPanel, clickClip, scoreClip, gameOverScoreText, gameOverBestText, gameOverCoinsText, startHighScoreText, medalImage, bronzeMedalSprite, silverMedalSprite, goldMedalSprite, platinumMedalSprite, medalPlaceholderSprite, newBestBadge, resultCardTransform);
 
         // Wire the buttons now that GameManager exists.
         GameManager gm = gameManagerGO.GetComponent<GameManager>();
@@ -168,6 +186,16 @@ public static class FlappyBirdSceneBuilder
         gm.shopPanel = shopPanel;
         gm.questsPanel = questsPanel;
         gm.leaderboardPanel = leaderboardPanel;
+        gm.screenBackdrop = screenBackdrop;
+        gm.starterMagnetWidget = starterMagnetWidget;
+        gm.starterBoostWidget = starterBoostWidget;
+        gm.starterDoubleWidget = starterDoubleWidget;
+        gm.starterHammerWidget = starterHammerWidget;
+        gm.coinsText = coinsTextGO;
+        gm.magnetTimerText = magnetTimerGO;
+        gm.boostTimerText = boostTimerGO;
+        gm.doubleTimerText = doubleTimerGO;
+        gm.hammerChargesWidget = hammerChargesGO;
         gm.playIconImage = playIconImageRef;
         gm.playSprite = playIcon;
         gm.homeSprite = homeIcon;
@@ -180,20 +208,53 @@ public static class FlappyBirdSceneBuilder
         ThemeApplier themeApplierRef = gameManagerGO.GetComponent<ThemeApplier>();
         if (themeApplierRef != null) themeApplierRef.themeNameLabel = activeThemeLabelText;
 
+        // Attach and wire the customizable MenuThemeConfig component to the Canvas
+        MenuThemeConfig themeConfig = canvas.gameObject.AddComponent<MenuThemeConfig>();
+        if (startPanel != null)
+        {
+            Transform navBarTrans = startPanel.transform.Find("BottomNavBar");
+            if (navBarTrans != null)
+            {
+                themeConfig.bottomBarBg = navBarTrans.GetComponent<Image>();
+                
+                Transform playBtnTrans = navBarTrans.Find("PlayButton");
+                if (playBtnTrans != null) themeConfig.centerPlayButtonImage = playBtnTrans.GetComponent<Image>();
+                
+                Transform indTrans = navBarTrans.Find("ActiveIndicator");
+                if (indTrans != null) themeConfig.activeIndicatorImage = indTrans.GetComponent<Image>();
+            }
+        }
+        if (lobbyPanel != null)
+        {
+            Transform leadTrans = lobbyPanel.transform.Find("LeaderboardButton");
+            if (leadTrans != null) themeConfig.leaderboardButtonImage = leadTrans.GetComponent<Image>();
+            
+            Transform vertTrans = lobbyPanel.transform.Find("VerticalModeButton");
+            if (vertTrans != null) themeConfig.verticalClimbButtonImage = vertTrans.GetComponent<Image>();
+            
+            Transform badgeTrans = lobbyPanel.transform.Find("HighScoreBadge");
+            if (badgeTrans != null) themeConfig.highScoreBadgeImage = badgeTrans.GetComponent<Image>();
+        }
+        themeConfig.ApplyTheme();
+
         UnityEventTools.AddPersistentListener(startButton.onClick, gm.StartGame);
-        UnityEventTools.AddPersistentListener(navPlayBtn.onClick, gm.StartGame);
+        UnityEventTools.AddPersistentListener(navPlayBtn.onClick, gm.OnCenterNavClicked);
         UnityEventTools.AddPersistentListener(shopButton.onClick, gm.OnShopClicked);
         UnityEventTools.AddPersistentListener(heroesButton.onClick, gm.OnHeroesClicked);
         UnityEventTools.AddPersistentListener(missionsButton.onClick, gm.OnMissionsClicked);
         UnityEventTools.AddPersistentListener(themesButton.onClick, gm.OnThemesClicked);
         UnityEventTools.AddPersistentListener(bestScoreButton.onClick, gm.OnLeaderboardClicked);
+        UnityEventTools.AddIntPersistentListener(starterMagnetWidget.GetComponent<Button>().onClick, gm.ToggleArmedStarter, (int)GameManager.StarterPower.Magnet);
+        UnityEventTools.AddIntPersistentListener(starterBoostWidget.GetComponent<Button>().onClick, gm.ToggleArmedStarter, (int)GameManager.StarterPower.Boost);
+        UnityEventTools.AddIntPersistentListener(starterDoubleWidget.GetComponent<Button>().onClick, gm.ToggleArmedStarter, (int)GameManager.StarterPower.Double);
+        UnityEventTools.AddIntPersistentListener(starterHammerWidget.GetComponent<Button>().onClick, gm.ToggleArmedStarter, (int)GameManager.StarterPower.Hammer);
 
         UnityEventTools.AddPersistentListener(menuButton.onClick, gm.RestartGame);
         UnityEventTools.AddPersistentListener(retryButton.onClick, gm.RetryGame);
 
-        // Wire all 21 hero cards (7 worlds x 3 skins) inside heroesPanel to the global selector
-        string[] wireThemeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja" };
-        for (int t = 0; t < 7; t++)
+        // Wire all 27 hero cards (9 worlds x 3 skins) inside heroesPanel to the global selector
+        string[] wireThemeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja", "Mario", "Mars" };
+        for (int t = 0; t < 9; t++)
         {
             for (int s = 0; s < 3; s++)
             {
@@ -240,6 +301,17 @@ public static class FlappyBirdSceneBuilder
         AddTag("Ceiling");
     }
 
+    /// <summary>
+    /// Physics layers (distinct from tags) so Physics2D.IgnoreLayerCollision can suppress real
+    /// collider contact between the bird and pipes during Boost — skipping Die() alone isn't
+    /// enough, since the Rigidbody2D/BoxCollider2D contact still physically shoves the bird.
+    /// </summary>
+    private static void EnsureLayers()
+    {
+        AddLayer("Bird");
+        AddLayer("Obstacle");
+    }
+
     private static void LockPortraitOrientation()
     {
         // Applies to Android/iOS builds. Forces strict portrait — no landscape rotation allowed.
@@ -264,6 +336,30 @@ public static class FlappyBirdSceneBuilder
         tagsProp.InsertArrayElementAtIndex(tagsProp.arraySize);
         tagsProp.GetArrayElementAtIndex(tagsProp.arraySize - 1).stringValue = tag;
         tagManager.ApplyModifiedProperties();
+    }
+
+    /// <summary>Unlike tags, the layers array is a fixed 32-slot array — find the first empty user slot (0-7 are Unity built-ins) instead of inserting.</summary>
+    private static void AddLayer(string name)
+    {
+        SerializedObject tagManager = new SerializedObject(
+            AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/TagManager.asset")[0]);
+        SerializedProperty layersProp = tagManager.FindProperty("layers");
+
+        for (int i = 0; i < layersProp.arraySize; i++)
+        {
+            if (layersProp.GetArrayElementAtIndex(i).stringValue == name) return; // already exists
+        }
+
+        for (int i = 8; i < layersProp.arraySize; i++)
+        {
+            SerializedProperty slot = layersProp.GetArrayElementAtIndex(i);
+            if (string.IsNullOrEmpty(slot.stringValue))
+            {
+                slot.stringValue = name;
+                tagManager.ApplyModifiedProperties();
+                return;
+            }
+        }
     }
 
     // ---------- Importing real downloaded assets (button art, sound clips) ----------
@@ -295,7 +391,7 @@ public static class FlappyBirdSceneBuilder
 
     // ---------- Sprite generation (original, procedurally drawn art — no external assets) ----------
 
-    private static Sprite GetOrCreateSprite(string name, int width, int height, System.Func<int, int, Texture2D> generator, float pixelsPerUnit, FilterMode filterMode = FilterMode.Bilinear, TextureWrapMode wrapMode = TextureWrapMode.Clamp)
+    private static Sprite GetOrCreateSprite(string name, int width, int height, System.Func<int, int, Texture2D> generator, float pixelsPerUnit, FilterMode filterMode = FilterMode.Bilinear, TextureWrapMode wrapMode = TextureWrapMode.Clamp, Vector4 border = default(Vector4))
     {
         string path = $"{SpriteFolder}/{name}.png";
 
@@ -312,6 +408,7 @@ public static class FlappyBirdSceneBuilder
         importer.wrapMode = wrapMode;
         importer.alphaIsTransparency = true;
         importer.mipmapEnabled = false;
+        importer.spriteBorder = border; // non-zero border => Image can use Sliced mode without distorting rounded corners
         importer.SaveAndReimport();
 
         return AssetDatabase.LoadAssetAtPath<Sprite>(path);
@@ -871,6 +968,8 @@ public static class FlappyBirdSceneBuilder
         ScrollingBackground scroller = bg.AddComponent<ScrollingBackground>();
         scroller.tileB = bg2.transform;
         scroller.scrollSpeed = 0.6f;
+
+        bg.AddComponent<BackgroundAnimator>();
     }
 
     // ---------- Scene objects ----------
@@ -929,6 +1028,7 @@ public static class FlappyBirdSceneBuilder
     {
         GameObject ground = new GameObject(name);
         ground.tag = "Ground";
+        ground.layer = LayerMask.NameToLayer("Obstacle"); // so Boost's Bird/Obstacle layer-ignore also covers the ground
         ground.transform.position = new Vector3(0, dirtTopY - dirtHeight / 2f, 0);
 
         SpriteRenderer sr = ground.AddComponent<SpriteRenderer>();
@@ -959,6 +1059,7 @@ public static class FlappyBirdSceneBuilder
     {
         GameObject bird = new GameObject("Bird");
         bird.tag = "Bird";
+        bird.layer = LayerMask.NameToLayer("Bird");
         SpriteRenderer sr = bird.AddComponent<SpriteRenderer>();
         sr.sprite = midSprites[0]; // default to yellow mid
         sr.sortingOrder = 30; // bird is on top of pipes (5) and ground (10/11)
@@ -1025,6 +1126,81 @@ public static class FlappyBirdSceneBuilder
         psRenderer.sortingOrder = 29; // just behind bird
         psRenderer.material = AssetDatabase.GetBuiltinExtraResource<Material>("Default-Particle.mat");
 
+        // Boost Storm — swirling energy ring around the bird, only active during Fast Boost.
+        GameObject storm = new GameObject("BoostStorm");
+        storm.transform.SetParent(bird.transform, false);
+        ParticleSystem stormPs = storm.AddComponent<ParticleSystem>();
+
+        var stormMain = stormPs.main;
+        stormMain.duration = 1f;
+        stormMain.loop = true;
+        stormMain.startLifetime = 0.6f;
+        stormMain.startSpeed = 0f; // orbital velocity module drives all movement
+        stormMain.startSize = 0.1f;
+        stormMain.gravityModifier = 0f;
+        stormMain.simulationSpace = ParticleSystemSimulationSpace.Local;
+        stormMain.startColor = new Color(0.6f, 0.85f, 1f, 0.8f);
+
+        var stormEmission = stormPs.emission;
+        stormEmission.rateOverTime = 20f;
+
+        var stormShape = stormPs.shape;
+        stormShape.shapeType = ParticleSystemShapeType.Circle;
+        stormShape.radius = 0.5f;
+
+        var stormVelocity = stormPs.velocityOverLifetime;
+        stormVelocity.enabled = true;
+        stormVelocity.orbitalZ = 6f; // spins particles around the bird in the 2D view plane
+
+        var stormRenderer = storm.GetComponent<ParticleSystemRenderer>();
+        stormRenderer.sortingOrder = 31; // in front of the bird for a wraparound look
+        stormRenderer.material = AssetDatabase.GetBuiltinExtraResource<Material>("Default-Particle.mat");
+
+        storm.SetActive(false); // toggled on/off by BirdController.SetBoostTrailActive
+
+        // Boost Comet — sharp stretched streaks trailing behind, only active during Fast Boost.
+        GameObject comet = new GameObject("BoostComet");
+        comet.transform.SetParent(bird.transform, false);
+        comet.transform.localPosition = new Vector3(-0.3f, 0f, 0f);
+        ParticleSystem cometPs = comet.AddComponent<ParticleSystem>();
+
+        var cometMain = cometPs.main;
+        cometMain.duration = 1f;
+        cometMain.loop = true;
+        cometMain.startLifetime = 0.25f;
+        cometMain.startSpeed = 3f;
+        cometMain.startSize = 0.18f;
+        cometMain.gravityModifier = 0f;
+        cometMain.simulationSpace = ParticleSystemSimulationSpace.World;
+        cometMain.startColor = new Color(1f, 0.95f, 0.6f);
+
+        var cometEmission = cometPs.emission;
+        cometEmission.rateOverTime = 8f;
+
+        var cometShape = cometPs.shape;
+        cometShape.shapeType = ParticleSystemShapeType.Cone;
+        cometShape.angle = 3f;
+        cometShape.radius = 0.05f;
+        cometShape.rotation = new Vector3(0f, -90f, 0f); // points emission along -X, trailing behind the bird
+
+        var cometColorOverLifetime = cometPs.colorOverLifetime;
+        cometColorOverLifetime.enabled = true;
+        Gradient cometGrad = new Gradient();
+        cometGrad.SetKeys(
+            new GradientColorKey[] { new GradientColorKey(new Color(1f, 0.95f, 0.6f), 0f), new GradientColorKey(new Color(1f, 0.6f, 0.1f), 1f) },
+            new GradientAlphaKey[] { new GradientAlphaKey(0.9f, 0f), new GradientAlphaKey(0f, 1f) }
+        );
+        cometColorOverLifetime.color = new ParticleSystem.MinMaxGradient(cometGrad);
+
+        var cometRenderer = comet.GetComponent<ParticleSystemRenderer>();
+        cometRenderer.renderMode = ParticleSystemRenderMode.Stretch;
+        cometRenderer.lengthScale = 4f;
+        cometRenderer.velocityScale = 0.3f;
+        cometRenderer.sortingOrder = 28; // behind the spark trail
+        cometRenderer.material = AssetDatabase.GetBuiltinExtraResource<Material>("Default-Particle.mat");
+
+        comet.SetActive(false); // toggled on/off by BirdController.SetBoostTrailActive
+
         return bird;
     }
 
@@ -1040,6 +1216,7 @@ public static class FlappyBirdSceneBuilder
         GameObject pipeBottom = new GameObject("PipeBottom");
         pipeBottom.transform.SetParent(root.transform);
         pipeBottom.tag = "Pipe";
+        pipeBottom.layer = LayerMask.NameToLayer("Obstacle");
         SpriteRenderer bottomSr = pipeBottom.AddComponent<SpriteRenderer>();
         bottomSr.sprite = pipeBodySprite; // shaded green body — safe to stretch vertically since shading is column-based only
         bottomSr.color = Color.white;
@@ -1051,6 +1228,7 @@ public static class FlappyBirdSceneBuilder
         GameObject pipeTop = new GameObject("PipeTop");
         pipeTop.transform.SetParent(root.transform);
         pipeTop.tag = "Pipe";
+        pipeTop.layer = LayerMask.NameToLayer("Obstacle");
         SpriteRenderer topSr = pipeTop.AddComponent<SpriteRenderer>();
         topSr.sprite = pipeBodySprite;
         topSr.color = Color.white;
@@ -1110,6 +1288,23 @@ public static class FlappyBirdSceneBuilder
         return spawnerGO;
     }
 
+    private static GameObject BuildItemSpawner(Sprite coinSprite, Sprite magnetSprite, Sprite boostSprite, Sprite doubleSprite, Sprite hammerSprite)
+    {
+        GameObject spawnerGO = new GameObject("ItemSpawner");
+        ItemSpawner spawner = spawnerGO.AddComponent<ItemSpawner>();
+        spawner.spawnInterval = 1.9f; // matches PipeSpawner's interval
+        spawner.initialDelay = 0.95f; // half the interval, so items land between pipe spawns
+        spawner.spawnXPosition = 10f;
+        spawner.minY = -3.5f;
+        spawner.maxY = 3.5f;
+        spawner.coinSprite = coinSprite;
+        spawner.magnetSprite = magnetSprite;
+        spawner.boostSprite = boostSprite;
+        spawner.doubleSprite = doubleSprite;
+        spawner.hammerSprite = hammerSprite;
+        return spawnerGO;
+    }
+
     private static void BuildEventSystem()
     {
         if (Object.FindObjectOfType<EventSystem>() != null) return;
@@ -1160,12 +1355,148 @@ public static class FlappyBirdSceneBuilder
         return go;
     }
 
+    /// <summary>Top-left coin counter (mirrors the top-right score display) plus three stacked, initially-hidden active power-up timer labels below it.</summary>
+    private static void BuildPowerupHUD(Transform canvasTransform, Sprite coinIcon, Sprite magnetIcon, Sprite boostIcon, Sprite doubleIcon, Sprite hammerIcon, out GameObject coinsTextGO, out GameObject magnetTimerGO, out GameObject boostTimerGO, out GameObject doubleTimerGO, out GameObject hammerChargesGO)
+    {
+        GameObject coinBadge = new GameObject("CoinsBadge");
+        coinBadge.transform.SetParent(canvasTransform, false);
+        RectTransform badgeRt = coinBadge.AddComponent<RectTransform>();
+        badgeRt.anchorMin = new Vector2(0f, 1f);
+        badgeRt.anchorMax = new Vector2(0f, 1f);
+        badgeRt.pivot = new Vector2(0f, 1f);
+        badgeRt.sizeDelta = new Vector2(220, 100);
+        badgeRt.anchoredPosition = new Vector2(30, -60); // mirrors ScoreText's top-right offset
+
+        GameObject coinIconGO = new GameObject("CoinIcon");
+        coinIconGO.transform.SetParent(coinBadge.transform, false);
+        UnityEngine.UI.Image coinIconImg = coinIconGO.AddComponent<UnityEngine.UI.Image>();
+        coinIconImg.sprite = coinIcon;
+        RectTransform coinIconRt = coinIconGO.GetComponent<RectTransform>();
+        coinIconRt.anchorMin = new Vector2(0f, 0.5f);
+        coinIconRt.anchorMax = new Vector2(0f, 0.5f);
+        coinIconRt.pivot = new Vector2(0f, 0.5f);
+        coinIconRt.sizeDelta = new Vector2(56, 56);
+        coinIconRt.anchoredPosition = Vector2.zero;
+
+        coinsTextGO = new GameObject("CoinsText");
+        coinsTextGO.transform.SetParent(coinBadge.transform, false);
+        Text coinsText = coinsTextGO.AddComponent<Text>();
+        coinsText.text = "0";
+        coinsText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        coinsText.fontSize = 48;
+        coinsText.fontStyle = FontStyle.Bold;
+        coinsText.alignment = TextAnchor.MiddleLeft;
+        coinsText.color = new Color(0.98f, 0.82f, 0.15f);
+        Outline coinsOutline = coinsTextGO.AddComponent<Outline>();
+        coinsOutline.effectColor = new Color(0.18f, 0.18f, 0.22f, 1f);
+        coinsOutline.effectDistance = new Vector2(3f, -3f);
+        RectTransform coinsTextRt = coinsTextGO.GetComponent<RectTransform>();
+        coinsTextRt.anchorMin = new Vector2(0f, 0.5f);
+        coinsTextRt.anchorMax = new Vector2(0f, 0.5f);
+        coinsTextRt.pivot = new Vector2(0f, 0.5f);
+        coinsTextRt.sizeDelta = new Vector2(140, 70);
+        coinsTextRt.anchoredPosition = new Vector2(64, 0);
+
+        magnetTimerGO = BuildTimerIndicator(canvasTransform, "MagnetTimer", magnetIcon, -170);
+        boostTimerGO = BuildTimerIndicator(canvasTransform, "BoostTimer", boostIcon, -260);
+        doubleTimerGO = BuildTimerIndicator(canvasTransform, "DoubleTimer", doubleIcon, -350);
+        hammerChargesGO = BuildTimerIndicator(canvasTransform, "HammerCharges", hammerIcon, -440);
+    }
+
+    /// <summary>Icon + countdown number (no text label) for an active power-up, shown only while it's running.</summary>
+    private static GameObject BuildTimerIndicator(Transform canvasTransform, string name, Sprite icon, float yOffset)
+    {
+        GameObject go = new GameObject(name);
+        go.transform.SetParent(canvasTransform, false);
+        RectTransform rt = go.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 1f);
+        rt.anchorMax = new Vector2(0.5f, 1f);
+        rt.pivot = new Vector2(0.5f, 1f);
+        rt.sizeDelta = new Vector2(180, 80);
+        rt.anchoredPosition = new Vector2(0, yOffset);
+
+        GameObject iconGO = new GameObject("Icon");
+        iconGO.transform.SetParent(go.transform, false);
+        Image iconImg = iconGO.AddComponent<Image>();
+        iconImg.sprite = icon;
+        RectTransform iconRt = iconGO.GetComponent<RectTransform>();
+        iconRt.sizeDelta = new Vector2(66, 66);
+        iconRt.anchoredPosition = new Vector2(-45, 0);
+
+        GameObject numberGO = new GameObject("Number");
+        numberGO.transform.SetParent(go.transform, false);
+        Text text = numberGO.AddComponent<Text>();
+        text.text = "";
+        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.fontSize = 44;
+        text.fontStyle = FontStyle.Bold;
+        text.alignment = TextAnchor.MiddleLeft;
+        text.color = Color.white;
+        Outline outline = numberGO.AddComponent<Outline>();
+        outline.effectColor = new Color(0.1f, 0.1f, 0.12f, 1f);
+        outline.effectDistance = new Vector2(2f, -2f);
+        RectTransform numberRt = numberGO.GetComponent<RectTransform>();
+        numberRt.sizeDelta = new Vector2(100, 60);
+        numberRt.anchoredPosition = new Vector2(25, 0);
+
+        go.SetActive(false); // only shown while its power-up is active
+        return go;
+    }
+
+    /// <summary>
+    /// Lobby starter-power icon+count widget. Tapping arms it (GameManager.ToggleArmedStarter),
+    /// which highlights it via the Outline until the run starts or it's tapped again to un-arm.
+    /// </summary>
+    private static GameObject BuildStarterWidget(Transform parent, Sprite icon, Vector2 position)
+    {
+        GameObject go = new GameObject("StarterWidget");
+        go.transform.SetParent(parent, false);
+        Image bg = go.AddComponent<Image>();
+        bg.color = new Color(0.15f, 0.15f, 0.18f, 0.85f);
+        RectTransform rt = go.GetComponent<RectTransform>();
+        rt.sizeDelta = new Vector2(96, 96);
+        rt.anchoredPosition = position;
+
+        Outline outline = go.AddComponent<Outline>();
+        outline.effectColor = new Color(0.35f, 0.35f, 0.4f);
+        outline.effectDistance = new Vector2(2f, -2f);
+
+        Button button = go.AddComponent<Button>();
+        button.transition = Selectable.Transition.None;
+
+        GameObject iconGO = new GameObject("Icon");
+        iconGO.transform.SetParent(go.transform, false);
+        Image iconImg = iconGO.AddComponent<Image>();
+        iconImg.sprite = icon;
+        RectTransform iconRt = iconGO.GetComponent<RectTransform>();
+        iconRt.sizeDelta = new Vector2(66, 66);
+        iconRt.anchoredPosition = new Vector2(0, 6);
+
+        GameObject countGO = new GameObject("Count");
+        countGO.transform.SetParent(go.transform, false);
+        Text countText = countGO.AddComponent<Text>();
+        countText.text = "x0";
+        countText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        countText.fontSize = 24;
+        countText.fontStyle = FontStyle.Bold;
+        countText.alignment = TextAnchor.MiddleCenter;
+        countText.color = new Color(0.95f, 0.72f, 0.15f);
+        Outline countOutline = countGO.AddComponent<Outline>();
+        countOutline.effectColor = new Color(0.1f, 0.1f, 0.12f, 1f);
+        countOutline.effectDistance = new Vector2(2f, -2f);
+        RectTransform countRt = countGO.GetComponent<RectTransform>();
+        countRt.sizeDelta = new Vector2(96, 30);
+        countRt.anchoredPosition = new Vector2(0, -34);
+
+        return go;
+    }
+
     private static readonly Color[] TitlePalette =
     {
         new Color(0.15f, 0.15f, 0.18f) // Premium dark charcoal color
     };
 
-    private static GameObject BuildStartPanel(Transform canvasTransform, Sprite buttonSprite, Sprite resultCardSprite, Sprite goldMedalSprite, out Button startButton, out GameObject startHighScoreText, Sprite[] birdMidSprites, ThemeData[] themeAssets, Sprite shopIcon, Sprite heroesIcon, Sprite missionsIcon, Sprite themesIcon, Sprite playIcon, Sprite homeIcon, out Button shopButton, out Button heroesButton, out Button missionsButton, out Button themesButton, out GameObject toastPanel, out GameObject themeSelectorPanelRef, out GameObject lobbyPanel, out GameObject heroesPanel, out UnityEngine.UI.Image playIconImageRef, out Button navPlayBtn, out Text activeThemeLabelText, out GameObject shopPanel, out GameObject questsPanel, out GameObject leaderboardPanel, out Button bestScoreButton)
+    private static GameObject BuildStartPanel(Transform canvasTransform, Sprite buttonSprite, Sprite resultCardSprite, Sprite goldMedalSprite, out Button startButton, out GameObject startHighScoreText, Sprite[] birdMidSprites, ThemeData[] themeAssets, Sprite shopIcon, Sprite heroesIcon, Sprite missionsIcon, Sprite themesIcon, Sprite playIcon, Sprite homeIcon, out Button shopButton, out Button heroesButton, out Button missionsButton, out Button themesButton, out GameObject toastPanel, out GameObject themeSelectorPanelRef, out GameObject lobbyPanel, out GameObject heroesPanel, out UnityEngine.UI.Image playIconImageRef, out Button navPlayBtn, out Text activeThemeLabelText, out GameObject shopPanel, out GameObject questsPanel, out GameObject leaderboardPanel, out Button bestScoreButton, out GameObject screenBackdrop, out GameObject starterMagnetWidget, out GameObject starterBoostWidget, out GameObject starterDoubleWidget, out GameObject starterHammerWidget, Sprite coinSprite, Sprite magnetSprite, Sprite boostSprite, Sprite doubleSprite, Sprite hammerSprite, Sprite navBarSprite, Sprite navIndicatorSprite)
     {
         GameObject panel = CreatePanel("StartPanel", canvasTransform, new Color(0, 0, 0, 0.0f));
 
@@ -1226,7 +1557,7 @@ public static class FlappyBirdSceneBuilder
 
         RectTransform badgeRt = scoreBadge.GetComponent<RectTransform>();
         badgeRt.sizeDelta = new Vector2(280, 68);
-        badgeRt.anchoredPosition = new Vector2(0, -210); // just above "TAP TO START", clear of the bird preview
+        badgeRt.anchoredPosition = new Vector2(0, -110); // moved up to clear the starter-power widget row below it
 
         // Small Gold Medal icon inside badge
         GameObject medalIcon = new GameObject("MedalIcon");
@@ -1248,8 +1579,15 @@ public static class FlappyBirdSceneBuilder
         bestOutline.effectColor = new Color(0.1f, 0.08f, 0.05f, 1f);
         bestOutline.effectDistance = new Vector2(2f, -2f);
 
+        // Starter Power widgets — small icon+count buttons. Tapping one arms it (consumes a charge)
+        // to auto-apply at the start of the next run; tapping the same one again un-arms/refunds it.
+        starterMagnetWidget = BuildStarterWidget(lobbyPanel.transform, magnetSprite, new Vector2(-165, -200));
+        starterBoostWidget = BuildStarterWidget(lobbyPanel.transform, boostSprite, new Vector2(-55, -200));
+        starterDoubleWidget = BuildStarterWidget(lobbyPanel.transform, doubleSprite, new Vector2(55, -200));
+        starterHammerWidget = BuildStarterWidget(lobbyPanel.transform, hammerSprite, new Vector2(165, -200));
+
         // Pulsing "TAP TO START" hint text on start screen
-        GameObject tapStartGO = CreateLabel("TapToStartText", lobbyPanel.transform, "TAP TO START", 52, new Vector2(0, -300));
+        GameObject tapStartGO = CreateLabel("TapToStartText", lobbyPanel.transform, "TAP TO START", 52, new Vector2(0, -340));
         Text tapText = tapStartGO.GetComponent<Text>();
         tapText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); // bulky, retro game font
         tapText.color = Color.white;
@@ -1267,6 +1605,21 @@ public static class FlappyBirdSceneBuilder
         UIPulse pulse = tapStartGO.AddComponent<UIPulse>();
         pulse.scaleAmount = 0.05f;
         pulse.speed = 3f;
+
+        // --- Shared dim backdrop behind every non-Lobby screen. Without this, the live gameplay
+        // background (whose color depends on whichever world theme is currently active — bright
+        // yellow for Bee, fiery orange for Dragon, etc.) shows through and clashes with whatever
+        // screen is on top. GameManager toggles this alongside CurrentScreen != Lobby.
+        screenBackdrop = new GameObject("ScreenBackdrop");
+        screenBackdrop.transform.SetParent(panel.transform, false);
+        Image backdropImg = screenBackdrop.AddComponent<Image>();
+        backdropImg.color = new Color(0.05f, 0.05f, 0.08f, 0.88f);
+        RectTransform backdropRt = screenBackdrop.GetComponent<RectTransform>();
+        backdropRt.anchorMin = Vector2.zero;
+        backdropRt.anchorMax = Vector2.one;
+        backdropRt.offsetMin = Vector2.zero;
+        backdropRt.offsetMax = Vector2.zero;
+        screenBackdrop.SetActive(false);
 
         // --- Interactive Heroes Selection Screen (Grid) ---
         heroesPanel = new GameObject("HeroesPanel");
@@ -1293,7 +1646,7 @@ public static class FlappyBirdSceneBuilder
         hbRt.sizeDelta = new Vector2(900, 80);
         hbRt.anchoredPosition = new Vector2(0, 620); // top header position
 
-        GameObject hbTxtGO = CreateLabel("Text", hbGO.transform, "HEROES (1/21)", 28, Vector2.zero);
+        GameObject hbTxtGO = CreateLabel("Text", hbGO.transform, "HEROES (1/27)", 28, Vector2.zero);
         hbTxtGO.GetComponent<Text>().color = Color.white;
         hbTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
         RectTransform hbtRt = hbTxtGO.GetComponent<RectTransform>();
@@ -1346,7 +1699,7 @@ public static class FlappyBirdSceneBuilder
         scrollRect.content = contentRt;
         scrollRect.viewport = viewportRt;
 
-        string[] heroThemeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja" };
+        string[] heroThemeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja", "Mario", "Mars" };
         string[][] heroNames = new string[][]
         {
             new [] { "YELLOW HERO", "BLUE HERO", "RED HERO" },
@@ -1355,31 +1708,45 @@ public static class FlappyBirdSceneBuilder
             new [] { "RED DRAKE", "EMERALD DRAGON", "GOLD WYVERN" },
             new [] { "GOLDFISH", "BULL SHARK", "PINK JELLYFISH" },
             new [] { "HONEY BEE", "LADYBUG", "BUTTERFLY" },
-            new [] { "SHADOW NINJA", "CRIMSON NINJA", "SILVER SHINOBI" }
+            new [] { "SHADOW NINJA", "CRIMSON NINJA", "SILVER SHINOBI" },
+            new [] { "JUMP MAN", "GREEN PLUMBER", "PRINCESS PEACH" },
+            new [] { "ASTRONAUT", "MARS ROVER", "CRYSTAL EXPLORER" }
         };
 
-        // Instantiate all 7 worlds x 3 skins = 21 hero cards (wired to GameManager.SelectHeroGlobal in BuildScene(), once GameManager exists)
-        for (int t = 0; t < 7; t++)
+        // Instantiate all 9 worlds x 3 skins = 27 hero cards
+        for (int t = 0; t < 9; t++)
         {
             for (int s = 0; s < 3; s++)
             {
                 GameObject cardGO = new GameObject(heroThemeNames[t] + "Card" + s);
                 cardGO.transform.SetParent(contentGO.transform, false);
+
+                // --- NO opaque background panel: card is fully transparent ---
+                // A very subtle rounded border gives visual separation without a dark box.
                 Image cardImg = cardGO.AddComponent<Image>();
                 cardImg.sprite = resultCardSprite;
-                // Tint each card toward its world's color (darkened for text contrast) so worlds
-                // stay visually distinguishable now that we don't show a separate world label.
-                Color worldTint = themeAssets != null && t < themeAssets.Length ? themeAssets[t].themeColor : new Color(0.3f, 0.3f, 0.35f);
-                Color darkenedTint = Color.Lerp(worldTint, Color.black, 0.72f);
-                cardImg.color = new Color(darkenedTint.r, darkenedTint.g, darkenedTint.b, 0.95f);
+                cardImg.color = new Color(1f, 1f, 1f, 0f); // fully transparent fill
 
+                // Faint coloured outline ring using the world theme colour
                 Outline cardOutline = cardGO.AddComponent<Outline>();
-                cardOutline.effectColor = new Color(0.35f, 0.35f, 0.4f);
-                cardOutline.effectDistance = new Vector2(2f, -2f);
+                Color worldTint = themeAssets != null && t < themeAssets.Length ? themeAssets[t].themeColor : new Color(0.5f, 0.5f, 0.6f);
+                cardOutline.effectColor = new Color(worldTint.r, worldTint.g, worldTint.b, 0.55f);
+                cardOutline.effectDistance = new Vector2(3f, -3f);
 
                 cardGO.AddComponent<Button>();
 
-                // Icon preview image (Classic = the 3 inspector-configured bird colors, other worlds = ThemeData.playerSprites)
+                // --- Subtle dark shadow disc behind the character icon ---
+                // Ensures light-coloured characters are always visible on any theme background.
+                GameObject shadowGO = new GameObject("ShadowDisc");
+                shadowGO.transform.SetParent(cardGO.transform, false);
+                Image shadowImg = shadowGO.AddComponent<Image>();
+                // Use a circular sprite by drawing it as a white image and tinting it dark
+                shadowImg.color = new Color(0f, 0f, 0f, 0.22f);
+                RectTransform shadowRt = shadowGO.GetComponent<RectTransform>();
+                shadowRt.sizeDelta = new Vector2(155, 155);
+                shadowRt.anchoredPosition = new Vector2(3f, 46f); // slightly offset down-right for drop-shadow feel
+
+                // --- Character icon preview ---
                 GameObject iconGO = new GameObject("PreviewImage");
                 iconGO.transform.SetParent(cardGO.transform, false);
                 Image previewImg = iconGO.AddComponent<Image>();
@@ -1396,23 +1763,29 @@ public static class FlappyBirdSceneBuilder
                 iconRt.sizeDelta = new Vector2(160, 160);
                 iconRt.anchoredPosition = new Vector2(0, 50);
 
-                // Hero name (only — no separate world sub-label; the card's tint conveys the world)
-                GameObject nameTxtGO = CreateLabel("NameText", cardGO.transform, heroNames[t][s], 18, new Vector2(0, -75));
-                nameTxtGO.GetComponent<Text>().color = Color.white;
-                nameTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+                // Hero name label — white with subtle dark shadow for legibility
+                GameObject nameTxtGO = CreateLabel("NameText", cardGO.transform, heroNames[t][s], 17, new Vector2(0, -75));
+                Text nameText = nameTxtGO.GetComponent<Text>();
+                nameText.color = Color.white;
+                nameText.fontStyle = FontStyle.Bold;
+                // Add text shadow for contrast on light backgrounds
+                Shadow nameShadow = nameTxtGO.AddComponent<Shadow>();
+                nameShadow.effectColor = new Color(0f, 0f, 0f, 0.7f);
+                nameShadow.effectDistance = new Vector2(1f, -1f);
                 RectTransform ntRt = nameTxtGO.GetComponent<RectTransform>();
                 ntRt.sizeDelta = new Vector2(240, 36);
 
-                // Selection Checkmark overlay badge
+
+                // Selection Checkmark overlay badge (top right)
                 GameObject checkGO = new GameObject("Checkmark");
                 checkGO.transform.SetParent(cardGO.transform, false);
                 Image checkImg = checkGO.AddComponent<Image>();
                 checkImg.sprite = goldMedalSprite;
                 RectTransform checkRt = checkGO.GetComponent<RectTransform>();
                 checkRt.sizeDelta = new Vector2(40, 40);
-                checkRt.anchoredPosition = new Vector2(95, 115); // top right of card
+                checkRt.anchoredPosition = new Vector2(95, 115);
 
-                checkGO.SetActive(false); // active if this hero is equipped
+                checkGO.SetActive(false); // activated by GameManager when hero is selected
             }
         }
 
@@ -1473,21 +1846,24 @@ public static class FlappyBirdSceneBuilder
         wGrid.constraintCount = 3;
 
         ThemeSelectorUI selectorUI = worldsPanel.AddComponent<ThemeSelectorUI>();
-        selectorUI.themeButtons = new Button[7];
+        selectorUI.themeButtons = new Button[9];
 
-        string[] themeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja" };
-        for (int i = 0; i < 7; i++)
+        string[] themeNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja", "Mario", "Mars" };
+        for (int i = 0; i < 9; i++)
         {
             GameObject cardGO = new GameObject(themeNames[i] + "Card");
             cardGO.transform.SetParent(wGridGO.transform, false);
 
+            // Transparent card background (just like Heroes cards)
             Image cardImg = cardGO.AddComponent<Image>();
             cardImg.sprite = resultCardSprite;
-            cardImg.color = new Color(0.15f, 0.15f, 0.18f, 0.95f); // dark card body
+            cardImg.color = new Color(1f, 1f, 1f, 0f); // fully transparent fill
 
+            // Card outline border styled with world theme color
             Outline cardOutline = cardGO.AddComponent<Outline>();
-            cardOutline.effectColor = new Color(0.35f, 0.35f, 0.4f);
-            cardOutline.effectDistance = new Vector2(2f, -2f);
+            Color worldTint = themeAssets != null && i < themeAssets.Length ? themeAssets[i].themeColor : new Color(0.5f, 0.5f, 0.6f);
+            cardOutline.effectColor = new Color(worldTint.r, worldTint.g, worldTint.b, 0.55f);
+            cardOutline.effectDistance = new Vector2(3f, -3f);
 
             Button btn = cardGO.AddComponent<Button>();
             selectorUI.themeButtons[i] = btn;
@@ -1498,14 +1874,26 @@ public static class FlappyBirdSceneBuilder
             Image previewImg = previewGO.AddComponent<Image>();
             previewImg.preserveAspect = true;
             if (themeAssets != null && i < themeAssets.Length) previewImg.sprite = themeAssets[i].backgroundSprite;
+            
+            // Add a subtle dark frame to the preview image
+            Outline previewOutline = previewGO.AddComponent<Outline>();
+            previewOutline.effectColor = new Color(0f, 0f, 0f, 0.5f);
+            previewOutline.effectDistance = new Vector2(2f, -2f);
+
             RectTransform previewRt = previewGO.GetComponent<RectTransform>();
             previewRt.sizeDelta = new Vector2(220, 130);
             previewRt.anchoredPosition = new Vector2(0, 55);
 
-            // Name label
+            // Name label - white with shadow for contrast
             GameObject wNameTxtGO = CreateLabel("NameText", cardGO.transform, themeNames[i].ToUpper(), 22, new Vector2(0, -70));
-            wNameTxtGO.GetComponent<Text>().color = Color.white;
-            wNameTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+            Text wNameText = wNameTxtGO.GetComponent<Text>();
+            wNameText.color = Color.white;
+            wNameText.fontStyle = FontStyle.Bold;
+
+            Shadow wNameShadow = wNameTxtGO.AddComponent<Shadow>();
+            wNameShadow.effectColor = new Color(0f, 0f, 0f, 0.75f);
+            wNameShadow.effectDistance = new Vector2(1.5f, -1.5f);
+
             RectTransform wNtRt = wNameTxtGO.GetComponent<RectTransform>();
             wNtRt.sizeDelta = new Vector2(240, 50);
 
@@ -1524,90 +1912,99 @@ public static class FlappyBirdSceneBuilder
         worldsPanel.SetActive(false);
 
         // --- Shop / Quests placeholder screens ---
-        shopPanel = BuildComingSoonPanel(panel.transform, "SHOP", "Gear, boosts and skins\nare on the way.", resultCardSprite);
-        questsPanel = BuildComingSoonPanel(panel.transform, "QUESTS", "Daily challenges and rewards\nare on the way.", resultCardSprite);
+        shopPanel = BuildStarterPowerShopPanel(panel.transform, resultCardSprite, buttonSprite, coinSprite, magnetSprite, boostSprite, doubleSprite, hammerSprite);
+        questsPanel = BuildUpgradeShopPanel(panel.transform, resultCardSprite, buttonSprite, coinSprite, magnetSprite, boostSprite, doubleSprite);
 
-        // --- Leaderboard screen ---
         leaderboardPanel = BuildLeaderboardPanel(panel.transform, resultCardSprite, buttonSprite);
 
         // --- Bottom Navigation Bar ---
         GameObject bottomBar = new GameObject("BottomNavBar");
         bottomBar.transform.SetParent(panel.transform, false);
         Image barImg = bottomBar.AddComponent<Image>();
-        barImg.sprite = resultCardSprite;
-        barImg.color = new Color(0.12f, 0.12f, 0.15f, 0.95f); // sleek dark charcoal
-        
+        barImg.sprite = navBarSprite;
+        barImg.type = Image.Type.Sliced; // 9-slice keeps corners round & crisp regardless of bar width/height
+        barImg.color = new Color(0.04f, 0.05f, 0.07f, 0.92f); // darker, sleek translucent glass
+
         RectTransform barRt = bottomBar.GetComponent<RectTransform>();
         barRt.anchorMin = new Vector2(0.5f, 0f);
         barRt.anchorMax = new Vector2(0.5f, 0f);
         barRt.pivot = new Vector2(0.5f, 0.5f);
-        barRt.sizeDelta = new Vector2(980, 150);
-        barRt.anchoredPosition = new Vector2(0, 110); // float elegantly
+        barRt.sizeDelta = new Vector2(900, 160);
+        barRt.anchoredPosition = new Vector2(0, 100); // float elegantly closer to the bottom
 
         Shadow barShadow = bottomBar.AddComponent<Shadow>();
-        barShadow.effectColor = new Color(0f, 0f, 0f, 0.4f);
-        barShadow.effectDistance = new Vector2(0f, -8f);
+        barShadow.effectColor = new Color(0f, 0f, 0f, 0.35f);
+        barShadow.effectDistance = new Vector2(0f, -6f);
 
         Outline barOutline = bottomBar.AddComponent<Outline>();
-        barOutline.effectColor = new Color(1f, 1f, 1f, 0.15f);
+        barOutline.effectColor = new Color(1f, 1f, 1f, 0.12f); // very clean, thin, subtle outline border
         barOutline.effectDistance = new Vector2(1f, -1f);
 
         GameObject indicatorGO = new GameObject("ActiveIndicator");
         indicatorGO.transform.SetParent(bottomBar.transform, false);
         Image indImg = indicatorGO.AddComponent<Image>();
-        indImg.sprite = resultCardSprite;
-        indImg.color = new Color(1f, 1f, 1f, 0.15f);
-        
+        indImg.sprite = navIndicatorSprite;
+        indImg.type = Image.Type.Sliced;
+        indImg.color = new Color(1f, 1f, 1f, 0.16f); // soft translucent capsule overlay
+
         RectTransform indRt = indicatorGO.GetComponent<RectTransform>();
         indRt.anchorMin = new Vector2(0.5f, 0.5f);
         indRt.anchorMax = new Vector2(0.5f, 0.5f);
         indRt.pivot = new Vector2(0.5f, 0.5f);
-        indRt.sizeDelta = new Vector2(180, 130);
-        indRt.anchoredPosition = new Vector2(0, 15);
+        indRt.sizeDelta = new Vector2(116, 106);
+        indRt.anchoredPosition = new Vector2(0, 0);
 
         // 1. Shop Button
         GameObject shopGO = new GameObject("ShopButton");
         shopGO.transform.SetParent(bottomBar.transform, false);
         Image shopImg = shopGO.AddComponent<Image>();
-        shopImg.sprite = shopIcon;
+        shopImg.sprite = resultCardSprite;
+        shopImg.color = Color.clear;
         shopButton = shopGO.AddComponent<Button>();
-        shopButton.transition = Selectable.Transition.None; // don't let Unity's built-in color tint fight our own active-state styling
+        shopButton.transition = Selectable.Transition.None;
         RectTransform shopRt = shopGO.GetComponent<RectTransform>();
         shopRt.sizeDelta = new Vector2(100, 100);
-        shopRt.anchoredPosition = new Vector2(-340, 0);
+        shopRt.anchoredPosition = new Vector2(-300, 0);
 
-        GameObject shopTxt = CreateLabel("Label", shopGO.transform, "SHOP", 18, new Vector2(0, -50));
-        shopTxt.GetComponent<Text>().color = new Color(0.9f, 0.9f, 0.9f);
+        GameObject shopIconGO = new GameObject("Icon");
+        shopIconGO.transform.SetParent(shopGO.transform, false);
+        Image sIconImg = shopIconGO.AddComponent<Image>();
+        sIconImg.sprite = shopIcon;
+        RectTransform sIconRt = shopIconGO.GetComponent<RectTransform>();
+        sIconRt.sizeDelta = new Vector2(82, 82);
+        sIconRt.anchoredPosition = Vector2.zero;
 
         // 2. Heroes Button
         GameObject heroesGO = new GameObject("HeroesButton");
         heroesGO.transform.SetParent(bottomBar.transform, false);
         Image heroesImg = heroesGO.AddComponent<Image>();
-        heroesImg.sprite = heroesIcon;
+        heroesImg.sprite = resultCardSprite;
+        heroesImg.color = Color.clear;
         heroesButton = heroesGO.AddComponent<Button>();
         heroesButton.transition = Selectable.Transition.None;
         RectTransform heroesRt = heroesGO.GetComponent<RectTransform>();
         heroesRt.sizeDelta = new Vector2(100, 100);
-        heroesRt.anchoredPosition = new Vector2(-170, 0);
+        heroesRt.anchoredPosition = new Vector2(-150, 0);
 
-        GameObject heroesTxt = CreateLabel("Label", heroesGO.transform, "HEROES", 18, new Vector2(0, -50));
-        heroesTxt.GetComponent<Text>().color = new Color(0.9f, 0.9f, 0.9f);
+        GameObject heroesIconGO = new GameObject("Icon");
+        heroesIconGO.transform.SetParent(heroesGO.transform, false);
+        Image hIconImg = heroesIconGO.AddComponent<Image>();
+        hIconImg.sprite = heroesIcon;
+        RectTransform hIconRt = heroesIconGO.GetComponent<RectTransform>();
+        hIconRt.sizeDelta = new Vector2(82, 82);
+        hIconRt.anchoredPosition = Vector2.zero;
 
-        // 3. Play Button (large circular center)
+        // 3. Play Button (Center Home/Play)
         GameObject playGO = new GameObject("PlayButton");
         playGO.transform.SetParent(bottomBar.transform, false);
         Image playImg = playGO.AddComponent<Image>();
         playImg.sprite = resultCardSprite;
-        playImg.color = new Color(0.98f, 0.82f, 0.12f); // yellow
+        playImg.color = Color.clear;
         navPlayBtn = playGO.AddComponent<Button>();
         navPlayBtn.transition = Selectable.Transition.None;
         RectTransform playRt = playGO.GetComponent<RectTransform>();
-        playRt.sizeDelta = new Vector2(170, 170);
-        playRt.anchoredPosition = new Vector2(0, 20); // overlaps top
-
-        Outline playOutline = playGO.AddComponent<Outline>();
-        playOutline.effectColor = Color.white;
-        playOutline.effectDistance = new Vector2(3f, -3f);
+        playRt.sizeDelta = new Vector2(100, 100);
+        playRt.anchoredPosition = new Vector2(0, 0);
 
         GameObject playIconGO = new GameObject("Icon");
         playIconGO.transform.SetParent(playGO.transform, false);
@@ -1615,36 +2012,48 @@ public static class FlappyBirdSceneBuilder
         pIconImg.sprite = playIcon;
         playIconImageRef = pIconImg;
         RectTransform piRt = playIconGO.GetComponent<RectTransform>();
-        piRt.sizeDelta = new Vector2(90, 90);
-        piRt.anchoredPosition = new Vector2(6, 0); // visual centering offset
+        piRt.sizeDelta = new Vector2(82, 82);
+        piRt.anchoredPosition = Vector2.zero;
 
         // 4. Missions Button
         GameObject missionsGO = new GameObject("MissionsButton");
         missionsGO.transform.SetParent(bottomBar.transform, false);
         Image missionsImg = missionsGO.AddComponent<Image>();
-        missionsImg.sprite = missionsIcon;
+        missionsImg.sprite = resultCardSprite;
+        missionsImg.color = Color.clear;
         missionsButton = missionsGO.AddComponent<Button>();
         missionsButton.transition = Selectable.Transition.None;
         RectTransform missionsRt = missionsGO.GetComponent<RectTransform>();
         missionsRt.sizeDelta = new Vector2(100, 100);
-        missionsRt.anchoredPosition = new Vector2(170, 0);
+        missionsRt.anchoredPosition = new Vector2(150, 0);
 
-        GameObject missionsTxt = CreateLabel("Label", missionsGO.transform, "QUESTS", 18, new Vector2(0, -50));
-        missionsTxt.GetComponent<Text>().color = new Color(0.9f, 0.9f, 0.9f);
+        GameObject missionsIconGO = new GameObject("Icon");
+        missionsIconGO.transform.SetParent(missionsGO.transform, false);
+        Image mIconImg = missionsIconGO.AddComponent<Image>();
+        mIconImg.sprite = missionsIcon;
+        RectTransform mIconRt = missionsIconGO.GetComponent<RectTransform>();
+        mIconRt.sizeDelta = new Vector2(82, 82);
+        mIconRt.anchoredPosition = Vector2.zero;
 
         // 5. Themes Button
         GameObject themesGO = new GameObject("ThemesButton");
         themesGO.transform.SetParent(bottomBar.transform, false);
         Image themesImg = themesGO.AddComponent<Image>();
-        themesImg.sprite = themesIcon;
+        themesImg.sprite = resultCardSprite;
+        themesImg.color = Color.clear;
         themesButton = themesGO.AddComponent<Button>();
         themesButton.transition = Selectable.Transition.None;
         RectTransform themesRt = themesGO.GetComponent<RectTransform>();
         themesRt.sizeDelta = new Vector2(100, 100);
-        themesRt.anchoredPosition = new Vector2(340, 0);
+        themesRt.anchoredPosition = new Vector2(300, 0);
 
-        GameObject themesTxt = CreateLabel("Label", themesGO.transform, "WORLDS", 18, new Vector2(0, -50));
-        themesTxt.GetComponent<Text>().color = new Color(0.9f, 0.9f, 0.9f);
+        GameObject themesIconGO = new GameObject("Icon");
+        themesIconGO.transform.SetParent(themesGO.transform, false);
+        Image tIconImg = themesIconGO.AddComponent<Image>();
+        tIconImg.sprite = themesIcon;
+        RectTransform tIconRt = themesIconGO.GetComponent<RectTransform>();
+        tIconRt.sizeDelta = new Vector2(82, 82);
+        tIconRt.anchoredPosition = Vector2.zero;
 
         // --- Fading Toast Notification Panel ---
         toastPanel = new GameObject("ToastPanel");
@@ -1681,76 +2090,6 @@ public static class FlappyBirdSceneBuilder
     }
 
     /// <summary>Full-screen placeholder used by Shop/Quests until those systems are built — same construction pattern as WorldsPanel/HeroesPanel.</summary>
-    private static GameObject BuildComingSoonPanel(Transform parent, string title, string message, Sprite resultCardSprite)
-    {
-        GameObject comingSoonPanel = new GameObject(title + "Panel");
-        comingSoonPanel.transform.SetParent(parent, false);
-        RectTransform rt = comingSoonPanel.AddComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0.5f, 0.5f);
-        rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = new Vector2(1000, 1400);
-        rt.anchoredPosition = new Vector2(0, 80);
-
-        GameObject hbGO = new GameObject("HeaderBar");
-        hbGO.transform.SetParent(comingSoonPanel.transform, false);
-        Image hbImg = hbGO.AddComponent<Image>();
-        hbImg.sprite = resultCardSprite;
-        hbImg.color = new Color(0.08f, 0.45f, 0.85f, 1f);
-
-        Outline hbOutline = hbGO.AddComponent<Outline>();
-        hbOutline.effectColor = Color.white;
-        hbOutline.effectDistance = new Vector2(2f, -2f);
-
-        RectTransform hbRt = hbGO.GetComponent<RectTransform>();
-        hbRt.sizeDelta = new Vector2(900, 80);
-        hbRt.anchoredPosition = new Vector2(0, 620);
-
-        GameObject hbTxtGO = CreateLabel("Text", hbGO.transform, title, 28, Vector2.zero);
-        hbTxtGO.GetComponent<Text>().color = Color.white;
-        hbTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
-        RectTransform hbtRt = hbTxtGO.GetComponent<RectTransform>();
-        hbtRt.anchorMin = Vector2.zero;
-        hbtRt.anchorMax = Vector2.one;
-        hbtRt.offsetMin = Vector2.zero;
-        hbtRt.offsetMax = Vector2.zero;
-
-        // Centered "coming soon" card
-        GameObject cardGO = new GameObject("Card");
-        cardGO.transform.SetParent(comingSoonPanel.transform, false);
-        Image cardImg = cardGO.AddComponent<Image>();
-        cardImg.sprite = resultCardSprite;
-        cardImg.color = new Color(0.15f, 0.15f, 0.18f, 0.95f);
-        Outline cardOutline = cardGO.AddComponent<Outline>();
-        cardOutline.effectColor = new Color(0.35f, 0.35f, 0.4f);
-        cardOutline.effectDistance = new Vector2(2f, -2f);
-        RectTransform cardRt = cardGO.GetComponent<RectTransform>();
-        cardRt.sizeDelta = new Vector2(700, 420);
-        cardRt.anchoredPosition = new Vector2(0, 80);
-
-        GameObject bigTitleGO = CreateLabel("BigTitle", cardGO.transform, "COMING SOON", 42, new Vector2(0, 70));
-        Text bigTitleTxt = bigTitleGO.GetComponent<Text>();
-        bigTitleTxt.color = new Color(0.95f, 0.72f, 0.15f);
-        bigTitleTxt.fontStyle = FontStyle.Bold;
-        Outline bigTitleOutline = bigTitleGO.GetComponent<Outline>();
-        if (bigTitleOutline == null) bigTitleOutline = bigTitleGO.AddComponent<Outline>();
-        bigTitleOutline.effectColor = new Color(0.1f, 0.08f, 0.05f, 1f);
-        bigTitleOutline.effectDistance = new Vector2(3f, -3f);
-
-        UIFloat titleFloat = bigTitleGO.AddComponent<UIFloat>();
-        titleFloat.floatAmount = 8f;
-        titleFloat.speed = 2f;
-
-        GameObject msgGO = CreateLabel("Message", cardGO.transform, message, 24, new Vector2(0, -70));
-        Text msgTxt = msgGO.GetComponent<Text>();
-        msgTxt.color = new Color(0.85f, 0.85f, 0.85f);
-        RectTransform msgRt = msgGO.GetComponent<RectTransform>();
-        msgRt.sizeDelta = new Vector2(600, 200);
-
-        comingSoonPanel.SetActive(false);
-        return comingSoonPanel;
-    }
-
     private static GameObject BuildLeaderboardPanel(Transform parent, Sprite resultCardSprite, Sprite buttonSprite)
     {
         GameObject leaderboardPanel = new GameObject("LeaderboardPanel");
@@ -1969,7 +2308,309 @@ public static class FlappyBirdSceneBuilder
         return leaderboardPanel;
     }
 
-    private static GameObject BuildGameOverPanel(Transform canvasTransform, Sprite buttonSprite, Sprite resultCardSprite, out Button menuButton, out Button retryButton, out GameObject scoreValueText, out GameObject bestValueText, out UnityEngine.UI.Image medalImage, out GameObject newBestBadge, out RectTransform resultCardTransform)
+    private static GameObject BuildUpgradeShopPanel(Transform parent, Sprite resultCardSprite, Sprite buttonSprite, Sprite coinSprite, Sprite magnetSprite, Sprite boostSprite, Sprite doubleSprite)
+    {
+        GameObject shopPanel = new GameObject("UpgradeShopPanel");
+        shopPanel.transform.SetParent(parent, false);
+        RectTransform rt = shopPanel.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0.5f);
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(1000, 1400);
+        rt.anchoredPosition = new Vector2(0, 80);
+
+        PowerupUpgradeUI shop = shopPanel.AddComponent<PowerupUpgradeUI>();
+
+        // Header bar
+        GameObject hbGO = new GameObject("HeaderBar");
+        hbGO.transform.SetParent(shopPanel.transform, false);
+        Image hbImg = hbGO.AddComponent<Image>();
+        hbImg.sprite = resultCardSprite;
+        hbImg.color = new Color(0.08f, 0.45f, 0.85f, 1f);
+        Outline hbOutline = hbGO.AddComponent<Outline>();
+        hbOutline.effectColor = Color.white;
+        hbOutline.effectDistance = new Vector2(2f, -2f);
+        RectTransform hbRt = hbGO.GetComponent<RectTransform>();
+        hbRt.sizeDelta = new Vector2(900, 80);
+        hbRt.anchoredPosition = new Vector2(0, 620);
+
+        GameObject hbTxtGO = CreateLabel("Text", hbGO.transform, "UPGRADES SHOP", 28, Vector2.zero);
+        hbTxtGO.GetComponent<Text>().color = Color.white;
+        hbTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+        RectTransform hbtRt = hbTxtGO.GetComponent<RectTransform>();
+        hbtRt.anchorMin = Vector2.zero;
+        hbtRt.anchorMax = Vector2.one;
+        hbtRt.offsetMin = Vector2.zero;
+        hbtRt.offsetMax = Vector2.zero;
+
+        // Total coins display
+        GameObject coinsRow = new GameObject("CoinsRow");
+        coinsRow.transform.SetParent(shopPanel.transform, false);
+        RectTransform coinsRowRt = coinsRow.AddComponent<RectTransform>();
+        coinsRowRt.anchorMin = new Vector2(0.5f, 0.5f);
+        coinsRowRt.anchorMax = new Vector2(0.5f, 0.5f);
+        coinsRowRt.sizeDelta = Vector2.zero;
+        coinsRowRt.anchoredPosition = new Vector2(0, 500);
+
+        GameObject coinsIconGO = new GameObject("CoinIcon");
+        coinsIconGO.transform.SetParent(coinsRow.transform, false);
+        Image coinsIconImg = coinsIconGO.AddComponent<Image>();
+        coinsIconImg.sprite = coinSprite;
+        RectTransform coinsIconRt = coinsIconGO.GetComponent<RectTransform>();
+        coinsIconRt.sizeDelta = new Vector2(56, 56);
+        coinsIconRt.anchoredPosition = new Vector2(-60, 0);
+        UIFloat coinsFloat = coinsIconGO.AddComponent<UIFloat>();
+        coinsFloat.floatAmount = 4f;
+        coinsFloat.speed = 3f;
+
+        GameObject coinsValueGO = CreateLabel("CoinsValue", coinsRow.transform, "0", 44, new Vector2(30, 0));
+        Text coinsValueText = coinsValueGO.GetComponent<Text>();
+        coinsValueText.color = new Color(0.98f, 0.82f, 0.15f);
+        coinsValueText.fontStyle = FontStyle.Bold;
+
+        // Three upgrade rows
+        Button magnetBtn, boostBtn, doubleBtn;
+        Text magnetLevel, magnetSegments, magnetDuration, magnetCost;
+        Text boostLevel, boostSegments, boostDuration, boostCost;
+        Text doubleLevel, doubleSegments, doubleDuration, doubleCost;
+
+        BuildUpgradeRow(shopPanel.transform, resultCardSprite, buttonSprite, magnetSprite, "MAGNET", 320,
+            out magnetBtn, out magnetLevel, out magnetSegments, out magnetDuration, out magnetCost);
+        BuildUpgradeRow(shopPanel.transform, resultCardSprite, buttonSprite, boostSprite, "GO FAST", 80,
+            out boostBtn, out boostLevel, out boostSegments, out boostDuration, out boostCost);
+        BuildUpgradeRow(shopPanel.transform, resultCardSprite, buttonSprite, doubleSprite, "DOUBLE COINS", -160,
+            out doubleBtn, out doubleLevel, out doubleSegments, out doubleDuration, out doubleCost);
+
+        shop.totalCoinsText = coinsValueText;
+        shop.magnetRow = new PowerupUpgradeUI.UpgradeRow { levelText = magnetLevel, segmentsText = magnetSegments, durationText = magnetDuration, costText = magnetCost, upgradeButton = magnetBtn };
+        shop.boostRow = new PowerupUpgradeUI.UpgradeRow { levelText = boostLevel, segmentsText = boostSegments, durationText = boostDuration, costText = boostCost, upgradeButton = boostBtn };
+        shop.doubleRow = new PowerupUpgradeUI.UpgradeRow { levelText = doubleLevel, segmentsText = doubleSegments, durationText = doubleDuration, costText = doubleCost, upgradeButton = doubleBtn };
+
+        shopPanel.SetActive(false);
+        return shopPanel;
+    }
+
+    private static void BuildUpgradeRow(Transform parent, Sprite resultCardSprite, Sprite buttonSprite, Sprite icon, string name, float yPos,
+        out Button upgradeButton, out Text levelText, out Text segmentsText, out Text durationText, out Text costText)
+    {
+        GameObject card = new GameObject(name.Replace(" ", "") + "Row");
+        card.transform.SetParent(parent, false);
+        Image cardImg = card.AddComponent<Image>();
+        cardImg.sprite = resultCardSprite;
+        cardImg.color = new Color(0.15f, 0.15f, 0.18f, 0.95f);
+        Outline cardOutline = card.AddComponent<Outline>();
+        cardOutline.effectColor = new Color(0.35f, 0.35f, 0.4f);
+        cardOutline.effectDistance = new Vector2(2f, -2f);
+        RectTransform cardRt = card.GetComponent<RectTransform>();
+        cardRt.sizeDelta = new Vector2(900, 200);
+        cardRt.anchoredPosition = new Vector2(0, yPos);
+
+        GameObject iconGO = new GameObject("Icon");
+        iconGO.transform.SetParent(card.transform, false);
+        Image iconImg = iconGO.AddComponent<Image>();
+        iconImg.sprite = icon;
+        RectTransform iconRt = iconGO.GetComponent<RectTransform>();
+        iconRt.sizeDelta = new Vector2(100, 100);
+        iconRt.anchoredPosition = new Vector2(-370, 0);
+
+        GameObject nameGO = CreateLabel("Name", card.transform, name, 26, new Vector2(-160, 60));
+        nameGO.GetComponent<Text>().color = Color.white;
+        nameGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+        RectTransform nameRt = nameGO.GetComponent<RectTransform>();
+        nameRt.sizeDelta = new Vector2(340, 50);
+
+        GameObject levelGO = CreateLabel("Level", card.transform, "LEVEL 1/5", 20, new Vector2(-160, 15));
+        levelText = levelGO.GetComponent<Text>();
+        levelText.color = new Color(0.85f, 0.85f, 0.85f);
+        RectTransform levelRt = levelGO.GetComponent<RectTransform>();
+        levelRt.sizeDelta = new Vector2(340, 40);
+
+        GameObject segmentsGO = CreateLabel("Segments", card.transform, "■ □ □ □ □", 22, new Vector2(-160, -25));
+        segmentsText = segmentsGO.GetComponent<Text>();
+        segmentsText.color = new Color(0.95f, 0.72f, 0.15f);
+        RectTransform segmentsRt = segmentsGO.GetComponent<RectTransform>();
+        segmentsRt.sizeDelta = new Vector2(340, 40);
+
+        GameObject durationGO = CreateLabel("Duration", card.transform, "5.0s DURATION", 18, new Vector2(-160, -60));
+        durationText = durationGO.GetComponent<Text>();
+        durationText.color = new Color(0.7f, 0.7f, 0.7f);
+        RectTransform durationRt = durationGO.GetComponent<RectTransform>();
+        durationRt.sizeDelta = new Vector2(340, 40);
+
+        GameObject upgradeGO = new GameObject("UpgradeButton");
+        upgradeGO.transform.SetParent(card.transform, false);
+        Image upgradeImg = upgradeGO.AddComponent<Image>();
+        upgradeImg.sprite = buttonSprite;
+        upgradeImg.type = Image.Type.Simple;
+        upgradeImg.color = new Color(0.98f, 0.6f, 0.12f); // vibrant orange, explicit tint for a bolder pop
+        RectTransform upgradeRt = upgradeGO.GetComponent<RectTransform>();
+        upgradeRt.sizeDelta = new Vector2(200, 70);
+        upgradeRt.anchoredPosition = new Vector2(330, 25);
+        Outline upgradeOutline = upgradeGO.AddComponent<Outline>();
+        upgradeOutline.effectColor = new Color(0.55f, 0.28f, 0.02f);
+        upgradeOutline.effectDistance = new Vector2(3f, -3f);
+        Shadow upgradeShadow = upgradeGO.AddComponent<Shadow>();
+        upgradeShadow.effectColor = new Color(0f, 0f, 0f, 0.45f);
+        upgradeShadow.effectDistance = new Vector2(0f, -6f);
+        upgradeButton = upgradeGO.AddComponent<Button>();
+        upgradeButton.transition = Selectable.Transition.None;
+
+        GameObject upgradeLabelGO = CreateLabel("Text", upgradeGO.transform, "UPGRADE", 22);
+        Text upgradeLabelText = upgradeLabelGO.GetComponent<Text>();
+        upgradeLabelText.color = Color.white;
+        upgradeLabelText.fontStyle = FontStyle.Bold;
+        Outline upgradeLabelOutline = upgradeLabelGO.GetComponent<Outline>();
+        if (upgradeLabelOutline != null) upgradeLabelOutline.effectColor = new Color(0.4f, 0.2f, 0.02f, 1f);
+
+        GameObject costGO = CreateLabel("Cost", card.transform, "100 COINS", 20, new Vector2(330, -35));
+        costText = costGO.GetComponent<Text>();
+        costText.color = new Color(0.95f, 0.72f, 0.15f);
+        RectTransform costRt = costGO.GetComponent<RectTransform>();
+        costRt.sizeDelta = new Vector2(220, 40);
+    }
+
+    private static GameObject BuildStarterPowerShopPanel(Transform parent, Sprite resultCardSprite, Sprite buttonSprite, Sprite coinSprite, Sprite magnetSprite, Sprite boostSprite, Sprite doubleSprite, Sprite hammerSprite)
+    {
+        GameObject shopPanel = new GameObject("StarterPowerShopPanel");
+        shopPanel.transform.SetParent(parent, false);
+        RectTransform rt = shopPanel.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0.5f);
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(1000, 1400);
+        rt.anchoredPosition = new Vector2(0, 80);
+
+        StarterPowerShopUI shop = shopPanel.AddComponent<StarterPowerShopUI>();
+
+        // Header bar
+        GameObject hbGO = new GameObject("HeaderBar");
+        hbGO.transform.SetParent(shopPanel.transform, false);
+        Image hbImg = hbGO.AddComponent<Image>();
+        hbImg.sprite = resultCardSprite;
+        hbImg.color = new Color(0.08f, 0.45f, 0.85f, 1f);
+        Outline hbOutline = hbGO.AddComponent<Outline>();
+        hbOutline.effectColor = Color.white;
+        hbOutline.effectDistance = new Vector2(2f, -2f);
+        RectTransform hbRt = hbGO.GetComponent<RectTransform>();
+        hbRt.sizeDelta = new Vector2(900, 80);
+        hbRt.anchoredPosition = new Vector2(0, 620);
+
+        GameObject hbTxtGO = CreateLabel("Text", hbGO.transform, "SHOP", 28, Vector2.zero);
+        hbTxtGO.GetComponent<Text>().color = Color.white;
+        hbTxtGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+        RectTransform hbtRt = hbTxtGO.GetComponent<RectTransform>();
+        hbtRt.anchorMin = Vector2.zero;
+        hbtRt.anchorMax = Vector2.one;
+        hbtRt.offsetMin = Vector2.zero;
+        hbtRt.offsetMax = Vector2.zero;
+
+        // Total coins display
+        GameObject coinsRow = new GameObject("CoinsRow");
+        coinsRow.transform.SetParent(shopPanel.transform, false);
+        RectTransform coinsRowRt = coinsRow.AddComponent<RectTransform>();
+        coinsRowRt.anchorMin = new Vector2(0.5f, 0.5f);
+        coinsRowRt.anchorMax = new Vector2(0.5f, 0.5f);
+        coinsRowRt.sizeDelta = Vector2.zero;
+        coinsRowRt.anchoredPosition = new Vector2(0, 500);
+
+        GameObject coinsIconGO = new GameObject("CoinIcon");
+        coinsIconGO.transform.SetParent(coinsRow.transform, false);
+        Image coinsIconImg = coinsIconGO.AddComponent<Image>();
+        coinsIconImg.sprite = coinSprite;
+        RectTransform coinsIconRt = coinsIconGO.GetComponent<RectTransform>();
+        coinsIconRt.sizeDelta = new Vector2(56, 56);
+        coinsIconRt.anchoredPosition = new Vector2(-60, 0);
+        UIFloat coinsFloat = coinsIconGO.AddComponent<UIFloat>();
+        coinsFloat.floatAmount = 4f;
+        coinsFloat.speed = 3f;
+
+        GameObject coinsValueGO = CreateLabel("CoinsValue", coinsRow.transform, "0", 44, new Vector2(30, 0));
+        Text coinsValueText = coinsValueGO.GetComponent<Text>();
+        coinsValueText.color = new Color(0.98f, 0.82f, 0.15f);
+        coinsValueText.fontStyle = FontStyle.Bold;
+
+        // Four buy rows — 20 coins each, one charge per purchase
+        Button magnetBtn, boostBtn, doubleBtn, hammerBtn;
+        Text magnetCount, boostCount, doubleCount, hammerCount;
+
+        BuildStarterShopRow(shopPanel.transform, resultCardSprite, buttonSprite, magnetSprite, "MAGNET", 340, out magnetBtn, out magnetCount);
+        BuildStarterShopRow(shopPanel.transform, resultCardSprite, buttonSprite, boostSprite, "GO FAST", 150, out boostBtn, out boostCount);
+        BuildStarterShopRow(shopPanel.transform, resultCardSprite, buttonSprite, doubleSprite, "DOUBLE COINS", -40, out doubleBtn, out doubleCount);
+        BuildStarterShopRow(shopPanel.transform, resultCardSprite, buttonSprite, hammerSprite, "HAMMER", -230, out hammerBtn, out hammerCount);
+
+        shop.totalCoinsText = coinsValueText;
+        shop.magnetRow = new StarterPowerShopUI.BuyRow { countText = magnetCount, buyButton = magnetBtn };
+        shop.boostRow = new StarterPowerShopUI.BuyRow { countText = boostCount, buyButton = boostBtn };
+        shop.doubleRow = new StarterPowerShopUI.BuyRow { countText = doubleCount, buyButton = doubleBtn };
+        shop.hammerRow = new StarterPowerShopUI.BuyRow { countText = hammerCount, buyButton = hammerBtn };
+
+        shopPanel.SetActive(false);
+        return shopPanel;
+    }
+
+    private static void BuildStarterShopRow(Transform parent, Sprite resultCardSprite, Sprite buttonSprite, Sprite icon, string name, float yPos,
+        out Button buyButton, out Text countText)
+    {
+        GameObject card = new GameObject(name.Replace(" ", "") + "BuyRow");
+        card.transform.SetParent(parent, false);
+        Image cardImg = card.AddComponent<Image>();
+        cardImg.sprite = resultCardSprite;
+        cardImg.color = new Color(0.15f, 0.15f, 0.18f, 0.95f);
+        Outline cardOutline = card.AddComponent<Outline>();
+        cardOutline.effectColor = new Color(0.35f, 0.35f, 0.4f);
+        cardOutline.effectDistance = new Vector2(2f, -2f);
+        RectTransform cardRt = card.GetComponent<RectTransform>();
+        cardRt.sizeDelta = new Vector2(900, 170);
+        cardRt.anchoredPosition = new Vector2(0, yPos);
+
+        GameObject iconGO = new GameObject("Icon");
+        iconGO.transform.SetParent(card.transform, false);
+        Image iconImg = iconGO.AddComponent<Image>();
+        iconImg.sprite = icon;
+        RectTransform iconRt = iconGO.GetComponent<RectTransform>();
+        iconRt.sizeDelta = new Vector2(90, 90);
+        iconRt.anchoredPosition = new Vector2(-370, 20);
+
+        GameObject nameGO = CreateLabel("Name", card.transform, name, 26, new Vector2(-160, 40));
+        nameGO.GetComponent<Text>().color = Color.white;
+        nameGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+        RectTransform nameRt = nameGO.GetComponent<RectTransform>();
+        nameRt.sizeDelta = new Vector2(340, 50);
+
+        GameObject countGO = CreateLabel("Count", card.transform, "x0", 30, new Vector2(-160, -25));
+        countText = countGO.GetComponent<Text>();
+        countText.color = new Color(0.95f, 0.72f, 0.15f);
+        countText.fontStyle = FontStyle.Bold;
+        RectTransform countRt = countGO.GetComponent<RectTransform>();
+        countRt.sizeDelta = new Vector2(340, 50);
+
+        GameObject buyGO = new GameObject("BuyButton");
+        buyGO.transform.SetParent(card.transform, false);
+        Image buyImg = buyGO.AddComponent<Image>();
+        buyImg.sprite = buttonSprite;
+        buyImg.type = Image.Type.Simple;
+        buyImg.color = new Color(0.22f, 0.78f, 0.38f); // vibrant green, explicit tint for a bolder pop
+        RectTransform buyRt = buyGO.GetComponent<RectTransform>();
+        buyRt.sizeDelta = new Vector2(220, 80);
+        buyRt.anchoredPosition = new Vector2(330, 0);
+        Outline buyOutline = buyGO.AddComponent<Outline>();
+        buyOutline.effectColor = new Color(0.05f, 0.4f, 0.15f);
+        buyOutline.effectDistance = new Vector2(3f, -3f);
+        Shadow buyShadow = buyGO.AddComponent<Shadow>();
+        buyShadow.effectColor = new Color(0f, 0f, 0f, 0.45f);
+        buyShadow.effectDistance = new Vector2(0f, -6f);
+        buyButton = buyGO.AddComponent<Button>();
+        buyButton.transition = Selectable.Transition.None;
+
+        GameObject buyLabelGO = CreateLabel("Text", buyGO.transform, "BUY (" + GameManager.StarterPurchaseCost + ")", 22);
+        Text buyLabelText = buyLabelGO.GetComponent<Text>();
+        buyLabelText.color = Color.white;
+        buyLabelText.fontStyle = FontStyle.Bold;
+        Outline buyLabelOutline = buyLabelGO.GetComponent<Outline>();
+        if (buyLabelOutline != null) buyLabelOutline.effectColor = new Color(0.05f, 0.3f, 0.1f, 1f);
+    }
+
+    private static GameObject BuildGameOverPanel(Transform canvasTransform, Sprite buttonSprite, Sprite resultCardSprite, Sprite coinIcon, out Button menuButton, out Button retryButton, out GameObject scoreValueText, out GameObject bestValueText, out GameObject coinsValueText, out UnityEngine.UI.Image medalImage, out GameObject newBestBadge, out RectTransform resultCardTransform)
     {
         // Dusk dark transparent background
         GameObject panel = CreatePanel("GameOverPanel", canvasTransform, new Color(0.15f, 0.1f, 0.05f, 0.6f));
@@ -1993,7 +2634,7 @@ public static class FlappyBirdSceneBuilder
         cardImg.sprite = resultCardSprite;
         cardImg.type = Image.Type.Simple;
         resultCardTransform = resultCard.GetComponent<RectTransform>();
-        resultCardTransform.sizeDelta = new Vector2(650, 380);
+        resultCardTransform.sizeDelta = new Vector2(650, 460);
         resultCardTransform.anchoredPosition = new Vector2(0, 50);
 
         Shadow cardShadow = resultCard.AddComponent<Shadow>();
@@ -2035,6 +2676,24 @@ public static class FlappyBirdSceneBuilder
         bvText.color = Color.white;
         bvText.fontStyle = FontStyle.Bold;
 
+        // 4b. COINS earned this run, tucked under the medal
+        GameObject coinsIconGO = new GameObject("CoinsIcon");
+        coinsIconGO.transform.SetParent(resultCard.transform, false);
+        Image coinsIconImg = coinsIconGO.AddComponent<Image>();
+        coinsIconImg.sprite = coinIcon;
+        RectTransform coinsIconRt = coinsIconGO.GetComponent<RectTransform>();
+        coinsIconRt.sizeDelta = new Vector2(36, 36);
+        coinsIconRt.anchoredPosition = new Vector2(-185, -195);
+
+        GameObject coinsVal = CreateLabel("CoinsValue", resultCard.transform, "0", 32, new Vector2(-135, -195));
+        coinsValueText = coinsVal;
+        Text cvText = coinsVal.GetComponent<Text>();
+        cvText.color = new Color(0.98f, 0.82f, 0.15f);
+        cvText.fontStyle = FontStyle.Bold;
+        cvText.alignment = TextAnchor.MiddleLeft;
+        RectTransform coinsValRt = coinsVal.GetComponent<RectTransform>();
+        coinsValRt.sizeDelta = new Vector2(100, 50);
+
         // 5. NEW Best badge next to the BEST score value
         GameObject newBadge = new GameObject("NewBestBadge");
         newBadge.transform.SetParent(resultCard.transform, false);
@@ -2060,7 +2719,7 @@ public static class FlappyBirdSceneBuilder
         ApplyButtonLook(menuImg, buttonSprite, new Color(0.55f, 0.6f, 0.65f));
         RectTransform menuRt = menuGO.GetComponent<RectTransform>();
         menuRt.sizeDelta = new Vector2(260, 100);
-        menuRt.anchoredPosition = new Vector2(-150, -220); // lowered slightly to clear the taller Results card
+        menuRt.anchoredPosition = new Vector2(-150, -260); // lowered to clear the taller Results card (grew to fit the COINS row)
         menuButton = menuGO.AddComponent<Button>();
         GameObject menuLabel = CreateLabel("Text", menuGO.transform, "MENU", 38);
         Text menuLabelText = menuLabel.GetComponent<Text>();
@@ -2076,7 +2735,7 @@ public static class FlappyBirdSceneBuilder
         ApplyButtonLook(retryImg, buttonSprite, new Color(0.4f, 0.82f, 0.4f));
         RectTransform retryRt = retryGO.GetComponent<RectTransform>();
         retryRt.sizeDelta = new Vector2(260, 100);
-        retryRt.anchoredPosition = new Vector2(150, -220);
+        retryRt.anchoredPosition = new Vector2(150, -260);
         retryButton = retryGO.AddComponent<Button>();
         GameObject retryLabel = CreateLabel("Text", retryGO.transform, "RETRY", 38);
         Text retryLabelText = retryLabel.GetComponent<Text>();
@@ -2207,12 +2866,13 @@ public static class FlappyBirdSceneBuilder
         return go;
     }
 
-    private static GameObject BuildGameManager(GameObject bird, GameObject pipeSpawnerGO, GameObject scoreTextGO, GameObject startPanel, GameObject gameOverPanel, AudioClip clickClip, AudioClip scoreClip, GameObject gameOverScoreText, GameObject gameOverBestText, GameObject startHighScoreText, UnityEngine.UI.Image medalImage, Sprite bronzeSprite, Sprite silverSprite, Sprite goldSprite, Sprite platinumSprite, Sprite placeholderSprite, GameObject newBestBadge, RectTransform resultCardTransform)
+    private static GameObject BuildGameManager(GameObject bird, GameObject pipeSpawnerGO, GameObject itemSpawnerGO, GameObject scoreTextGO, GameObject startPanel, GameObject gameOverPanel, AudioClip clickClip, AudioClip scoreClip, GameObject gameOverScoreText, GameObject gameOverBestText, GameObject gameOverCoinsText, GameObject startHighScoreText, UnityEngine.UI.Image medalImage, Sprite bronzeSprite, Sprite silverSprite, Sprite goldSprite, Sprite platinumSprite, Sprite placeholderSprite, GameObject newBestBadge, RectTransform resultCardTransform)
     {
         GameObject go = new GameObject("GameManager");
         GameManager gm = go.AddComponent<GameManager>();
         gm.bird = bird;
         gm.pipeSpawner = pipeSpawnerGO.GetComponent<PipeSpawner>();
+        gm.itemSpawner = itemSpawnerGO.GetComponent<ItemSpawner>();
         gm.scoreText = scoreTextGO;
         gm.startPanel = startPanel;
         gm.gameOverPanel = gameOverPanel;
@@ -2220,6 +2880,7 @@ public static class FlappyBirdSceneBuilder
         gm.scoreSound = scoreClip;
         gm.gameOverScoreText = gameOverScoreText;
         gm.gameOverBestText = gameOverBestText;
+        gm.gameOverCoinsText = gameOverCoinsText;
         gm.startHighScoreText = startHighScoreText;
         gm.medalImage = medalImage;
         gm.bronzeMedal = bronzeSprite;
@@ -2501,6 +3162,203 @@ public static class FlappyBirdSceneBuilder
         return tex;
     }
 
+    private static Texture2D GenerateCoinTexture(int width, int height)
+    {
+        Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        Color clear = new Color(0, 0, 0, 0);
+        Color gold = new Color(0.98f, 0.82f, 0.15f);
+        Color darkGold = new Color(0.72f, 0.55f, 0.06f);
+        Color highlight = new Color(1f, 0.95f, 0.7f, 0.55f);
+
+        Vector2 center = new Vector2(width / 2f, height / 2f);
+        float radius = width * 0.42f;
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                float dist = Vector2.Distance(new Vector2(x, y), center);
+                Color pixel = clear;
+
+                if (dist <= radius)
+                {
+                    pixel = dist >= radius - width * 0.06f ? darkGold : gold;
+
+                    // Vertical slot line through the middle
+                    if (Mathf.Abs(x - center.x) <= width * 0.035f && Mathf.Abs(y - center.y) <= height * 0.28f)
+                    {
+                        pixel = darkGold;
+                    }
+
+                    // Diagonal reflection streak
+                    float diag = (x - center.x) - (y - center.y);
+                    if (diag > width * 0.05f && diag < width * 0.15f)
+                    {
+                        pixel = Color.Lerp(pixel, highlight, highlight.a);
+                    }
+                }
+                tex.SetPixel(x, y, pixel);
+            }
+        }
+        tex.Apply();
+        return tex;
+    }
+
+    private static Texture2D GenerateMagnetTexture(int width, int height)
+    {
+        Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        Color clear = new Color(0, 0, 0, 0);
+        Color red = new Color(0.82f, 0.15f, 0.12f);
+        Color silver = new Color(0.82f, 0.84f, 0.88f);
+
+        Vector2 center = new Vector2(width / 2f, height * 0.42f);
+        float outerRadius = width * 0.32f;
+        float innerRadius = width * 0.18f;
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                Color pixel = clear;
+                float dx = x - center.x;
+                float dy = y - center.y;
+                float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                float angle = Mathf.Atan2(dy, dx) * Mathf.Rad2Deg; // -180..180, 0 = right, -90 = up
+
+                bool inRing = dist <= outerRadius && dist >= innerRadius;
+                // Horseshoe: ring for the bottom half + a bit past horizontal on each side, open at the top.
+                bool inArc = !(angle > -160f && angle < -20f); // exclude the top opening
+                if (inRing && inArc)
+                {
+                    pixel = red;
+                }
+
+                // Silver pole tips (the two open ends of the horseshoe, pointing up)
+                bool inLeftPole = x >= center.x - outerRadius && x <= center.x - innerRadius && y >= center.y - outerRadius * 1.4f && y <= center.y;
+                bool inRightPole = x <= center.x + outerRadius && x >= center.x + innerRadius && y >= center.y - outerRadius * 1.4f && y <= center.y;
+                if ((inLeftPole || inRightPole) && y <= center.y - outerRadius * 0.85f)
+                {
+                    pixel = silver;
+                }
+
+                tex.SetPixel(x, y, pixel);
+            }
+        }
+        tex.Apply();
+        return tex;
+    }
+
+    private static Texture2D GenerateHammerTexture(int width, int height)
+    {
+        Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        Color clear = new Color(0, 0, 0, 0);
+        Color steel = new Color(0.55f, 0.58f, 0.62f);
+        Color steelDark = new Color(0.35f, 0.38f, 0.42f);
+        Color wood = new Color(0.55f, 0.35f, 0.15f);
+        Color woodDark = new Color(0.35f, 0.2f, 0.08f);
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                Color pixel = clear;
+
+                // Handle: diagonal wooden shaft
+                float handleWidth = width * 0.12f;
+                float t = (float)y / height;
+                float handleCenterX = width * 0.55f - t * width * 0.15f;
+                if (Mathf.Abs(x - handleCenterX) < handleWidth * 0.5f && y < height * 0.72f)
+                {
+                    pixel = (x < handleCenterX) ? woodDark : wood;
+                }
+
+                // Head: rectangular steel block near the top
+                if (y >= height * 0.58f && y <= height * 0.85f && x >= width * 0.18f && x <= width * 0.78f)
+                {
+                    pixel = (y > height * 0.75f) ? steelDark : steel;
+                }
+
+                tex.SetPixel(x, y, pixel);
+            }
+        }
+        tex.Apply();
+        return tex;
+    }
+
+    private static Texture2D GenerateBoostTexture(int width, int height)
+    {
+        Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        Color clear = new Color(0, 0, 0, 0);
+        Color gold = new Color(1f, 0.82f, 0.1f);
+        Color darkGold = new Color(0.85f, 0.55f, 0.02f);
+
+        // Classic lightning bolt as two overlapping triangles.
+        Vector2 a = new Vector2(width * 0.58f, height * 0.95f);
+        Vector2 b = new Vector2(width * 0.32f, height * 0.48f);
+        Vector2 c = new Vector2(width * 0.55f, height * 0.48f);
+
+        Vector2 d = new Vector2(width * 0.42f, height * 0.05f);
+        Vector2 e = new Vector2(width * 0.68f, height * 0.52f);
+        Vector2 f = new Vector2(width * 0.45f, height * 0.52f);
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                Vector2 p = new Vector2(x, y);
+                Color pixel = clear;
+                if (PointInTriangle(p, a, b, c) || PointInTriangle(p, d, e, f))
+                {
+                    pixel = (y > height * 0.5f) ? darkGold : gold;
+                }
+                tex.SetPixel(x, y, pixel);
+            }
+        }
+        tex.Apply();
+        return tex;
+    }
+
+    private static Texture2D GenerateDoubleTexture(int width, int height)
+    {
+        Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        Color clear = new Color(0, 0, 0, 0);
+        Color purple = new Color(0.55f, 0.2f, 0.85f);
+        Color lightPurple = new Color(0.82f, 0.6f, 1f);
+        Color glow = new Color(0.7f, 0.4f, 1f, 0.35f);
+
+        Vector2 center = new Vector2(width / 2f, height / 2f);
+        float radius = width * 0.38f;
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                float dist = Vector2.Distance(new Vector2(x, y), center);
+                Color pixel = clear;
+
+                if (dist <= radius * 1.25f && dist > radius)
+                {
+                    pixel = glow; // soft outer glow
+                }
+                else if (dist <= radius)
+                {
+                    pixel = Color.Lerp(lightPurple, purple, Mathf.Clamp01(dist / radius));
+
+                    // Two accent rings to read as "double" without needing bitmap text.
+                    float ring1 = Mathf.Abs(dist - radius * 0.4f);
+                    float ring2 = Mathf.Abs(dist - radius * 0.7f);
+                    if (ring1 < width * 0.02f || ring2 < width * 0.02f)
+                    {
+                        pixel = lightPurple;
+                    }
+                }
+                tex.SetPixel(x, y, pixel);
+            }
+        }
+        tex.Apply();
+        return tex;
+    }
+
     private static bool IsPointInStar(float x, float y, float r)
     {
         float d = Mathf.Sqrt(x * x + y * y);
@@ -2533,11 +3391,11 @@ public static class FlappyBirdSceneBuilder
             AssetDatabase.CreateFolder("Assets/ScriptableObjects", "Themes");
         }
 
-        string[] names = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja" };
-        ThemeData[] themeAssets = new ThemeData[7];
+        string[] names = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja", "Mario", "Mars" };
+        ThemeData[] themeAssets = new ThemeData[9];
 
         // Ensure directories for Sprites
-        for (int i = 0; i < 7; i++)
+        for (int i = 0; i < 9; i++)
         {
             string spriteDir = $"{SpriteFolder}/{names[i]}";
             if (!AssetDatabase.IsValidFolder(spriteDir))
@@ -2546,7 +3404,7 @@ public static class FlappyBirdSceneBuilder
             }
         }
 
-        for (int i = 0; i < 7; i++)
+        for (int i = 0; i < 9; i++)
         {
             string path = $"{folder}/{names[i]}Theme.asset";
             ThemeData data = AssetDatabase.LoadAssetAtPath<ThemeData>(path);
@@ -2600,6 +3458,8 @@ public static class FlappyBirdSceneBuilder
         else if (index == 4) data.themeColor = new Color(0.08f, 0.25f, 0.45f); // Fish teal
         else if (index == 5) data.themeColor = new Color(0.78f, 0.72f, 0.38f); // Bee yellow
         else if (index == 6) data.themeColor = new Color(0.1f, 0.1f, 0.15f); // Ninja black
+        else if (index == 7) data.themeColor = new Color(0.36f, 0.58f, 0.98f); // Mario sky blue
+        else if (index == 8) data.themeColor = new Color(0.28f, 0.10f, 0.06f); // Mars dark red
 
         // Generate 3 unique skins for this theme
         data.playerSprites = new Sprite[3];
@@ -2615,6 +3475,20 @@ public static class FlappyBirdSceneBuilder
         {
             data.obstacleTopCapSprite = null;
             data.obstacleBottomCapSprite = null;
+        }
+        else if (index == 7) // Mario: Bricks on top, Green Warp Pipe on bottom
+        {
+            data.obstacleTopSprite = GetOrCreateSprite($"{name}/ObstacleTopBricks", 256, 256, (w, h) => GenerateThemeTexture("MarioBricks", index, w, h), 256, FilterMode.Point);
+            data.obstacleBottomSprite = GetOrCreateSprite($"{name}/ObstacleBottomPipe", 256, 256, (w, h) => GenerateThemeTexture("MarioPipeBody", index, w, h), 256, FilterMode.Point);
+            data.obstacleTopCapSprite = null; // Bricks don't need caps
+            data.obstacleBottomCapSprite = GetOrCreateSprite($"{name}/ObstacleBottomCap", 256, 256, (w, h) => GenerateThemeTexture("MarioPipeCap", index, w, h), 256, FilterMode.Point);
+        }
+        else if (index == 8) // Mars: Dark rocky spire columns
+        {
+            data.obstacleTopSprite    = GetOrCreateSprite($"{name}/ObstacleTop",    256, 256, (w, h) => GenerateThemeTexture("ObstacleBody", index, w, h), 256, FilterMode.Point);
+            data.obstacleBottomSprite = data.obstacleTopSprite;
+            data.obstacleTopCapSprite    = GetOrCreateSprite($"{name}/ObstacleCap", 256, 256, (w, h) => GenerateThemeTexture("ObstacleCap",  index, w, h), 256, FilterMode.Point);
+            data.obstacleBottomCapSprite = data.obstacleTopCapSprite;
         }
         else
         {
@@ -2642,6 +3516,102 @@ public static class FlappyBirdSceneBuilder
                 tex.SetPixel(x, y, clear);
 
         Vector2 center = new Vector2(width / 2f, height / 2f);
+
+        if (type == "MarioBricks")
+        {
+            Color brickCol = new Color(0.85f, 0.35f, 0.12f);
+            Color brickShadow = new Color(0.5f, 0.15f, 0.05f);
+            Color brickHighlight = new Color(0.98f, 0.6f, 0.45f);
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int rowHeight = height / 4;
+                    int row = y / rowHeight;
+                    int colWidth = width / 2;
+                    int colOffset = (row % 2 == 0) ? 0 : colWidth / 2;
+
+                    int localY = y % rowHeight;
+                    int localX = (x + colOffset) % colWidth;
+
+                    if (localY == 0 || localY == rowHeight - 1 || localX == 0 || localX == colWidth - 1)
+                    {
+                        tex.SetPixel(x, y, brickShadow);
+                    }
+                    else if (localY == 1 || localX == 1)
+                    {
+                        tex.SetPixel(x, y, brickHighlight);
+                    }
+                    else
+                    {
+                        tex.SetPixel(x, y, brickCol);
+                    }
+                }
+            }
+            tex.Apply();
+            return tex;
+        }
+        else if (type == "MarioPipeBody")
+        {
+            Color pipeGreen = new Color(0.0f, 0.75f, 0.0f);
+            Color pipeHighlight = new Color(0.5f, 0.95f, 0.5f);
+            Color pipeShadow = new Color(0.0f, 0.4f, 0.0f);
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Color pCol = pipeGreen;
+                    float ratio = (float)x / width;
+
+                    if (ratio < 0.15f) pCol = Color.Lerp(pipeShadow, pipeHighlight, ratio / 0.15f);
+                    else if (ratio < 0.35f) pCol = Color.Lerp(pipeHighlight, pipeGreen, (ratio - 0.15f) / 0.2f);
+                    else if (ratio > 0.7f) pCol = Color.Lerp(pipeGreen, pipeShadow, (ratio - 0.7f) / 0.3f);
+
+                    if (x == (int)(width * 0.22f) || x == (int)(width * 0.28f) || x == (int)(width * 0.78f))
+                    {
+                        pCol = pipeShadow;
+                    }
+
+                    if (x < 12 || x > width - 12) pCol = pipeShadow;
+
+                    tex.SetPixel(x, y, pCol);
+                }
+            }
+            tex.Apply();
+            return tex;
+        }
+        else if (type == "MarioPipeCap")
+        {
+            Color pipeGreen = new Color(0.0f, 0.75f, 0.0f);
+            Color pipeHighlight = new Color(0.5f, 0.95f, 0.5f);
+            Color pipeShadow = new Color(0.0f, 0.4f, 0.0f);
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Color pCol = pipeGreen;
+                    float ratio = (float)x / width;
+
+                    if (ratio < 0.15f) pCol = Color.Lerp(pipeShadow, pipeHighlight, ratio / 0.15f);
+                    else if (ratio < 0.35f) pCol = Color.Lerp(pipeHighlight, pipeGreen, (ratio - 0.15f) / 0.2f);
+                    else if (ratio > 0.7f) pCol = Color.Lerp(pipeGreen, pipeShadow, (ratio - 0.7f) / 0.3f);
+
+                    if (x == (int)(width * 0.22f) || x == (int)(width * 0.28f) || x == (int)(width * 0.78f))
+                    {
+                        pCol = pipeShadow;
+                    }
+
+                    if (x < 8 || x > width - 8 || y < 12 || y > height - 12) pCol = pipeShadow;
+
+                    tex.SetPixel(x, y, pCol);
+                }
+            }
+            tex.Apply();
+            return tex;
+        }
 
         if (type == "Player")
         {
@@ -2832,6 +3802,8 @@ public static class FlappyBirdSceneBuilder
             else if (index == 4) { bottomColor = new Color(0.08f, 0.28f, 0.52f); topColor = new Color(0.04f, 0.12f, 0.25f); }
             else if (index == 5) { bottomColor = new Color(0.55f, 0.85f, 0.35f); topColor = new Color(0.48f, 0.81f, 0.95f); }
             else if (index == 6) { bottomColor = new Color(0.08f, 0.08f, 0.14f); topColor = new Color(0.02f, 0.02f, 0.05f); }
+            else if (index == 7) { bottomColor = new Color(0.36f, 0.58f, 0.98f); topColor = new Color(0.36f, 0.58f, 0.98f); } // Mario sky blue
+            else if (index == 8) { bottomColor = new Color(0.30f, 0.12f, 0.06f); topColor = new Color(0.06f, 0.04f, 0.10f); } // Mars: dark red-brown ground to deep indigo sky
 
             for (int y = 0; y < height; y++)
             {
@@ -2842,9 +3814,36 @@ public static class FlappyBirdSceneBuilder
                     tex.SetPixel(x, y, col);
                     if (index == 1)
                     {
-                        if ((x * 17 + y * 23) % 401 == 0 && (x % 3 == 0))
+                        // Determine star presence via deterministic hash
+                        float h1 = Mathf.Abs(Mathf.Sin(x * 127.1f + y * 311.7f) * 43758.5453f % 1f);
+                        float h2 = Mathf.Abs(Mathf.Sin(x * 269.5f + y * 183.3f) * 43758.5453f % 1f);
+
+                        // White cross-shaped plus sparkle stars — sparse, only brightest
+                        if (h1 > 0.9985f)
                         {
-                            tex.SetPixel(x, y, Color.white);
+                            float brightness = 0.75f + h2 * 0.25f;
+                            Color starCol = new Color(brightness, brightness, brightness, 1f);
+                            tex.SetPixel(x, y, starCol);
+                            if (x > 0) tex.SetPixel(x - 1, y, starCol * 0.5f);
+                            if (x < width - 1) tex.SetPixel(x + 1, y, starCol * 0.5f);
+                            if (y > 0) tex.SetPixel(x, y - 1, starCol * 0.5f);
+                            if (y < height - 1) tex.SetPixel(x, y + 1, starCol * 0.5f);
+                        }
+                        // Occasional cyan pixel dot accent
+                        else if (h1 > 0.9975f && h2 > 0.6f)
+                        {
+                            tex.SetPixel(x, y, new Color(0.2f, 0.9f, 1f, 0.85f));
+                        }
+                        // Occasional purple pixel dot accent
+                        else if (h1 > 0.9968f && h2 < 0.35f)
+                        {
+                            tex.SetPixel(x, y, new Color(0.7f, 0.3f, 1f, 0.80f));
+                        }
+                        // Dim small background dot stars — reduced count
+                        else if (h1 > 0.994f)
+                        {
+                            float dim = 0.25f + h2 * 0.35f;
+                            tex.SetPixel(x, y, new Color(dim, dim, dim + 0.08f, 1f));
                         }
                     }
                     else if (index == 2)
@@ -2861,56 +3860,465 @@ public static class FlappyBirdSceneBuilder
                             tex.SetPixel(x, y, new Color(0.95f, 0.85f, 0.2f));
                         }
                     }
+                    else if (index == 7) // Mario retro hills with black outline and black oval eyes
+                    {
+                        // Define three distinct green hills across the screen
+                        float[] centers = { 250f, 750f, 1250f };
+                        float[] halfWidths = { 100f, 150f, 120f };
+                        float[] hillHeights = { 160f, 220f, 180f };
+
+                        bool insideHill = false;
+                        bool isOutline = false;
+                        bool isEye = false;
+
+                        for (int h = 0; h < 3; h++)
+                        {
+                            float dx = x - centers[h];
+                            float hw = halfWidths[h];
+                            float hh = hillHeights[h];
+                            
+                            if (dx >= -hw && dx <= hw)
+                            {
+                                float ratio = dx / hw;
+                                float currentHillY = (1f - ratio * ratio) * hh;
+                                if (y < currentHillY)
+                                {
+                                    insideHill = true;
+                                    if (y > currentHillY - 4f)
+                                    {
+                                        isOutline = true;
+                                    }
+                                    
+                                    // Eye calculations near the peak of the hill
+                                    float eyeYCenter = hh * 0.75f;
+                                    if (Mathf.Abs(y - eyeYCenter) < 12f)
+                                    {
+                                        if (Mathf.Abs(dx - 8f) < 3f || Mathf.Abs(dx + 8f) < 3f)
+                                        {
+                                            isEye = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (isOutline || isEye)
+                        {
+                            tex.SetPixel(x, y, Color.black);
+                        }
+                        else if (insideHill)
+                        {
+                            tex.SetPixel(x, y, new Color(0.0f, 0.72f, 0.0f)); // classic green
+                        }
+                    }
+                    // Mars: glowing amber/orange sun on horizon + jagged dark rock spire silhouettes
+                    else if (index == 8)
+                    {
+                        // Sun glow — large warm circle at horizontal center-bottom
+                        float sunX = width * 0.5f;
+                        float sunY = height * 0.32f;
+                        float distSun = Mathf.Sqrt((x - sunX)*(x - sunX)*0.6f + (y - sunY)*(y - sunY));
+
+                        // Atmospheric glow falloff
+                        float glow = 1f - Mathf.Clamp01(distSun / (height * 0.38f));
+                        Color skyCol = tex.GetPixel(x, y);
+                        Color glowColor = new Color(0.95f, 0.55f, 0.18f) * (glow * glow * 1.4f);
+                        Color blended = new Color(
+                            Mathf.Clamp01(skyCol.r + glowColor.r),
+                            Mathf.Clamp01(skyCol.g + glowColor.g * 0.5f),
+                            Mathf.Clamp01(skyCol.b + glowColor.b * 0.1f));
+                        tex.SetPixel(x, y, blended);
+
+                        // Crisp white sun disc
+                        if (distSun < height * 0.07f)
+                            tex.SetPixel(x, y, new Color(1f, 0.95f, 0.78f));
+
+                        // Jagged dark rock spire silhouettes on left and right
+                        // Left cluster
+                        float[] lSpireX = { width*0.04f, width*0.10f, width*0.16f, width*0.22f, width*0.02f, width*0.13f };
+                        float[] lSpireH = { height*0.62f, height*0.75f, height*0.58f, height*0.50f, height*0.45f, height*0.68f };
+                        float[] lSpireW = { width*0.04f, width*0.05f, width*0.04f, width*0.035f, width*0.03f, width*0.04f };
+                        // Right cluster
+                        float[] rSpireX = { width*0.78f, width*0.85f, width*0.90f, width*0.96f, width*0.82f, width*0.93f };
+                        float[] rSpireH = { height*0.58f, height*0.72f, height*0.60f, height*0.48f, height*0.50f, height*0.65f };
+                        float[] rSpireW = { width*0.04f, width*0.05f, width*0.04f, width*0.035f, width*0.03f, width*0.04f };
+
+                        bool inSpire = false;
+                        for (int s = 0; s < 6; s++)
+                        {
+                            // Left spires: jagged triangle shape
+                            float dx = Mathf.Abs(x - lSpireX[s]);
+                            float spireEdge = lSpireH[s] * (1f - dx / lSpireW[s]);
+                            if (dx < lSpireW[s] && y < spireEdge) { inSpire = true; break; }
+                            // Right spires
+                            dx = Mathf.Abs(x - rSpireX[s]);
+                            spireEdge = rSpireH[s] * (1f - dx / rSpireW[s]);
+                            if (dx < rSpireW[s] && y < spireEdge) { inSpire = true; break; }
+                        }
+                        if (inSpire)
+                        {
+                            float darkT = (float)y / height;
+                            tex.SetPixel(x, y, new Color(
+                                Mathf.Lerp(0.18f, 0.08f, darkT),
+                                Mathf.Lerp(0.10f, 0.04f, darkT),
+                                Mathf.Lerp(0.12f, 0.06f, darkT)));
+                        }
+
+                        // Sparse stars in upper half
+                        if (y > height * 0.55f)
+                        {
+                            float h1 = Mathf.Abs(Mathf.Sin(x * 197.3f + y * 311.7f) * 43758.5453f % 1f);
+                            if (h1 > 0.997f) tex.SetPixel(x, y, new Color(1f, 0.9f, 0.8f, 0.9f));
+                        }
+                    }
                 }
             }
         }
         else if (type == "GroundDirt")
         {
-            Color dirtColor = Color.grey;
-            if (index == 1) dirtColor = new Color(0.12f, 0.12f, 0.16f);
-            else if (index == 2) dirtColor = new Color(0.38f, 0.22f, 0.08f);
-            else if (index == 3) dirtColor = new Color(0.18f, 0.08f, 0.08f);
-            else if (index == 4) dirtColor = new Color(0.85f, 0.72f, 0.45f);
-            else if (index == 5) dirtColor = new Color(0.28f, 0.15f, 0.05f);
-            else if (index == 6) dirtColor = new Color(0.25f, 0.16f, 0.1f);
+            Color dirtBase = new Color(0.85f, 0.68f, 0.38f);
+            Color hatch = new Color(0.68f, 0.5f, 0.25f);
+            Color lineColor = new Color(0.55f, 0.38f, 0.18f);
+
+            if (index == 1) // Space
+            {
+                dirtBase = new Color(0.12f, 0.12f, 0.16f);
+                hatch = new Color(0.18f, 0.18f, 0.24f);
+                lineColor = new Color(0.08f, 0.08f, 0.1f);
+            }
+            else if (index == 2) // Football
+            {
+                dirtBase = new Color(0.38f, 0.22f, 0.08f);
+                hatch = new Color(0.48f, 0.3f, 0.15f);
+                lineColor = new Color(0.28f, 0.15f, 0.05f);
+            }
+            else if (index == 3) // Dragon
+            {
+                dirtBase = new Color(0.18f, 0.08f, 0.08f);
+                hatch = new Color(0.28f, 0.12f, 0.12f);
+                lineColor = new Color(0.1f, 0.03f, 0.03f);
+            }
+            else if (index == 4) // Fish
+            {
+                dirtBase = new Color(0.85f, 0.72f, 0.45f);
+                hatch = new Color(0.92f, 0.8f, 0.55f);
+                lineColor = new Color(0.7f, 0.58f, 0.32f);
+            }
+            else if (index == 5) // Bee
+            {
+                dirtBase = new Color(0.32f, 0.2f, 0.06f);
+                hatch = new Color(0.42f, 0.28f, 0.1f);
+                lineColor = new Color(0.22f, 0.12f, 0.03f);
+            }
+            else if (index == 6) // Ninja
+            {
+                dirtBase = new Color(0.2f, 0.18f, 0.16f);
+                hatch = new Color(0.28f, 0.25f, 0.22f);
+                lineColor = new Color(0.12f, 0.1f, 0.08f);
+            }
+            else if (index == 7) // Mario
+            {
+                Color baseCol = new Color(0.85f, 0.35f, 0.12f);       // orange-brown
+                Color darkLine = new Color(0.12f, 0.05f, 0.02f);      // dark brown border
+                Color highlightCol = new Color(0.98f, 0.85f, 0.7f);   // white/beige highlight
+                Color shadowCol = new Color(0.55f, 0.2f, 0.05f);      // dark brown shadow
+
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        int bx = x % 32;
+                        int by = y % 32;
+
+                        Color px = baseCol;
+
+                        if (bx == 0 || bx == 31 || by == 0 || by == 31)
+                        {
+                            px = darkLine;
+                        }
+                        else if ((bx <= 3 && by >= 29) || (bx <= 3 && bx == (31 - by)) || (by >= 29 && bx == by))
+                        {
+                            px = highlightCol;
+                        }
+                        else if (bx >= 28 || by <= 3)
+                        {
+                            px = shadowCol;
+                        }
+                        else if ((bx >= 12 && bx <= 14 && by >= 10 && by <= 22) || 
+                                 (by >= 12 && by <= 14 && bx >= 10 && bx <= 22) ||
+                                 (bx >= 20 && bx <= 22 && by >= 16 && by <= 26) ||
+                                 (by >= 20 && by <= 22 && bx >= 16 && bx <= 26))
+                        {
+                            px = darkLine;
+                        }
+
+                        tex.SetPixel(x, y, px);
+                    }
+                }
+                tex.Apply();
+                return tex;
+            }
 
             for (int y = 0; y < height; y++)
             {
                 for (int x = 0; x < width; x++)
                 {
-                    Color col = dirtColor;
-                    if ((x + y * 7) % 19 == 0) col *= 0.85f;
-                    tex.SetPixel(x, y, col);
+                    Color pixel = dirtBase;
+
+                    // Sediment bands
+                    int layer = y / 48;
+                    if (layer % 2 == 0)
+                    {
+                        pixel = Color.Lerp(dirtBase, hatch, 0.4f);
+                    }
+
+                    // Diagonal hatches
+                    int diag = (x + y) % 32;
+                    if (diag < 2)
+                    {
+                        pixel = hatch;
+                    }
+
+                    // Layer divider lines
+                    if (y == 24 || y == 25 || y == 96 || y == 97 || y == 160 || y == 161 || y == 220 || y == 221)
+                    {
+                        pixel = lineColor;
+                    }
+
+                    tex.SetPixel(x, y, pixel);
+                }
+            }
+
+            // Pebble stones
+            System.Random rng = new System.Random(index * 23 + 101);
+            int dotCount = (width * height) / 120;
+            for (int i = 0; i < dotCount; i++)
+            {
+                int cx = rng.Next(0, width);
+                int cy = rng.Next(0, height);
+                int radius = rng.Next(2, 4);
+                Color stoneColor = rng.Next(0, 2) == 0 ? lineColor : hatch;
+                for (int dy = -radius; dy <= radius; dy++)
+                {
+                    for (int dx = -radius; dx <= radius; dx++)
+                    {
+                        if (dx * dx + dy * dy > radius * radius) continue;
+                        int px = cx + dx;
+                        int py = cy + dy;
+                        if (px < 0 || px >= width || py < 0 || py >= height) continue;
+                        tex.SetPixel(px, py, stoneColor);
+                    }
                 }
             }
         }
         else if (type == "GroundGrass")
         {
-            Color grassColor = Color.green;
-            if (index == 1) grassColor = new Color(0f, 0.95f, 0.95f);
-            else if (index == 2) grassColor = Color.white;
-            else if (index == 3) grassColor = new Color(0.95f, 0.25f, 0.05f);
-            else if (index == 4) grassColor = new Color(0.1f, 0.65f, 0.35f);
-            else if (index == 5) grassColor = new Color(0.95f, 0.85f, 0.15f);
-            else if (index == 6) grassColor = new Color(0.45f, 0.45f, 0.5f);
+            Color grass = new Color(0.38f, 0.8f, 0.28f);
+            Color grassHighlight = new Color(0.58f, 0.92f, 0.38f);
+            Color grassShadow = new Color(0.24f, 0.6f, 0.16f);
 
-            for (int y = 0; y < height; y++)
+            if (index == 1) // Space
             {
+                grass = new Color(0f, 0.75f, 0.75f);
+                grassHighlight = new Color(0f, 0.95f, 0.95f);
+                grassShadow = new Color(0f, 0.5f, 0.5f);
+            }
+            else if (index == 2) // Football
+            {
+                grass = new Color(0.15f, 0.65f, 0.15f);
+                grassHighlight = new Color(0.35f, 0.85f, 0.35f);
+                grassShadow = new Color(0.05f, 0.45f, 0.05f);
+            }
+            else if (index == 3) // Dragon
+            {
+                grass = new Color(0.85f, 0.2f, 0.05f);
+                grassHighlight = new Color(0.98f, 0.45f, 0.15f);
+                grassShadow = new Color(0.6f, 0.1f, 0.02f);
+            }
+            else if (index == 4) // Fish
+            {
+                grass = new Color(0.1f, 0.65f, 0.35f);
+                grassHighlight = new Color(0.3f, 0.82f, 0.55f);
+                grassShadow = new Color(0.05f, 0.45f, 0.2f);
+            }
+            else if (index == 5) // Bee
+            {
+                grass = new Color(0.9f, 0.75f, 0.12f);
+                grassHighlight = new Color(0.98f, 0.88f, 0.25f);
+                grassShadow = new Color(0.7f, 0.55f, 0.05f);
+            }
+            else if (index == 6) // Ninja
+            {
+                grass = new Color(0.35f, 0.45f, 0.35f);
+                grassHighlight = new Color(0.5f, 0.6f, 0.5f);
+                grassShadow = new Color(0.2f, 0.3f, 0.2f);
+            }
+            else if (index == 8) // Mars: jagged dark rocky rim with faint blue crystal accents
+            {
+                Color rockBase  = new Color(0.22f, 0.08f, 0.04f); // dark maroon rock
+                Color rockDark  = new Color(0.12f, 0.04f, 0.02f);
+                Color crystalTip = new Color(0.15f, 0.65f, 0.80f); // blue crystal glint
+
+                int toothW = Mathf.Max(6, width / 14);
+                float toothH = height * 0.40f;
+                float baseT  = height * 0.50f;
+
                 for (int x = 0; x < width; x++)
                 {
-                    if (y > height - 12)
+                    float phase = (x % toothW) / (float)toothW;
+                    // Irregular jagged spire shape (not smooth triangle)
+                    float jagged = (1f - Mathf.Abs(phase - 0.5f) * 2f);
+                    jagged = Mathf.Pow(jagged, 0.6f); // sharper peaks
+                    float edgeY = baseT + jagged * toothH;
+
+                    // Add per-spire noise using sine
+                    edgeY += Mathf.Sin(x * 0.3f) * 6f;
+
+                    for (int y = 0; y < height; y++)
                     {
-                        tex.SetPixel(x, y, grassColor);
+                        if (y > edgeY)
+                        {
+                            tex.SetPixel(x, y, Color.clear);
+                        }
+                        else if (y > edgeY - 5f)
+                        {
+                            // Crystal tip glow on top of tallest spires
+                            tex.SetPixel(x, y, jagged > 0.7f ? crystalTip : rockDark);
+                        }
+                        else
+                        {
+                            tex.SetPixel(x, y, rockBase);
+                        }
+                    }
+                }
+                tex.Apply();
+                return tex;
+            }
+            else if (index == 7) // Mario: custom repeating blocky tiles with a flat top black rim
+            {
+                Color baseCol = new Color(0.85f, 0.35f, 0.12f);       // orange-brown
+                Color darkLine = new Color(0.12f, 0.05f, 0.02f);      // dark brown border
+                Color highlightCol = new Color(0.98f, 0.85f, 0.7f);   // white/beige highlight
+                Color shadowCol = new Color(0.55f, 0.2f, 0.05f);      // dark brown shadow
+
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        int bx = x % 32;
+                        int by = y % 32;
+
+                        Color px = baseCol;
+
+                        if (y >= height - 4)
+                        {
+                            px = darkLine;
+                        }
+                        else if (bx == 0 || bx == 31 || by == 0 || by == 31)
+                        {
+                            px = darkLine;
+                        }
+                        else if ((bx <= 3 && by >= 29) || (bx <= 3 && bx == (31 - by)) || (by >= 29 && bx == by))
+                        {
+                            px = highlightCol;
+                        }
+                        else if (bx >= 28 || by <= 3)
+                        {
+                            px = shadowCol;
+                        }
+                        else if ((bx >= 12 && bx <= 14 && by >= 10 && by <= 22) || 
+                                 (by >= 12 && by <= 14 && bx >= 10 && bx <= 22) ||
+                                 (bx >= 20 && bx <= 22 && by >= 16 && by <= 26) ||
+                                 (by >= 20 && by <= 22 && bx >= 16 && bx <= 26))
+                        {
+                            px = darkLine;
+                        }
+
+                        tex.SetPixel(x, y, px);
+                    }
+                }
+                tex.Apply();
+                return tex;
+            }
+
+            int toothWidth = Mathf.Max(4, width / 16);
+            float toothHeight = height * 0.35f;
+            float baseTop = height * 0.55f;
+
+            for (int x = 0; x < width; x++)
+            {
+                float toothPhase = (x % toothWidth) / (float)toothWidth;
+                float triangleHeight = (1f - Mathf.Abs(toothPhase - 0.5f) * 2f) * toothHeight;
+                float edgeY = baseTop + triangleHeight;
+
+                for (int y = 0; y < height; y++)
+                {
+                    if (y > edgeY)
+                    {
+                        tex.SetPixel(x, y, Color.clear);
+                    }
+                    else if (y > edgeY - 6) // Highlight on the teeth tips
+                    {
+                        tex.SetPixel(x, y, grassHighlight);
+                    }
+                    else if (y < 12) // Subtle shadow where the grass meets the dirt
+                    {
+                        tex.SetPixel(x, y, grassShadow);
                     }
                     else
                     {
-                        tex.SetPixel(x, y, new Color(0f, 0f, 0f, 0f));
+                        tex.SetPixel(x, y, grass);
                     }
                 }
             }
         }
         else if (type == "ObstacleBody")
         {
+            if (index == 1) // Space asteroid rock column
+            {
+
+                // Asteroid-rock pillar with teal glow trim on the inner edge. Brightened well above the
+                // near-black starfield background — the original near-black rock tones made the whole
+                // obstacle "wipe out" (blend invisibly) against Space's dark backdrop.
+                Color rockBase  = new Color(0.24f, 0.28f, 0.40f); // lit charcoal rock
+                Color rockMid   = new Color(0.34f, 0.39f, 0.53f); // mid rock tone
+                Color rockLight = new Color(0.48f, 0.54f, 0.68f); // lighter rock vein
+                Color rockDark  = new Color(0.15f, 0.17f, 0.24f); // shadow crevice (still visible, not near-black)
+                Color tealGlow  = new Color(0.05f, 0.75f, 0.80f); // teal inner glow edge
+                Color tealFade  = new Color(0.03f, 0.40f, 0.48f); // teal glow fade
+
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        Color px;
+
+                        // Teal glow strip on the inner (right) edge
+                        if (x >= width - 6)
+                            px = x >= width - 2 ? tealGlow : tealFade;
+                        else
+                        {
+                            // Rocky noise using two sine waves to fake craggy texture
+                            float noise1 = Mathf.Sin(x * 0.31f + y * 0.17f) * Mathf.Cos(y * 0.27f - x * 0.13f);
+                            float noise2 = Mathf.Sin(x * 0.09f + y * 0.43f);
+                            float rock = (noise1 + noise2) * 0.5f;
+
+                            if (rock > 0.35f)       px = rockLight;
+                            else if (rock > 0.05f)  px = rockMid;
+                            else if (rock < -0.35f) px = rockDark;
+                            else                    px = rockBase;
+
+                            // Dark left-edge shadow bevel
+                            if (x < 8)
+                                px = Color.Lerp(rockDark, px, x / 8f);
+                        }
+                        tex.SetPixel(x, y, px);
+                    }
+                }
+                tex.Apply();
+                return tex;
+            }
+
             Color col = Color.green;
             if (index == 1) col = new Color(0.35f, 0.35f, 0.4f);
             else if (index == 2) col = Color.white;
@@ -2918,6 +4326,33 @@ public static class FlappyBirdSceneBuilder
             else if (index == 4) col = new Color(0.85f, 0.35f, 0.5f);
             else if (index == 5) col = new Color(0.12f, 0.45f, 0.15f);
             else if (index == 6) col = new Color(0.38f, 0.25f, 0.15f);
+            else if (index == 8) // Mars: dark rock spire with blue crystal veins
+            {
+                Color spireBase  = new Color(0.18f, 0.10f, 0.08f);
+                Color spireMid   = new Color(0.24f, 0.14f, 0.10f);
+                Color spireLight = new Color(0.32f, 0.18f, 0.12f);
+                Color spireDark  = new Color(0.10f, 0.05f, 0.04f);
+                Color crystal    = new Color(0.10f, 0.65f, 0.85f);
+                Color crystalDim = new Color(0.06f, 0.35f, 0.50f);
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        float n1 = Mathf.Sin(x * 0.27f + y * 0.19f) * Mathf.Cos(y * 0.23f - x * 0.11f);
+                        float n2 = Mathf.Sin(x * 0.07f + y * 0.41f);
+                        float rock = (n1 + n2) * 0.5f;
+                        Color px = rock > 0.35f ? spireLight : (rock > 0.05f ? spireMid : (rock < -0.35f ? spireDark : spireBase));
+                        float vein = Mathf.Sin(x * 0.18f - y * 0.28f + 1.5f);
+                        if (vein > 0.82f) px = crystal;
+                        else if (vein > 0.72f) px = crystalDim;
+                        if (x < 10) px = Color.Lerp(spireDark, px, x / 10f);
+                        if (x >= width - 5) px = x >= width - 2 ? crystal : crystalDim;
+                        tex.SetPixel(x, y, px);
+                    }
+                }
+                tex.Apply();
+                return tex;
+            }
 
             for (int y = 0; y < height; y++)
             {
@@ -2939,6 +4374,53 @@ public static class FlappyBirdSceneBuilder
         }
         else if (type == "ObstacleCap")
         {
+            if (index == 1) // Space asteroid rock cap — glowing teal inner rim
+            {
+                // Brightened to match the ObstacleBody fix above — see comment there.
+                Color rockBase  = new Color(0.26f, 0.30f, 0.42f);
+                Color rockMid   = new Color(0.36f, 0.42f, 0.55f);
+                Color rockLight = new Color(0.50f, 0.56f, 0.70f);
+                Color rockDark  = new Color(0.16f, 0.18f, 0.25f);
+                Color tealGlow  = new Color(0.05f, 0.85f, 0.90f);
+                Color tealMid   = new Color(0.03f, 0.55f, 0.62f);
+
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        Color px;
+                        bool topEdge    = (y > height - 10);
+                        bool bottomEdge = (y < 10);
+                        bool sideEdge   = (x < 8 || x > width - 8);
+
+                        if (topEdge)
+                        {
+                            // Top inner glow edge — bright teal bar across full width
+                            float edgeFade = (y - (height - 10f)) / 10f;
+                            px = Color.Lerp(tealMid, tealGlow, edgeFade);
+                        }
+                        else if (bottomEdge || sideEdge)
+                        {
+                            px = rockDark;
+                        }
+                        else
+                        {
+                            float noise1 = Mathf.Sin(x * 0.28f + y * 0.19f) * Mathf.Cos(y * 0.23f - x * 0.11f);
+                            float noise2 = Mathf.Sin(x * 0.11f + y * 0.37f);
+                            float rock = (noise1 + noise2) * 0.5f;
+
+                            if (rock > 0.35f)       px = rockLight;
+                            else if (rock > 0.05f)  px = rockMid;
+                            else if (rock < -0.35f) px = rockDark;
+                            else                    px = rockBase;
+                        }
+                        tex.SetPixel(x, y, px);
+                    }
+                }
+                tex.Apply();
+                return tex;
+            }
+
             Color col = Color.green;
             if (index == 1) col = new Color(0.45f, 0.45f, 0.5f);
             else if (index == 2) col = Color.white;
@@ -2946,6 +4428,39 @@ public static class FlappyBirdSceneBuilder
             else if (index == 4) col = new Color(0.95f, 0.45f, 0.6f);
             else if (index == 5) col = new Color(0.95f, 0.72f, 0.1f);
             else if (index == 6) col = new Color(0.55f, 0.55f, 0.55f);
+            else if (index == 8) // Mars: glowing blue crystal cluster cap
+            {
+                Color cBright = new Color(0.20f, 0.85f, 1.00f);
+                Color cMid    = new Color(0.10f, 0.55f, 0.78f);
+                Color cDark   = new Color(0.04f, 0.28f, 0.42f);
+                Color rBase   = new Color(0.18f, 0.08f, 0.06f);
+                Color rDark   = new Color(0.08f, 0.04f, 0.03f);
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        Color px = rDark;
+                        int numSpikes = 5;
+                        for (int k = 0; k < numSpikes; k++)
+                        {
+                            float cx = width * (k + 0.5f) / numSpikes;
+                            float halfW = width * 0.07f;
+                            float dx = Mathf.Abs(x - cx);
+                            if (dx < halfW)
+                            {
+                                float spikeH = height * (0.55f + 0.35f * (1f - Mathf.Abs(k - numSpikes/2f) / (numSpikes/2f)));
+                                float taperT = 1f - dx / halfW;
+                                if (y < spikeH * taperT)
+                                    px = taperT > 0.6f ? cBright : (taperT > 0.3f ? cMid : cDark);
+                            }
+                        }
+                        if (y < height * 0.22f) px = rBase;
+                        tex.SetPixel(x, y, px);
+                    }
+                }
+                tex.Apply();
+                return tex;
+            }
 
             for (int y = 0; y < height; y++)
             {
@@ -3225,9 +4740,159 @@ public static class FlappyBirdSceneBuilder
                 }
             }
         }
+        else if (index == 7) // Mario
+        {
+            Color primaryCol = (skin == 0) ? new Color(0.9f, 0.1f, 0.1f) : (skin == 1 ? new Color(0.1f, 0.75f, 0.15f) : new Color(0.95f, 0.45f, 0.65f)); // red cap, green cap, or pink dress
+            Color overallsCol = (skin == 0) ? new Color(0.1f, 0.35f, 0.85f) : (skin == 1 ? new Color(0.08f, 0.25f, 0.6f) : new Color(0.95f, 0.85f, 0.15f)); // blue/gold
+            Color hairCol = (skin == 2) ? new Color(0.98f, 0.88f, 0.25f) : new Color(0.35f, 0.22f, 0.12f); // blonde/brown
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Vector2 p = new Vector2(x, y);
+                    // Body/Face circle
+                    if (Vector2.Distance(p, center) <= width * 0.32f)
+                    {
+                        tex.SetPixel(x, y, new Color(0.98f, 0.82f, 0.72f)); // skin tone
+                        
+                        // Eyes
+                        if (Vector2.Distance(p, new Vector2(width * 0.58f, height * 0.54f)) <= 4f ||
+                            Vector2.Distance(p, new Vector2(width * 0.66f, height * 0.54f)) <= 4f)
+                        {
+                            tex.SetPixel(x, y, Color.black);
+                        }
+
+                        // Cap (drawn on the upper half)
+                        if (y > height * 0.65f && skin < 2)
+                        {
+                            tex.SetPixel(x, y, primaryCol);
+                        }
+                    }
+
+                    // Overalls / Dress at the bottom
+                    if (Vector2.Distance(p, center) <= width * 0.32f && y < height * 0.38f)
+                    {
+                        tex.SetPixel(x, y, overallsCol);
+                    }
+
+                    // Crown for Princess Peach (skin 2)
+                    if (skin == 2 && y > height * 0.65f && y < height * 0.82f && x > width * 0.4f && x < width * 0.6f)
+                    {
+                        int tx = x - (int)(width * 0.4f);
+                        int tw = (int)(width * 0.2f);
+                        if (y < height * 0.72f || (tx % (tw/2) < 4))
+                        {
+                            tex.SetPixel(x, y, new Color(0.98f, 0.82f, 0.1f)); // gold
+                        }
+                    }
+
+                    // Hair
+                    if (skin == 2 && Vector2.Distance(p, center) <= width * 0.34f && x < width * 0.45f)
+                    {
+                        tex.SetPixel(x, y, hairCol);
+                    }
+                }
+            }
+        }
+        else if (index == 8) // Mars: 3 themed skins
+        {
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Vector2 p = new Vector2(x, y);
+
+                    if (skin == 0) // Astronaut — white spacesuit with gold visor
+                    {
+                        // Helmet large circle
+                        if (Vector2.Distance(p, new Vector2(width * 0.5f, height * 0.65f)) <= width * 0.26f)
+                        {
+                            tex.SetPixel(x, y, new Color(0.92f, 0.92f, 0.93f));
+                            // Gold visor strip
+                            if (y > height * 0.64f && y < height * 0.76f &&
+                                x > width * 0.30f && x < width * 0.70f)
+                                tex.SetPixel(x, y, new Color(0.95f, 0.72f, 0.15f));
+                            // Visor reflection shine
+                            if (y > height * 0.67f && y < height * 0.72f &&
+                                x > width * 0.34f && x < width * 0.42f)
+                                tex.SetPixel(x, y, new Color(1f, 0.95f, 0.6f, 0.75f));
+                        }
+                        // Body suit ellipse lower
+                        if (IsInsideEllipse(p, new Vector2(width * 0.5f, height * 0.32f), width * 0.24f, height * 0.18f))
+                            tex.SetPixel(x, y, new Color(0.88f, 0.88f, 0.90f));
+                        // Backpack rectangle
+                        if (x < width * 0.28f && y > height * 0.28f && y < height * 0.50f)
+                            tex.SetPixel(x, y, new Color(0.70f, 0.70f, 0.74f));
+                        // NASA blue stripe
+                        if (y > height * 0.40f && y < height * 0.44f &&
+                            x > width * 0.35f && x < width * 0.65f)
+                            tex.SetPixel(x, y, new Color(0.12f, 0.35f, 0.85f));
+                    }
+                    else if (skin == 1) // Mars Rover — boxy body + solar panels + wheels
+                    {
+                        // Main rover body
+                        if (x > width * 0.20f && x < width * 0.80f &&
+                            y > height * 0.40f && y < height * 0.62f)
+                            tex.SetPixel(x, y, new Color(0.72f, 0.62f, 0.48f));
+                        // 3 wheels
+                        float[] wX = { 0.28f, 0.50f, 0.72f };
+                        for (int ww = 0; ww < 3; ww++)
+                        {
+                            if (Vector2.Distance(p, new Vector2(width*wX[ww], height*0.30f)) <= width*0.09f)
+                                tex.SetPixel(x, y, new Color(0.22f, 0.20f, 0.16f));
+                            if (Vector2.Distance(p, new Vector2(width*wX[ww], height*0.30f)) <= width*0.05f)
+                                tex.SetPixel(x, y, new Color(0.38f, 0.32f, 0.24f));
+                        }
+                        // Solar panels left + right
+                        if (y > height * 0.60f && y < height * 0.76f)
+                        {
+                            if ((x > width * 0.10f && x < width * 0.32f) ||
+                                (x > width * 0.68f && x < width * 0.90f))
+                            {
+                                tex.SetPixel(x, y, new Color(0.10f, 0.28f, 0.78f));
+                                if (x % 10 < 2 || y % 8 < 1)
+                                    tex.SetPixel(x, y, new Color(0.06f, 0.18f, 0.52f));
+                            }
+                        }
+                        // Camera mast
+                        if (x > width*0.48f && x < width*0.52f && y > height*0.62f && y < height*0.85f)
+                            tex.SetPixel(x, y, new Color(0.52f, 0.48f, 0.40f));
+                        if (Vector2.Distance(p, new Vector2(width*0.5f, height*0.85f)) <= width*0.05f)
+                            tex.SetPixel(x, y, new Color(0.82f, 0.82f, 0.85f));
+                    }
+                    else // skin == 2: Crystal Explorer — dark teal armor + blue crystal backpack
+                    {
+                        // Body suit dark teal
+                        if (Vector2.Distance(p, new Vector2(width*0.5f, height*0.60f)) <= width*0.24f)
+                            tex.SetPixel(x, y, new Color(0.08f, 0.28f, 0.42f));
+                        // Helmet visor glowing cyan
+                        if (Vector2.Distance(p, new Vector2(width*0.5f, height*0.68f)) <= width*0.18f && y > height * 0.60f)
+                            tex.SetPixel(x, y, new Color(0.10f, 0.72f, 0.95f, 0.88f));
+                        // Crystal backpack — 3 spikes on left side
+                        for (int k = 0; k < 3; k++)
+                        {
+                            float bx = width * (0.20f - k * 0.04f);
+                            float by = height * (0.50f + k * 0.06f);
+                            float bh = height * (0.18f - k * 0.03f);
+                            float bw = width * 0.032f;
+                            for (int ky = 0; ky < height; ky++)
+                            {
+                                float taperT = 1f - Mathf.Abs(ky - by) / bh;
+                                if (taperT > 0 && Mathf.Abs(x - bx) < bw * taperT)
+                                    tex.SetPixel(x, ky, k == 0 ?
+                                        new Color(0.20f, 0.85f, 1.00f) :
+                                        new Color(0.10f, 0.55f, 0.78f));
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         tex.Apply();
         return tex;
+
     }
 
     private static Texture2D GenerateIconTexture(string name, int w, int h)

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 
@@ -25,6 +26,8 @@ public class GameManager : MonoBehaviour
     public GameObject gameOverScoreText;
     [Tooltip("Text on the Game Over panel showing the all-time best score.")]
     public GameObject gameOverBestText;
+    [Tooltip("Text on the Game Over panel showing coins collected this run.")]
+    public GameObject gameOverCoinsText;
     [Tooltip("Text on the Start panel showing the high score.")]
     public GameObject startHighScoreText;
 
@@ -46,6 +49,7 @@ public class GameManager : MonoBehaviour
     public GameObject shopPanel;
     public GameObject questsPanel;
     public GameObject leaderboardPanel;
+    public GameObject screenBackdrop;
     public UnityEngine.UI.Image playIconImage;
     public Sprite playSprite;
     public Sprite homeSprite;
@@ -60,9 +64,69 @@ public class GameManager : MonoBehaviour
     [Header("References")]
     public GameObject bird;
     public PipeSpawner pipeSpawner;
+    public ItemSpawner itemSpawner;
 
     private const string HighScoreKey = "FlappyBird_HighScore";
     private int bestScore = 0;
+
+    // --- Coins & Power-ups ---
+    private const string TotalCoinsKey = "FlappyBird_TotalCoins";
+    private const string MagnetLevelKey = "FlappyBird_MagnetLevel";
+    private const string BoostLevelKey = "FlappyBird_BoostLevel";
+    private const string DoubleLevelKey = "FlappyBird_DoubleLevel";
+    private const float BaseMagnetRadius = 4.0f;
+    private const float BoostSpeedMultiplier = 2.2f;
+
+    // --- Starter Powers: buy charges in the Shop, arm one on the Lobby to auto-apply at the start of your next run ---
+    public enum StarterPower { None, Magnet, Boost, Double, Hammer }
+    private const string StarterMagnetCountKey = "FlappyBird_StarterMagnetCount";
+    private const string StarterBoostCountKey = "FlappyBird_StarterBoostCount";
+    private const string StarterDoubleCountKey = "FlappyBird_StarterDoubleCount";
+    private const string StarterHammerCountKey = "FlappyBird_StarterHammerCount";
+    private const string StarterPowersGrantedKey = "FlappyBird_StarterPowersGranted";
+    public const int StarterPurchaseCost = 20;
+    private const int StarterFreeGrantAmount = 3;
+
+    public int StarterMagnetCount { get; private set; }
+    public int StarterBoostCount { get; private set; }
+    public int StarterDoubleCount { get; private set; }
+    public int StarterHammerCount { get; private set; }
+    public StarterPower ArmedStarter { get; private set; } = StarterPower.None;
+
+    [Header("Coins & Power-ups HUD")]
+    public GameObject coinsText;
+    public GameObject magnetTimerText;
+    public GameObject boostTimerText;
+    public GameObject doubleTimerText;
+    public GameObject hammerChargesWidget;
+
+    [Header("Starter Power Widgets (Lobby icon + count)")]
+    public GameObject starterMagnetWidget;
+    public GameObject starterBoostWidget;
+    public GameObject starterDoubleWidget;
+    public GameObject starterHammerWidget;
+
+    public int TotalCoins { get; private set; }
+    public int MagnetLevel { get; private set; } = 1;
+    public int BoostLevel { get; private set; } = 1;
+    public int DoubleLevel { get; private set; } = 1;
+
+    private int sessionCoins = 0;
+    private float magnetTimer = 0f;
+    private float boostTimer = 0f;
+    private float doubleTimer = 0f;
+    private int hammerCharges = 0;
+
+    public bool IsBoostActive => boostTimer > 0f;
+    public bool IsDoubleActive => doubleTimer > 0f;
+    public bool IsInvulnerable() => IsBoostActive;
+    public int HammerCharges => hammerCharges;
+
+    public float GetMagnetRadius()
+    {
+        if (magnetTimer > 0f) return BaseMagnetRadius;
+        return 0f;
+    }
 
     [Header("Audio (optional — leave empty to skip)")]
     public AudioClip scoreSound;
@@ -99,6 +163,27 @@ public class GameManager : MonoBehaviour
         // Local on-device persistence — survives app restarts (PlayerPrefs is
         // Unity's standard local key/value storage, backed by the OS on each platform).
         bestScore = PlayerPrefs.GetInt(HighScoreKey, 0);
+
+        TotalCoins = PlayerPrefs.GetInt(TotalCoinsKey, 0);
+        MagnetLevel = PlayerPrefs.GetInt(MagnetLevelKey, 1);
+        BoostLevel = PlayerPrefs.GetInt(BoostLevelKey, 1);
+        DoubleLevel = PlayerPrefs.GetInt(DoubleLevelKey, 1);
+
+        // First launch only: gift 3 free charges of each starter power so new players
+        // can try them without needing coins first.
+        if (PlayerPrefs.GetInt(StarterPowersGrantedKey, 0) == 0)
+        {
+            PlayerPrefs.SetInt(StarterMagnetCountKey, StarterFreeGrantAmount);
+            PlayerPrefs.SetInt(StarterBoostCountKey, StarterFreeGrantAmount);
+            PlayerPrefs.SetInt(StarterDoubleCountKey, StarterFreeGrantAmount);
+            PlayerPrefs.SetInt(StarterHammerCountKey, StarterFreeGrantAmount);
+            PlayerPrefs.SetInt(StarterPowersGrantedKey, 1);
+            PlayerPrefs.Save();
+        }
+        StarterMagnetCount = PlayerPrefs.GetInt(StarterMagnetCountKey, 0);
+        StarterBoostCount = PlayerPrefs.GetInt(StarterBoostCountKey, 0);
+        StarterDoubleCount = PlayerPrefs.GetInt(StarterDoubleCountKey, 0);
+        StarterHammerCount = PlayerPrefs.GetInt(StarterHammerCountKey, 0);
     }
 
     void Start()
@@ -108,6 +193,11 @@ public class GameManager : MonoBehaviour
 
     void Update()
     {
+        if (CurrentState == GameState.Playing)
+        {
+            TickPowerupTimers();
+        }
+
         if (CurrentState == GameState.Start)
         {
             if (Input.GetKeyDown(KeyCode.Space))
@@ -145,6 +235,19 @@ public class GameManager : MonoBehaviour
         score = 0; // each run starts fresh — this was never reset, so score kept accumulating across retries
         UpdateScoreUI();
 
+        sessionCoins = 0;
+        magnetTimer = 0f;
+        boostTimer = 0f;
+        doubleTimer = 0f;
+        hammerCharges = 0;
+        SetBoostTrail(false);
+        if (magnetTimerText != null) magnetTimerText.SetActive(false);
+        if (boostTimerText != null) boostTimerText.SetActive(false);
+        if (doubleTimerText != null) doubleTimerText.SetActive(false);
+        if (hammerChargesWidget != null) hammerChargesWidget.SetActive(false);
+        UpdateCoinsUI();
+        RefreshStarterWidgets();
+
         if (startPanel != null) startPanel.SetActive(true);
         if (gameOverPanel != null) gameOverPanel.SetActive(false);
         if (scoreText != null) scoreText.SetActive(false);
@@ -158,6 +261,7 @@ public class GameManager : MonoBehaviour
         if (weather != null) weather.ResetWeather();
 
         if (pipeSpawner != null) pipeSpawner.StopSpawning();
+        if (itemSpawner != null) itemSpawner.StopSpawning();
 
         // Remove any pipes left over from a previous run.
         ClearExistingPipes();
@@ -185,6 +289,7 @@ public class GameManager : MonoBehaviour
         if (shopPanel != null) shopPanel.SetActive(screen == MenuScreen.Shop);
         if (questsPanel != null) questsPanel.SetActive(screen == MenuScreen.Quests);
         if (leaderboardPanel != null) leaderboardPanel.SetActive(screen == MenuScreen.Leaderboard);
+        if (screenBackdrop != null) screenBackdrop.SetActive(!onLobby);
 
         // Bird preview only shows on the Lobby screen.
         if (bird != null)
@@ -215,6 +320,16 @@ public class GameManager : MonoBehaviour
         {
             LeaderboardUI board = leaderboardPanel != null ? leaderboardPanel.GetComponent<LeaderboardUI>() : null;
             if (board != null) board.Refresh();
+        }
+        if (screen == MenuScreen.Quests)
+        {
+            PowerupUpgradeUI shop = questsPanel != null ? questsPanel.GetComponent<PowerupUpgradeUI>() : null;
+            if (shop != null) shop.Refresh();
+        }
+        if (screen == MenuScreen.Shop)
+        {
+            StarterPowerShopUI starterShop = shopPanel != null ? shopPanel.GetComponent<StarterPowerShopUI>() : null;
+            if (starterShop != null) starterShop.Refresh();
         }
 
         UpdateNavVisuals(screen);
@@ -293,12 +408,26 @@ public class GameManager : MonoBehaviour
         }
 
         if (pipeSpawner != null) pipeSpawner.StartSpawning();
+        if (itemSpawner != null) itemSpawner.StartSpawning();
 
         if (backgroundMusic != null && musicSource != null && !musicSource.isPlaying)
         {
             musicSource.clip = backgroundMusic;
             musicSource.volume = musicVolume;
             musicSource.Play();
+        }
+
+        if (ArmedStarter != StarterPower.None)
+        {
+            switch (ArmedStarter)
+            {
+                case StarterPower.Magnet: ActivateMagnet(); break;
+                case StarterPower.Boost: ActivateBoostForDuration(GetPowerupDuration(BoostLevel)); break;
+                case StarterPower.Double: ActivateDouble(); break;
+                case StarterPower.Hammer: ActivateHammer(); break;
+            }
+            ArmedStarter = StarterPower.None;
+            RefreshStarterWidgets();
         }
     }
 
@@ -316,11 +445,307 @@ public class GameManager : MonoBehaviour
 
     public float GetCurrentSpeedMultiplier()
     {
-        if (CurrentState == GameState.Start) return 1f; // Normal speed on start menu
+        float themeScale = 1f;
+        if (ThemeManager.Instance != null && ThemeManager.Instance.GetCurrentTheme() != null && ThemeManager.Instance.GetCurrentTheme().themeName.ToLower() == "mario")
+        {
+            themeScale = 0.62f; // Slower speed specifically for Mario theme
+        }
+
+        if (CurrentState == GameState.Start) return 1f * themeScale;
         
         int speedTier = score / 10;
         float multiplier = 1f + speedTier * 0.08f; // 8% speed increase per 10 score points
-        return Mathf.Min(multiplier, 1.48f); // Capped at +48% speed for playability
+        multiplier = Mathf.Min(multiplier, 1.48f);
+        if (IsBoostActive) multiplier *= BoostSpeedMultiplier;
+        return multiplier * themeScale;
+    }
+
+    // --- Coins & Power-ups ---
+
+    public static float GetPowerupDuration(int level)
+    {
+        switch (level)
+        {
+            case 1: return 5f;
+            case 2: return 7f;
+            case 3: return 9f;
+            case 4: return 11f;
+            default: return 15f; // level 5 (max)
+        }
+    }
+
+    public void AddCoins(int amount)
+    {
+        int actual = IsDoubleActive ? amount * 2 : amount;
+        sessionCoins += actual;
+        UpdateCoinsUI();
+    }
+
+    public void ActivateMagnet()
+    {
+        magnetTimer = GetPowerupDuration(MagnetLevel);
+        UpdateTimerUI(magnetTimerText, magnetTimer);
+    }
+
+    public void ActivateBoost()
+    {
+        ActivateBoostForDuration(GetPowerupDuration(BoostLevel));
+    }
+
+    private void ActivateBoostForDuration(float duration)
+    {
+        boostTimer = duration;
+        UpdateTimerUI(boostTimerText, boostTimer);
+        SetBoostTrail(true);
+    }
+
+    public void ActivateDouble()
+    {
+        doubleTimer = GetPowerupDuration(DoubleLevel);
+        UpdateTimerUI(doubleTimerText, doubleTimer);
+    }
+
+    /// <summary>Hammer is charge-based, not a timer — one charge destroys the next pipe touched.</summary>
+    public void ActivateHammer()
+    {
+        hammerCharges++;
+        UpdateHammerUI();
+    }
+
+    /// <summary>Called from BirdController when the bird touches a pipe — consumes one charge if available.</summary>
+    public bool TryConsumeHammerCharge()
+    {
+        if (hammerCharges <= 0) return false;
+        hammerCharges--;
+        UpdateHammerUI();
+        return true;
+    }
+
+    private void UpdateHammerUI()
+    {
+        if (hammerChargesWidget == null) return;
+        hammerChargesWidget.SetActive(hammerCharges > 0);
+        if (hammerCharges <= 0) return;
+
+        Transform numberTrans = hammerChargesWidget.transform.Find("Number");
+        if (numberTrans == null) return;
+        UnityEngine.UI.Text numberText = numberTrans.GetComponent<UnityEngine.UI.Text>();
+        if (numberText != null) numberText.text = hammerCharges.ToString();
+    }
+
+    private void SetBoostTrail(bool active)
+    {
+        // Skipping Die() in HandleImpact alone isn't real invulnerability — the bird's Dynamic
+        // Rigidbody2D still physically collides with the pipe's solid BoxCollider2D and gets
+        // shoved/flung off-screen. Ignoring the layer pair suppresses that contact entirely.
+        int birdLayer = LayerMask.NameToLayer("Bird");
+        int obstacleLayer = LayerMask.NameToLayer("Obstacle");
+        if (birdLayer >= 0 && obstacleLayer >= 0) Physics2D.IgnoreLayerCollision(birdLayer, obstacleLayer, active);
+
+        if (bird == null) return;
+        BirdController birdController = bird.GetComponent<BirdController>();
+        if (birdController != null) birdController.SetBoostTrailActive(active);
+    }
+
+    private void TickPowerupTimers()
+    {
+        if (magnetTimer > 0f)
+        {
+            magnetTimer -= Time.deltaTime;
+            if (magnetTimer <= 0f) { magnetTimer = 0f; if (magnetTimerText != null) magnetTimerText.SetActive(false); }
+            else UpdateTimerUI(magnetTimerText, magnetTimer);
+        }
+
+        if (boostTimer > 0f)
+        {
+            boostTimer -= Time.deltaTime;
+            if (boostTimer <= 0f)
+            {
+                boostTimer = 0f;
+                if (boostTimerText != null) boostTimerText.SetActive(false);
+                SetBoostTrail(false);
+            }
+            else UpdateTimerUI(boostTimerText, boostTimer);
+        }
+
+        if (doubleTimer > 0f)
+        {
+            doubleTimer -= Time.deltaTime;
+            if (doubleTimer <= 0f) { doubleTimer = 0f; if (doubleTimerText != null) doubleTimerText.SetActive(false); }
+            else UpdateTimerUI(doubleTimerText, doubleTimer);
+        }
+    }
+
+    /// <summary>Updates the countdown number on an icon+number power-up indicator (see BuildTimerIndicator).</summary>
+    private void UpdateTimerUI(GameObject go, float secondsLeft)
+    {
+        if (go == null) return;
+        if (!go.activeSelf) go.SetActive(true);
+        Transform numberTrans = go.transform.Find("Number");
+        if (numberTrans == null) return;
+        UnityEngine.UI.Text numberText = numberTrans.GetComponent<UnityEngine.UI.Text>();
+        if (numberText != null) numberText.text = secondsLeft.ToString("F1");
+    }
+
+    /// <summary>Cost to go from the given level to level+1. Levels 1-5, so 4 upgrade steps.</summary>
+    public int GetUpgradeCost(int currentLevel)
+    {
+        switch (currentLevel)
+        {
+            case 1: return 100;
+            case 2: return 250;
+            case 3: return 500;
+            case 4: return 1000;
+            default: return -1; // already max (level 5)
+        }
+    }
+
+    public bool UpgradeMagnet()
+    {
+        int cost = GetUpgradeCost(MagnetLevel);
+        if (cost < 0 || TotalCoins < cost) return false;
+        TotalCoins -= cost;
+        MagnetLevel++;
+        PlayerPrefs.SetInt(TotalCoinsKey, TotalCoins);
+        PlayerPrefs.SetInt(MagnetLevelKey, MagnetLevel);
+        PlayerPrefs.Save();
+        return true;
+    }
+
+    public bool UpgradeBoost()
+    {
+        int cost = GetUpgradeCost(BoostLevel);
+        if (cost < 0 || TotalCoins < cost) return false;
+        TotalCoins -= cost;
+        BoostLevel++;
+        PlayerPrefs.SetInt(TotalCoinsKey, TotalCoins);
+        PlayerPrefs.SetInt(BoostLevelKey, BoostLevel);
+        PlayerPrefs.Save();
+        return true;
+    }
+
+    public bool UpgradeDouble()
+    {
+        int cost = GetUpgradeCost(DoubleLevel);
+        if (cost < 0 || TotalCoins < cost) return false;
+        TotalCoins -= cost;
+        DoubleLevel++;
+        PlayerPrefs.SetInt(TotalCoinsKey, TotalCoins);
+        PlayerPrefs.SetInt(DoubleLevelKey, DoubleLevel);
+        PlayerPrefs.Save();
+        return true;
+    }
+
+    /// <summary>Hooked up to each Shop "BUY" button — one purchase adds one charge of that power.</summary>
+    public bool BuyStarterCharge(StarterPower type)
+    {
+        PlayClickSound();
+        if (type == StarterPower.None || TotalCoins < StarterPurchaseCost) return false;
+
+        TotalCoins -= StarterPurchaseCost;
+        PlayerPrefs.SetInt(TotalCoinsKey, TotalCoins);
+        AdjustStarterCount(type, +1);
+        PlayerPrefs.Save();
+        UpdateCoinsUI();
+        RefreshStarterWidgets();
+        return true;
+    }
+
+    /// <summary>Int overload so this can be wired via UnityEventTools.AddIntPersistentListener at scene-build time.</summary>
+    public void BuyStarterCharge(int typeIndex)
+    {
+        BuyStarterCharge((StarterPower)typeIndex);
+    }
+
+    /// <summary>Hooked up to each Lobby icon — arms/un-arms a starter power for the next run, consuming/refunding a charge.</summary>
+    public void ToggleArmedStarter(StarterPower type)
+    {
+        PlayClickSound();
+        if (type == StarterPower.None) return;
+
+        if (ArmedStarter == type)
+        {
+            AdjustStarterCount(type, +1);
+            ArmedStarter = StarterPower.None;
+        }
+        else
+        {
+            if (ArmedStarter != StarterPower.None)
+            {
+                AdjustStarterCount(ArmedStarter, +1);
+                ArmedStarter = StarterPower.None;
+            }
+            if (GetStarterCount(type) > 0)
+            {
+                AdjustStarterCount(type, -1);
+                ArmedStarter = type;
+            }
+        }
+        PlayerPrefs.Save();
+        RefreshStarterWidgets();
+    }
+
+    /// <summary>Int overload so this can be wired via UnityEventTools.AddIntPersistentListener at scene-build time.</summary>
+    public void ToggleArmedStarter(int typeIndex)
+    {
+        ToggleArmedStarter((StarterPower)typeIndex);
+    }
+
+    private int GetStarterCount(StarterPower type)
+    {
+        switch (type)
+        {
+            case StarterPower.Magnet: return StarterMagnetCount;
+            case StarterPower.Boost: return StarterBoostCount;
+            case StarterPower.Double: return StarterDoubleCount;
+            case StarterPower.Hammer: return StarterHammerCount;
+            default: return 0;
+        }
+    }
+
+    private void AdjustStarterCount(StarterPower type, int delta)
+    {
+        switch (type)
+        {
+            case StarterPower.Magnet: StarterMagnetCount += delta; PlayerPrefs.SetInt(StarterMagnetCountKey, StarterMagnetCount); break;
+            case StarterPower.Boost: StarterBoostCount += delta; PlayerPrefs.SetInt(StarterBoostCountKey, StarterBoostCount); break;
+            case StarterPower.Double: StarterDoubleCount += delta; PlayerPrefs.SetInt(StarterDoubleCountKey, StarterDoubleCount); break;
+            case StarterPower.Hammer: StarterHammerCount += delta; PlayerPrefs.SetInt(StarterHammerCountKey, StarterHammerCount); break;
+        }
+    }
+
+    /// <summary>Updates the 3 Lobby icon+count widgets — call after any change to counts or the armed selection.</summary>
+    public void RefreshStarterWidgets()
+    {
+        UpdateStarterWidget(starterMagnetWidget, StarterMagnetCount, ArmedStarter == StarterPower.Magnet);
+        UpdateStarterWidget(starterBoostWidget, StarterBoostCount, ArmedStarter == StarterPower.Boost);
+        UpdateStarterWidget(starterDoubleWidget, StarterDoubleCount, ArmedStarter == StarterPower.Double);
+        UpdateStarterWidget(starterHammerWidget, StarterHammerCount, ArmedStarter == StarterPower.Hammer);
+    }
+
+    private void UpdateStarterWidget(GameObject widget, int count, bool armed)
+    {
+        if (widget == null) return;
+
+        Transform countTrans = widget.transform.Find("Count");
+        if (countTrans != null)
+        {
+            UnityEngine.UI.Text countText = countTrans.GetComponent<UnityEngine.UI.Text>();
+            if (countText != null) countText.text = "x" + count;
+        }
+
+        UnityEngine.UI.Outline outline = widget.GetComponent<UnityEngine.UI.Outline>();
+        if (outline != null)
+        {
+            outline.effectColor = armed ? new Color(0.95f, 0.72f, 0.15f) : new Color(0.35f, 0.35f, 0.4f);
+            outline.effectDistance = armed ? new Vector2(4f, -4f) : new Vector2(2f, -2f);
+        }
+        widget.transform.localScale = armed ? new Vector3(1.08f, 1.08f, 1f) : Vector3.one;
+    }
+
+    private void UpdateCoinsUI()
+    {
+        SetText(coinsText, (TotalCoins + sessionCoins).ToString());
     }
 
     private Coroutine gameOverCoroutine;
@@ -331,6 +756,7 @@ public class GameManager : MonoBehaviour
 
         CurrentState = GameState.GameOver;
         if (pipeSpawner != null) pipeSpawner.StopSpawning();
+        if (itemSpawner != null) itemSpawner.StopSpawning();
         if (musicSource != null) musicSource.Stop();
 
         // Trigger camera shake to add feedback on impact
@@ -338,6 +764,15 @@ public class GameManager : MonoBehaviour
 
         // Hide top-right score counter when Game Over card displays
         if (scoreText != null) scoreText.SetActive(false);
+
+        // Bank this run's coins into the persistent total.
+        if (sessionCoins > 0)
+        {
+            TotalCoins += sessionCoins;
+            PlayerPrefs.SetInt(TotalCoinsKey, TotalCoins);
+            PlayerPrefs.Save();
+        }
+        SetBoostTrail(false);
 
         // Update + persist the best score before showing the panel, so it's
         // always accurate the instant the run ends.
@@ -385,6 +820,7 @@ public class GameManager : MonoBehaviour
 
         SetText(gameOverScoreText, "0");
         SetText(gameOverBestText, bestScore.ToString());
+        SetText(gameOverCoinsText, sessionCoins.ToString());
 
         // Slide card up
         float duration = 0.5f;
@@ -569,11 +1005,11 @@ public class GameManager : MonoBehaviour
         SetMenuScreen(CurrentScreen == MenuScreen.Heroes ? MenuScreen.Lobby : MenuScreen.Heroes);
     }
 
-    private static readonly string[] HeroWorldNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja" };
+    private static readonly string[] HeroWorldNames = { "Classic", "Space", "Football", "Dragon", "Fish", "Bee", "Ninja", "Mario", "Mars" };
 
     /// <summary>
     /// Hooked up to every card in the all-worlds Heroes roster. globalIndex is (worldIndex*3 + skinIndex),
-    /// covering all 7 worlds x 3 skins = 21 heroes. Fully independent of the selected World —
+    /// covering all 9 worlds x 3 skins = 27 heroes. Fully independent of the selected World —
     /// picking a hero here never changes which world/environment is active, and vice versa.
     /// </summary>
     private const string SelectedHeroKey = "FlappyBird_SelectedHeroGlobal";
@@ -603,10 +1039,10 @@ public class GameManager : MonoBehaviour
         if (headerTextTrans != null)
         {
             UnityEngine.UI.Text headerText = headerTextTrans.GetComponent<UnityEngine.UI.Text>();
-            if (headerText != null) headerText.text = "HEROES (" + (currentGlobal + 1) + "/21)";
+            if (headerText != null) headerText.text = "HEROES (" + (currentGlobal + 1) + "/27)";
         }
 
-        // Update the selected-state outline/scale/checkmark on all 21 cards (names/sprites are
+        // Update the selected-state outline/scale/checkmark on all 27 cards (names/sprites are
         // baked in at build time since the roster never changes).
         for (int t = 0; t < HeroWorldNames.Length; t++)
         {
@@ -645,6 +1081,21 @@ public class GameManager : MonoBehaviour
         if (CurrentState != GameState.Start) return;
 
         SetMenuScreen(CurrentScreen == MenuScreen.Worlds ? MenuScreen.Lobby : MenuScreen.Worlds);
+    }
+
+    public void OnCenterNavClicked()
+    {
+        PlayClickSound();
+        if (CurrentState != GameState.Start) return;
+
+        if (CurrentScreen != MenuScreen.Lobby)
+        {
+            SetMenuScreen(MenuScreen.Lobby);
+        }
+        else
+        {
+            StartGame();
+        }
     }
 
     public void OnLeaderboardClicked()
@@ -700,10 +1151,16 @@ public class GameManager : MonoBehaviour
 
             if (navIndicator != null)
             {
+                // Soft translucent capsule highlight behind active icon
+                UnityEngine.UI.Image indImg = navIndicator.GetComponent<UnityEngine.UI.Image>();
+                if (indImg != null)
+                {
+                    indImg.color = new Color(1f, 1f, 1f, 0.16f);
+                }
+
                 RectTransform targetRt = targetBtn.GetComponent<RectTransform>();
                 Vector2 targetPos = targetRt.anchoredPosition;
-                if (isCenter) targetPos.y += 10f;
-                Vector2 targetSize = isCenter ? new Vector2(180, 130) : new Vector2(120, 110);
+                Vector2 targetSize = new Vector2(116, 106);
 
                 if (navIndicator.anchoredPosition == Vector2.zero) // Snap on first layout
                 {
@@ -741,43 +1198,65 @@ public class GameManager : MonoBehaviour
     private void SetNavButtonActive(UnityEngine.UI.Button btn, bool active, bool isCenter)
     {
         if (btn == null) return;
-        float targetScale = active ? 1.15f : (isCenter ? 0.9f : 1f);
-        btn.transform.localScale = new Vector3(targetScale, targetScale, 1f);
+
+        // Find MenuThemeConfig for our custom neon theme variables
+        MenuThemeConfig themeConfig = FindFirstObjectByType<MenuThemeConfig>();
 
         Color activeColor = Color.white;
-        if (ThemeManager.Instance != null)
+        if (themeConfig != null)
         {
-            ThemeData currentTheme = ThemeManager.Instance.GetCurrentTheme();
-            if (currentTheme != null)
+            activeColor = themeConfig.playButtonColor;
+        }
+
+        RectTransform rt = btn.GetComponent<RectTransform>();
+        if (rt != null)
+        {
+            // Keep button size uniform and flat at Y: 0 (Liquid Glass style)
+            rt.sizeDelta = new Vector2(100, 100);
+            rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, 0f);
+        }
+
+        // All navigation buttons have transparent backgrounds at all times.
+        // The ActiveIndicator (frosted glass capsule) provides the active highlight background behind them.
+        btn.image.color = Color.clear;
+        btn.image.sprite = null;
+        
+        Outline outline = btn.GetComponent<Outline>();
+        if (outline != null) outline.enabled = false;
+
+        // 1. Style the child icon (Play, Home, Shop, Heroes, Quests, Worlds)
+        Transform iconTrans = btn.transform.Find("Icon");
+        if (iconTrans != null)
+        {
+            RectTransform iconRt = iconTrans.GetComponent<RectTransform>();
+            if (iconRt != null)
             {
-                activeColor = currentTheme.themeColor;
-                float h, s, v;
-                Color.RGBToHSV(activeColor, out h, out s, out v);
-                s = Mathf.Max(s, 0.75f);
-                v = Mathf.Max(v, 0.95f);
-                activeColor = Color.HSVToRGB(h, s, v);
+                iconRt.sizeDelta = active ? new Vector2(100, 100) : new Vector2(82, 82);
+            }
+
+            UnityEngine.UI.Image img = iconTrans.GetComponent<UnityEngine.UI.Image>();
+            if (img != null)
+            {
+                // Active colorful icon is fully colored (white tint), inactive is faded/desaturated (grey tint)
+                img.color = active ? Color.white : new Color(0.6f, 0.6f, 0.6f, 0.75f);
             }
         }
 
-        if (isCenter)
+        // 2. Style the label text
+        Transform labelTrans = btn.transform.Find("Label");
+        if (labelTrans != null)
         {
-            // Keeps its yellow branding, but visibly fades when it's not the active tab
-            // (Play, on Lobby) instead of always reading as highlighted.
-            Color c = btn.image.color;
-            btn.image.color = new Color(c.r, c.g, c.b, active ? 1f : 0.55f);
-        }
-        else
-        {
-            btn.image.color = active ? Color.white : new Color(0.6f, 0.6f, 0.6f, 0.8f);
-
-            Transform labelTrans = btn.transform.Find("Label");
-            if (labelTrans != null)
+            UnityEngine.UI.Text txt = labelTrans.GetComponent<UnityEngine.UI.Text>();
+            if (txt != null)
             {
-                UnityEngine.UI.Text txt = labelTrans.GetComponent<UnityEngine.UI.Text>();
-                if (txt != null)
+                txt.color = active ? activeColor : new Color(0.7f, 0.7f, 0.7f, 0.8f);
+                txt.fontStyle = active ? FontStyle.Bold : FontStyle.Normal;
+
+                RectTransform labelRt = labelTrans.GetComponent<RectTransform>();
+                if (labelRt != null)
                 {
-                    txt.color = active ? activeColor : new Color(0.7f, 0.7f, 0.7f, 0.8f);
-                    txt.fontStyle = active ? FontStyle.Bold : FontStyle.Normal;
+                    // Fixed flat Y position below the icon
+                    labelRt.anchoredPosition = new Vector2(0, -38f);
                 }
             }
         }

@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a931a1a2c4a43619a4ec184579a944, type: 3}
+  m_Name: MarioTheme
+  m_EditorClassIdentifier: Assembly-CSharp::ThemeData
+  themeName: Mario
+  themeColor: {r: 0.36, g: 0.58, b: 0.98, a: 1}
+  playerSprites:
+  - {fileID: 21300000, guid: cda66063ce10c4bf98c33b2448e1d021, type: 3}
+  - {fileID: 21300000, guid: 72ad94086505941a9870d6750d66ab2a, type: 3}
+  - {fileID: 21300000, guid: 3566fb47efa004ccab67c97821738a29, type: 3}
+  obstacleTopSprite: {fileID: 21300000, guid: 3c9e891294a8f47c5bc9250d9c15b547, type: 3}
+  obstacleBottomSprite: {fileID: 21300000, guid: 233572dad637c446bb9d0bb8e0775d9b, type: 3}
+  obstacleTopCapSprite: {fileID: 0}
+  obstacleBottomCapSprite: {fileID: 21300000, guid: 7ed86a63a673144e9b1c4dbe3f6e662b, type: 3}
+  backgroundSprite: {fileID: 21300000, guid: f8d325c6039b240688a0c8cf4f8f021c, type: 3}
+  groundDirtSprite: {fileID: 21300000, guid: 4d4c08186043a45beb2acb22834baa9e, type: 3}
+  groundGrassSprite: {fileID: 21300000, guid: cab8b5af86b9b42fe9d1a825980ee7f0, type: 3}
+  flapSound: {fileID: 8300000, guid: 5416899b0017c45c380689db898528b3, type: 3}
+  scoreSound: {fileID: 8300000, guid: fe31ad2b8bb7541ee8ec3cda337b725e, type: 3}
+  hitSound: {fileID: 8300000, guid: 898877ff2a88247ea8d8d647fae5f894, type: 3}
+  backgroundMusic: {fileID: 0}

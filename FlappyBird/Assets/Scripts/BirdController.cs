@@ -63,6 +63,7 @@ public class BirdController : MonoBehaviour
     }
 
     private SpriteRenderer spriteRenderer;
+    private SpriteRenderer shadowSpriteRenderer; // Minor shadow for better visual separation
     private Rigidbody2D rb;
     private AudioSource audioSource;
     private Vector3 startPosition;
@@ -72,16 +73,48 @@ public class BirdController : MonoBehaviour
     private bool isIdle = true;
     private float idleTimeOffset;
 
+    private ParticleSystem trailParticles;
+    private float trailBaseRate;
+    private ParticleSystem.MinMaxGradient trailBaseColor;
+    private GameObject stormEffect;
+    private GameObject cometEffect;
+
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
         startPosition = transform.position;
 
+        Transform trailTrans = transform.Find("Trail");
+        if (trailTrans != null)
+        {
+            trailParticles = trailTrans.GetComponent<ParticleSystem>();
+            if (trailParticles != null)
+            {
+                trailBaseRate = trailParticles.emission.rateOverTime.constant;
+                trailBaseColor = trailParticles.main.startColor;
+            }
+        }
+
+        Transform stormTrans = transform.Find("BoostStorm");
+        if (stormTrans != null) stormEffect = stormTrans.gameObject;
+        Transform cometTrans = transform.Find("BoostComet");
+        if (cometTrans != null) cometEffect = cometTrans.gameObject;
+
         // Auto-add an AudioSource so sounds work without extra Inspector setup.
         audioSource = GetComponent<AudioSource>();
         if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
         audioSource.playOnAwake = false;
+
+        // Create the minor shadow SpriteRenderer
+        GameObject shadowGO = new GameObject("PlayerShadow");
+        shadowGO.transform.SetParent(transform, false);
+        // Minor offset down and back slightly
+        shadowGO.transform.localPosition = new Vector3(0.05f, -0.05f, 0.01f);
+        shadowGO.transform.localScale = Vector3.one;
+        shadowSpriteRenderer = shadowGO.AddComponent<SpriteRenderer>();
+        shadowSpriteRenderer.color = new Color(0f, 0f, 0f, 0.35f); // subtle dark shadow
+        shadowSpriteRenderer.sortingOrder = spriteRenderer != null ? spriteRenderer.sortingOrder - 1 : 29;
 
         // Randomizes the bob cycle slightly so a restarted bird doesn't look robotic.
         idleTimeOffset = Random.Range(0f, 10f);
@@ -125,6 +158,16 @@ public class BirdController : MonoBehaviour
 
         UpdateTilt();
         AnimateWings(animationSpeed);
+    }
+
+    void LateUpdate()
+    {
+        if (shadowSpriteRenderer != null && spriteRenderer != null)
+        {
+            shadowSpriteRenderer.sprite = spriteRenderer.sprite;
+            shadowSpriteRenderer.flipX = spriteRenderer.flipX;
+            shadowSpriteRenderer.flipY = spriteRenderer.flipY;
+        }
     }
 
     private void AnimateWings(float speed)
@@ -219,12 +262,42 @@ public class BirdController : MonoBehaviour
 
         if (other.CompareTag("Ground"))
         {
+            if (GameManager.Instance != null && GameManager.Instance.IsInvulnerable()) return; // Fast Boost active — same pass-through as pipes
             Land();
         }
         else if (other.CompareTag("Pipe") || other.CompareTag("Wall") || other.CompareTag("Ceiling"))
         {
+            if (other.CompareTag("Pipe") && GameManager.Instance != null && GameManager.Instance.TryConsumeHammerCharge())
+            {
+                BlastPipe(other.transform.parent != null ? other.transform.parent.gameObject : other);
+                return; // Hammer charge consumed — that pipe is destroyed, keep flying
+            }
+            if (GameManager.Instance != null && GameManager.Instance.IsInvulnerable()) return; // Fast Boost active — fly straight through
             Die();
         }
+    }
+
+    /// <summary>Hammer charge consumed on pipe contact — blow up the whole PipePair instead of dying.</summary>
+    private void BlastPipe(GameObject pipePairRoot)
+    {
+        SpawnBlastEffect(pipePairRoot.transform.position);
+        Destroy(pipePairRoot);
+    }
+
+    /// <summary>Intensifies the existing wing-flap trail into a dense golden spark trail while Fast Boost is active.</summary>
+    public void SetBoostTrailActive(bool active)
+    {
+        if (trailParticles == null) return;
+
+        var emission = trailParticles.emission;
+        emission.rateOverTime = active ? trailBaseRate * 6f : trailBaseRate;
+
+        var main = trailParticles.main;
+        main.startColor = active ? new ParticleSystem.MinMaxGradient(new Color(1f, 0.85f, 0.1f), new Color(1f, 0.6f, 0f)) : trailBaseColor;
+        main.startSize = active ? new ParticleSystem.MinMaxCurve(0.14f, 0.22f) : new ParticleSystem.MinMaxCurve(0.12f);
+
+        if (stormEffect != null) stormEffect.SetActive(active);
+        if (cometEffect != null) cometEffect.SetActive(active);
     }
 
     /// <summary>
@@ -284,8 +357,13 @@ public class BirdController : MonoBehaviour
 
     private void SpawnBlastEffect()
     {
+        SpawnBlastEffect(transform.position);
+    }
+
+    private void SpawnBlastEffect(Vector3 position)
+    {
         GameObject blast = new GameObject("PixelBlast");
-        blast.transform.position = transform.position;
+        blast.transform.position = position;
 
         ParticleSystem ps = blast.AddComponent<ParticleSystem>();
         ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear); // Stop default auto-play before editing parameters
