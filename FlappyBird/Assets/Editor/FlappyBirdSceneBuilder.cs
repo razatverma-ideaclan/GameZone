@@ -4019,40 +4019,38 @@ public static class FlappyBirdSceneBuilder
                 hatch = new Color(0.28f, 0.25f, 0.22f);
                 lineColor = new Color(0.12f, 0.1f, 0.08f);
             }
-            else if (index == 7) // Mario
+            else if (index == 7) // Mario — same clean staggered brick pattern used on the Mario pipes
+                                  // (offset rows of solid blocks with a dark border + top-left highlight),
+                                  // instead of the busier diagonal cross-hatch bricks used previously.
             {
-                Color baseCol = new Color(0.85f, 0.35f, 0.12f);       // orange-brown
-                Color darkLine = new Color(0.12f, 0.05f, 0.02f);      // dark brown border
-                Color highlightCol = new Color(0.98f, 0.85f, 0.7f);   // white/beige highlight
-                Color shadowCol = new Color(0.55f, 0.2f, 0.05f);      // dark brown shadow
+                Color brickCol = new Color(0.85f, 0.35f, 0.12f);
+                Color brickShadow = new Color(0.5f, 0.15f, 0.05f);
+                Color brickHighlight = new Color(0.98f, 0.6f, 0.45f);
 
                 for (int y = 0; y < height; y++)
                 {
                     for (int x = 0; x < width; x++)
                     {
-                        int bx = x % 32;
-                        int by = y % 32;
+                        int rowHeight = height / 4;
+                        int row = y / rowHeight;
+                        int colWidth = width / 2;
+                        int colOffset = (row % 2 == 0) ? 0 : colWidth / 2;
 
-                        Color px = baseCol;
+                        int localY = y % rowHeight;
+                        int localX = (x + colOffset) % colWidth;
 
-                        if (bx == 0 || bx == 31 || by == 0 || by == 31)
+                        Color px;
+                        if (localY == 0 || localY == rowHeight - 1 || localX == 0 || localX == colWidth - 1)
                         {
-                            px = darkLine;
+                            px = brickShadow;
                         }
-                        else if ((bx <= 3 && by >= 29) || (bx <= 3 && bx == (31 - by)) || (by >= 29 && bx == by))
+                        else if (localY == 1 || localX == 1)
                         {
-                            px = highlightCol;
+                            px = brickHighlight;
                         }
-                        else if (bx >= 28 || by <= 3)
+                        else
                         {
-                            px = shadowCol;
-                        }
-                        else if ((bx >= 12 && bx <= 14 && by >= 10 && by <= 22) || 
-                                 (by >= 12 && by <= 14 && bx >= 10 && bx <= 22) ||
-                                 (bx >= 20 && bx <= 22 && by >= 16 && by <= 26) ||
-                                 (by >= 20 && by <= 22 && bx >= 16 && bx <= 26))
-                        {
-                            px = darkLine;
+                            px = brickCol;
                         }
 
                         tex.SetPixel(x, y, px);
@@ -4197,51 +4195,13 @@ public static class FlappyBirdSceneBuilder
                 tex.Apply();
                 return tex;
             }
-            else if (index == 7) // Mario: custom repeating blocky tiles with a flat top black rim
+            else if (index == 7) // Mario: real green grass cap sitting on top of the brick floor
+                                  // (matches other themes' look — was previously a busy diagonal
+                                  // brick pattern here too, so the "grass" never looked like grass).
             {
-                Color baseCol = new Color(0.85f, 0.35f, 0.12f);       // orange-brown
-                Color darkLine = new Color(0.12f, 0.05f, 0.02f);      // dark brown border
-                Color highlightCol = new Color(0.98f, 0.85f, 0.7f);   // white/beige highlight
-                Color shadowCol = new Color(0.55f, 0.2f, 0.05f);      // dark brown shadow
-
-                for (int y = 0; y < height; y++)
-                {
-                    for (int x = 0; x < width; x++)
-                    {
-                        int bx = x % 32;
-                        int by = y % 32;
-
-                        Color px = baseCol;
-
-                        if (y >= height - 4)
-                        {
-                            px = darkLine;
-                        }
-                        else if (bx == 0 || bx == 31 || by == 0 || by == 31)
-                        {
-                            px = darkLine;
-                        }
-                        else if ((bx <= 3 && by >= 29) || (bx <= 3 && bx == (31 - by)) || (by >= 29 && bx == by))
-                        {
-                            px = highlightCol;
-                        }
-                        else if (bx >= 28 || by <= 3)
-                        {
-                            px = shadowCol;
-                        }
-                        else if ((bx >= 12 && bx <= 14 && by >= 10 && by <= 22) || 
-                                 (by >= 12 && by <= 14 && bx >= 10 && bx <= 22) ||
-                                 (bx >= 20 && bx <= 22 && by >= 16 && by <= 26) ||
-                                 (by >= 20 && by <= 22 && bx >= 16 && bx <= 26))
-                        {
-                            px = darkLine;
-                        }
-
-                        tex.SetPixel(x, y, px);
-                    }
-                }
-                tex.Apply();
-                return tex;
+                grass = new Color(0.0f, 0.72f, 0.0f);          // classic Mario green
+                grassHighlight = new Color(0.35f, 0.9f, 0.25f);
+                grassShadow = new Color(0.0f, 0.5f, 0.0f);
             }
 
             int toothWidth = Mathf.Max(4, width / 16);
