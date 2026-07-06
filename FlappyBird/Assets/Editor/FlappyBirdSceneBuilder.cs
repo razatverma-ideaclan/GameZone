@@ -95,7 +95,10 @@ public static class FlappyBirdSceneBuilder
 
         // Dedicated 9-sliced pill for the bottom nav bar — white fill so it can be tinted via Image.color,
         // with a border baked in so the rounded corners stay crisp at ANY bar width/height (no stretch distortion).
-        Sprite navBarSprite = GetOrCreateSprite("NavBarPill", 240, 160, (w, h) => GenerateRoundedRectTexture(w, h, 36, Color.white, new Color(1f, 1f, 1f, 0.5f), 3), 240, FilterMode.Bilinear, TextureWrapMode.Clamp, new Vector4(40, 40, 40, 40));
+        // Subtle vertical gradient baked in (lighter near the top, darker near the bottom) so the
+        // bar reads as a glossy premium pill instead of a flat single-tone fill once Image.color
+        // tints it — the gradient's relative light/dark shape survives the tint multiply.
+        Sprite navBarSprite = GetOrCreateSprite("NavBarPill", 240, 160, (w, h) => GenerateGradientRoundedRectTexture(w, h, 36, new Color(1f, 1f, 1f, 1f), new Color(0.55f, 0.55f, 0.55f, 1f), new Color(1f, 1f, 1f, 0.5f), 3), 240, FilterMode.Bilinear, TextureWrapMode.Clamp, new Vector4(40, 40, 40, 40));
         Sprite navIndicatorSprite = GetOrCreateSprite("NavIndicatorPill", 160, 160, (w, h) => GenerateRoundedRectTexture(w, h, 44, Color.white, new Color(1f, 1f, 1f, 0.5f), 0), 160, FilterMode.Bilinear, TextureWrapMode.Clamp, new Vector4(44, 44, 44, 44));
         
         // Shiny metallic medals with gradient, shadow, and embossing
@@ -530,6 +533,43 @@ public static class FlappyBirdSceneBuilder
             for (int x = 0; x < width; x++)
             {
                 tex.SetPixel(x, y, col);
+            }
+        }
+        tex.Apply();
+        return tex;
+    }
+
+    /// <summary>
+    /// Same shape as GenerateRoundedRectTexture, but the fill is a vertical gradient
+    /// (topColor at the top edge, bottomColor at the bottom edge) instead of a flat
+    /// color — used for the bottom nav bar so it reads as a glossy pill rather than
+    /// a flat single-tone fill once Image.color tints it.
+    /// </summary>
+    private static Texture2D GenerateGradientRoundedRectTexture(int width, int height, int radius, Color topColor, Color bottomColor, Color border, int borderWidth)
+    {
+        Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        Color clear = new Color(0, 0, 0, 0);
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                bool inside = IsInsideRoundedRect(x, y, width, height, radius);
+                bool insideInner = IsInsideRoundedRect(x, y, width, height, Mathf.Max(1, radius - borderWidth), borderWidth);
+                Color pixel = clear;
+                if (inside)
+                {
+                    if (insideInner)
+                    {
+                        float t = (float)y / Mathf.Max(1, height - 1);
+                        pixel = Color.Lerp(bottomColor, topColor, t);
+                    }
+                    else
+                    {
+                        pixel = border;
+                    }
+                }
+                tex.SetPixel(x, y, pixel);
             }
         }
         tex.Apply();
@@ -4853,9 +4893,59 @@ public static class FlappyBirdSceneBuilder
             }
         }
 
+        // Every hero (across all 9 worlds x 3 skins) gets the same dark outline stroke the
+        // classic yellow/blue/red birds already have — drawn generically by detecting any
+        // transparent pixel touching an opaque one, so it works regardless of each hero's
+        // specific silhouette (rocket, UFO, ball, dragon, etc.) without custom per-shape code.
+        ApplyHeroOutline(tex, new Color(0.08f, 0.08f, 0.1f, 1f), 3);
+
         tex.Apply();
         return tex;
 
+    }
+
+    /// <summary>
+    /// Adds a solid outline around the opaque silhouette of a texture by scanning for
+    /// transparent pixels within `thickness` of any opaque pixel and filling them with
+    /// outlineColor. Works on any shape since it only looks at alpha, not geometry.
+    /// </summary>
+    private static void ApplyHeroOutline(Texture2D tex, Color outlineColor, int thickness)
+    {
+        int width = tex.width;
+        int height = tex.height;
+        Color[] original = tex.GetPixels();
+        Color[] result = (Color[])original.Clone();
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int idx = y * width + x;
+                if (original[idx].a > 0.01f) continue; // only fill in currently-transparent pixels
+
+                bool nearOpaque = false;
+                for (int dy = -thickness; dy <= thickness && !nearOpaque; dy++)
+                {
+                    int ny = y + dy;
+                    if (ny < 0 || ny >= height) continue;
+                    for (int dx = -thickness; dx <= thickness; dx++)
+                    {
+                        int nx = x + dx;
+                        if (nx < 0 || nx >= width) continue;
+                        if (dx * dx + dy * dy > thickness * thickness) continue; // circular brush
+                        if (original[ny * width + nx].a > 0.01f)
+                        {
+                            nearOpaque = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (nearOpaque) result[idx] = outlineColor;
+            }
+        }
+
+        tex.SetPixels(result);
     }
 
     private static Texture2D GenerateIconTexture(string name, int w, int h)
@@ -4869,7 +4959,11 @@ public static class FlappyBirdSceneBuilder
 
         if (name == "Home")
         {
-            Color col = Color.white;
+            // Colorized to match the other nav icons (Shop/Heroes/Missions/Themes are all
+            // full-color) instead of a flat white silhouette that looked plain next to them.
+            Color roofRed = new Color(0.92f, 0.25f, 0.25f);
+            Color wallGold = new Color(0.95f, 0.78f, 0.35f);
+            Color doorBlue = new Color(0.12f, 0.35f, 0.68f);
             Vector2 a = new Vector2(w * 0.5f, h * 0.85f);
             Vector2 b = new Vector2(w * 0.15f, h * 0.5f);
             Vector2 c = new Vector2(w * 0.85f, h * 0.5f);
@@ -4881,16 +4975,20 @@ public static class FlappyBirdSceneBuilder
                     bool inRoof = PointInTriangle(p, a, b, c);
                     bool inBody = (x >= w * 0.22f && x <= w * 0.78f && y >= h * 0.15f && y <= h * 0.5f);
                     bool inChimney = (x >= w * 0.65f && x <= w * 0.75f && y >= h * 0.5f && y <= h * 0.8f);
-                    
-                    if (inRoof || inBody || inChimney)
+
+                    if (inRoof || inChimney)
                     {
-                        tex.SetPixel(x, y, col);
+                        tex.SetPixel(x, y, roofRed);
                     }
-                    
+                    else if (inBody)
+                    {
+                        tex.SetPixel(x, y, wallGold);
+                    }
+
                     // Stencil cutouts
                     if (x >= w * 0.43f && x <= w * 0.57f && y >= h * 0.15f && y <= h * 0.35f)
                     {
-                        tex.SetPixel(x, y, clear); // Doorway cutout
+                        tex.SetPixel(x, y, doorBlue); // Doorway
                     }
                     if (Vector2.Distance(p, new Vector2(w * 0.5f, h * 0.6f)) <= w * 0.07f)
                     {
@@ -5097,6 +5195,13 @@ public static class FlappyBirdSceneBuilder
         }
         else if (name == "Play")
         {
+            // Gradient-filled green triangle with a dark outline stroke so it reads clearly
+            // as a distinct, colorful "Play" action against ANY theme's nav bar background,
+            // instead of a flat white shape that washed out on busy/light themes.
+            Color gradientTop = new Color(0.55f, 0.95f, 0.35f);
+            Color gradientBottom = new Color(0.1f, 0.65f, 0.15f);
+            Color outlineCol = new Color(0.04f, 0.28f, 0.06f);
+
             Vector2 a = new Vector2(w * 0.32f, h * 0.72f);
             Vector2 b = new Vector2(w * 0.32f, h * 0.28f);
             Vector2 c = new Vector2(w * 0.72f, h * 0.5f);
@@ -5104,9 +5209,19 @@ public static class FlappyBirdSceneBuilder
             {
                 for (int x = 0; x < w; x++)
                 {
-                    if (PointInTriangle(new Vector2(x, y), a, b, c))
+                    Vector2 p = new Vector2(x, y);
+                    if (PointInTriangle(p, a, b, c))
                     {
-                        tex.SetPixel(x, y, Color.white);
+                        bool onOutline = !PointInTriangle(p, a + new Vector2(3f, -1f), b + new Vector2(3f, 1f), c + new Vector2(-4f, 0f));
+                        if (onOutline)
+                        {
+                            tex.SetPixel(x, y, outlineCol);
+                        }
+                        else
+                        {
+                            float t = Mathf.Clamp01((y - b.y) / (a.y - b.y));
+                            tex.SetPixel(x, y, Color.Lerp(gradientBottom, gradientTop, t));
+                        }
                     }
                 }
             }
