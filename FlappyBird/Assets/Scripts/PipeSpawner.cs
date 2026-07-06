@@ -52,6 +52,12 @@ public class PipeSpawner : MonoBehaviour
         }
     }
 
+    [Header("Safety")]
+    [Tooltip("If a coin/power-up is about to spawn within this distance of a new pipe (can happen right " +
+             "after Boost shortens both spawners' intervals at once), remove the item rather than delay " +
+             "the pipe — pipe timing drives difficulty/scoring and shouldn't be affected by item placement.")]
+    public float minItemClearance = 2f;
+
     private void SpawnPipe()
     {
         if (pipePairPrefab == null)
@@ -60,8 +66,23 @@ public class PipeSpawner : MonoBehaviour
             return;
         }
 
+        ClearNearbyItems();
+
         float gapY = Random.Range(minGapY, maxGapY);
         Vector3 spawnPos = new Vector3(spawnXPosition, gapY, 0f);
         Instantiate(pipePairPrefab, spawnPos, Quaternion.identity);
+    }
+
+    private void ClearNearbyItems()
+    {
+        CollectableItem[] items = FindObjectsOfType<CollectableItem>();
+        foreach (CollectableItem item in items)
+        {
+            if (item == null) continue;
+            if (Mathf.Abs(item.transform.position.x - spawnXPosition) < minItemClearance)
+            {
+                Destroy(item.gameObject);
+            }
+        }
     }
 }

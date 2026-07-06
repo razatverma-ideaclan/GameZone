@@ -273,7 +273,7 @@ public class ThemeApplier : MonoBehaviour
             MenuThemeConfig themeConfig = FindFirstObjectByType<MenuThemeConfig>();
             if (themeConfig != null)
             {
-                themeConfig.ApplyTheme();
+                themeConfig.ApplyTheme(theme);
                 return;
             }
 

@@ -10,7 +10,7 @@ public class MenuThemeConfig : MonoBehaviour
 {
     [Header("Color Configuration")]
     [Tooltip("Background color of panels and navigation bar.")]
-    public Color panelColor = new Color(0.08f, 0.09f, 0.12f, 0.88f); // charcoal dark blue
+    public Color panelColor = new Color(0.09f, 0.09f, 0.12f, 1.0f); // solid premium slate gray
     
     [Tooltip("Outline border glow color (neon cyan).")]
     public Color glowBorderColor = new Color(0.0f, 0.85f, 1.0f, 0.6f); // neon cyan
@@ -66,25 +66,51 @@ public class MenuThemeConfig : MonoBehaviour
     }
 #endif
 
-    public void ApplyTheme()
+    public void ApplyTheme(ThemeData theme = null)
     {
         GenerateTexturesIfNeeded();
+
+        // Automatically resolve current theme if not passed at runtime
+        if (theme == null && ThemeManager.Instance != null)
+        {
+            theme = ThemeManager.Instance.GetCurrentTheme();
+        }
 
         Sprite panelSprite = glassPanelOverride != null ? glassPanelOverride : generatedGlassPanel;
         Sprite outlineSprite = glowOutlineOverride != null ? glowOutlineOverride : generatedGlowOutline;
         Sprite playSprite = playButtonOverride != null ? playButtonOverride : generatedPlayButton;
         Sprite badgeSprite = pillBadgeOverride != null ? pillBadgeOverride : generatedPillBadge;
 
+        Color currentPanelColor = panelColor;
+        Color currentGlowColor = glowBorderColor;
+        Color currentTextColor = accentTextColor;
+
+        if (theme != null)
+        {
+            Color themeColor = theme.themeColor;
+            
+            // Outline border glow is a vibrant neon matching the theme
+            currentGlowColor = Color.Lerp(themeColor, Color.white, 0.35f);
+            currentGlowColor.a = 0.65f;
+            
+            // Text color matches the theme color
+            currentTextColor = Color.Lerp(themeColor, Color.white, 0.60f);
+        }
+
         // 1. Bottom Nav Bar Background & Outline
         if (bottomBarBg != null)
         {
             bottomBarBg.sprite = panelSprite;
-            bottomBarBg.color = panelColor;
+            bottomBarBg.color = currentPanelColor;
+            
+            // Disable legacy UI Outline component on the bar itself to prevent the white border line glitch
+            Outline legacyOutline = bottomBarBg.GetComponent<Outline>();
+            if (legacyOutline != null) legacyOutline.enabled = false;
         }
         if (bottomBarOutline != null)
         {
             bottomBarOutline.sprite = outlineSprite;
-            bottomBarOutline.color = glowBorderColor;
+            bottomBarOutline.color = currentGlowColor;
         }
 
         // 2. Center Play Button (Made transparent so the sliding ActiveIndicator circle acts as the background)
@@ -100,20 +126,20 @@ public class MenuThemeConfig : MonoBehaviour
         if (leaderboardButtonImage != null)
         {
             leaderboardButtonImage.sprite = panelSprite;
-            leaderboardButtonImage.color = panelColor;
+            leaderboardButtonImage.color = currentPanelColor;
             
             Outline outline = leaderboardButtonImage.GetComponent<Outline>();
-            if (outline != null) outline.effectColor = glowBorderColor;
+            if (outline != null) outline.effectColor = currentGlowColor;
         }
 
         // 4. Climb (Vertical Mode) Button
         if (verticalClimbButtonImage != null)
         {
             verticalClimbButtonImage.sprite = panelSprite;
-            verticalClimbButtonImage.color = panelColor;
+            verticalClimbButtonImage.color = currentPanelColor;
             
             Outline outline = verticalClimbButtonImage.GetComponent<Outline>();
-            if (outline != null) outline.effectColor = glowBorderColor;
+            if (outline != null) outline.effectColor = currentGlowColor;
         }
 
         // 4.5 style all buttons in the bottom bar automatically
@@ -157,10 +183,10 @@ public class MenuThemeConfig : MonoBehaviour
         }
 
         // 7. Update text colors inside badges
-        UpdateChildTextColors();
+        UpdateChildTextColors(currentTextColor);
     }
 
-    private void UpdateChildTextColors()
+    private void UpdateChildTextColors(Color accentColor)
     {
         if (leaderboardButtonImage != null)
         {
@@ -175,7 +201,7 @@ public class MenuThemeConfig : MonoBehaviour
         if (highScoreBadgeImage != null)
         {
             Text text = highScoreBadgeImage.GetComponentInChildren<Text>();
-            if (text != null) text.color = accentTextColor;
+            if (text != null) text.color = accentColor;
         }
     }
 
@@ -234,7 +260,7 @@ public class MenuThemeConfig : MonoBehaviour
                 else
                 {
                     // Translucent white base color for frosted glass
-                    float baseAlpha = 0.28f;
+                    float baseAlpha = 1.0f;
                     
                     // Specular bevel highlight along the top edge
                     float specular = 0f;

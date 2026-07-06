@@ -99,7 +99,7 @@ public class BackgroundAnimator : MonoBehaviour
                     }
                     else if (go.name.StartsWith("MarioGoomba"))
                     {
-                        go.transform.position = new Vector3(maxX, -5.3f, go.transform.position.z);
+                        go.transform.position = new Vector3(maxX, data.minY, go.transform.position.z);
                     }
                     else
                     {
@@ -256,7 +256,7 @@ public class BackgroundAnimator : MonoBehaviour
             for (int i = 0; i < 2; i++)
             {
                 GameObject goomba = new GameObject("MarioGoomba");
-                goomba.transform.SetParent(transform, false);
+                goomba.transform.SetParent(null);
                 SpriteRenderer gSr = goomba.AddComponent<SpriteRenderer>();
                 gSr.sprite = goombaSprite;
                 gSr.sortingOrder = 12; // Render in front of ground grass (11) to show Goomba face and feet!
@@ -267,7 +267,7 @@ public class BackgroundAnimator : MonoBehaviour
                 // = -5.35 visual surface), not the distant painted background hill — the hill
                 // artwork only reaches that height in three spots, so tying the Goomba to it made
                 // it look grounded near a hill but buried in the brick everywhere else.
-                const float goombaGroundY = -5.05f;
+                const float goombaGroundY = -5.25f;
                 goomba.transform.position = new Vector3(startX, goombaGroundY, 1.2f);
 
                 DriftData gDrift = goomba.AddComponent<DriftData>();
